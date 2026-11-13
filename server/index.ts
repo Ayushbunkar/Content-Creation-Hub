@@ -1088,7 +1088,13 @@ app.get('/api/clipper/projects/:id', async (req, res) => {
       clips: clips.map(c => ({
         ...c,
         custom_style: c.custom_style ? JSON.parse(c.custom_style) : {},
-        transcript_segments: c.transcript_segments ? JSON.parse(c.transcript_segments) : []
+        transcript_segments: c.transcript_segments ? JSON.parse(c.transcript_segments) : [],
+        virality_metrics: c.virality_metrics ? JSON.parse(c.virality_metrics) : null,
+        platform_metadata: c.platform_metadata ? JSON.parse(c.platform_metadata) : null,
+        thumbnail_concepts: c.thumbnail_concepts ? JSON.parse(c.thumbnail_concepts) : null,
+        broll_config: c.broll_config ? JSON.parse(c.broll_config) : null,
+        retention_optimizations: c.retention_optimizations ? JSON.parse(c.retention_optimizations) : null,
+        audio_settings: c.audio_settings ? JSON.parse(c.audio_settings) : null
       }))
     });
   } catch (err: any) {
@@ -1244,11 +1250,18 @@ app.put('/api/clipper/clips/:clipId', async (req, res) => {
       start_time,
       end_time,
       category,
+      aspect_ratio,
       reframing_mode,
       caption_template,
       caption_language,
       custom_style,
-      transcript_segments
+      transcript_segments,
+      virality_metrics,
+      platform_metadata,
+      thumbnail_concepts,
+      broll_config,
+      retention_optimizations,
+      audio_settings
     } = req.body;
 
     const start = start_time !== undefined ? parseFloat(start_time) : clip.start_time;
@@ -1264,11 +1277,18 @@ app.put('/api/clipper/clips/:clipId', async (req, res) => {
         end_time = ?,
         duration = ?,
         category = COALESCE(?, category),
+        aspect_ratio = COALESCE(?, aspect_ratio),
         reframing_mode = COALESCE(?, reframing_mode),
         caption_template = COALESCE(?, caption_template),
         caption_language = COALESCE(?, caption_language),
         custom_style = COALESCE(?, custom_style),
         transcript_segments = COALESCE(?, transcript_segments),
+        virality_metrics = COALESCE(?, virality_metrics),
+        platform_metadata = COALESCE(?, platform_metadata),
+        thumbnail_concepts = COALESCE(?, thumbnail_concepts),
+        broll_config = COALESCE(?, broll_config),
+        retention_optimizations = COALESCE(?, retention_optimizations),
+        audio_settings = COALESCE(?, audio_settings),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `, [
@@ -1279,11 +1299,18 @@ app.put('/api/clipper/clips/:clipId', async (req, res) => {
       end,
       duration,
       category !== undefined ? category : null,
+      aspect_ratio !== undefined ? aspect_ratio : null,
       reframing_mode !== undefined ? reframing_mode : null,
       caption_template !== undefined ? caption_template : null,
       caption_language !== undefined ? caption_language : null,
       custom_style ? JSON.stringify(custom_style) : null,
       transcript_segments ? JSON.stringify(transcript_segments) : null,
+      virality_metrics ? JSON.stringify(virality_metrics) : null,
+      platform_metadata ? JSON.stringify(platform_metadata) : null,
+      thumbnail_concepts ? JSON.stringify(thumbnail_concepts) : null,
+      broll_config ? JSON.stringify(broll_config) : null,
+      retention_optimizations ? JSON.stringify(retention_optimizations) : null,
+      audio_settings ? JSON.stringify(audio_settings) : null,
       clipId
     ]);
 
@@ -1292,7 +1319,13 @@ app.put('/api/clipper/clips/:clipId', async (req, res) => {
       clip: {
         ...updated,
         custom_style: updated.custom_style ? JSON.parse(updated.custom_style) : {},
-        transcript_segments: updated.transcript_segments ? JSON.parse(updated.transcript_segments) : []
+        transcript_segments: updated.transcript_segments ? JSON.parse(updated.transcript_segments) : [],
+        virality_metrics: updated.virality_metrics ? JSON.parse(updated.virality_metrics) : null,
+        platform_metadata: updated.platform_metadata ? JSON.parse(updated.platform_metadata) : null,
+        thumbnail_concepts: updated.thumbnail_concepts ? JSON.parse(updated.thumbnail_concepts) : null,
+        broll_config: updated.broll_config ? JSON.parse(updated.broll_config) : null,
+        retention_optimizations: updated.retention_optimizations ? JSON.parse(updated.retention_optimizations) : null,
+        audio_settings: updated.audio_settings ? JSON.parse(updated.audio_settings) : null
       }
     });
   } catch (err: any) {

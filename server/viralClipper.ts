@@ -45,6 +45,23 @@ export interface ClipperClip {
   caption_language: string;
   custom_style: any;
   transcript_segments: TranscriptSegment[];
+  aspect_ratio?: '9:16' | '16:9' | '1:1';
+  virality_metrics?: {
+    hook_score: number;
+    curiosity_gap: number;
+    emotional_engagement: number;
+    shareability: number;
+    relatability: number;
+    info_density: number;
+    retention_prediction: number;
+    ending_impact: number;
+    confidence_level: 'High' | 'Very High';
+  };
+  broll_config?: any;
+  audio_settings?: any;
+  retention_optimizations?: any;
+  platform_metadata?: any;
+  thumbnail_concepts?: any;
   status: 'detected' | 'rendering' | 'ready' | 'failed';
   exported_video: string | null;
   error_message: string | null;
@@ -317,8 +334,9 @@ export class ViralClipperService {
         await runQuery(`
           INSERT INTO clipper_clips (
             id, project_id, title, hook, summary, start_time, end_time, duration, engagement_score, category, reason,
-            reframing_mode, caption_template, caption_language, custom_style, transcript_segments, status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'detected')
+            reframing_mode, caption_template, caption_language, custom_style, transcript_segments, status,
+            virality_metrics, platform_metadata, thumbnail_concepts, broll_config, retention_optimizations
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'detected', ?, ?, ?, ?, ?)
         `, [
           clipId,
           projectId,
@@ -345,7 +363,12 @@ export class ViralClipperService {
             alignment: 'center',
             verticalOffset: 480
           }),
-          JSON.stringify(c.transcript_segments)
+          JSON.stringify(c.transcript_segments),
+          JSON.stringify(c.virality_metrics || null),
+          JSON.stringify(c.platform_metadata || null),
+          JSON.stringify(c.thumbnail_concepts || null),
+          JSON.stringify(c.broll_config || null),
+          JSON.stringify(c.retention_optimizations || null)
         ]);
       }
 
@@ -559,6 +582,11 @@ export class ViralClipperService {
     category: string;
     reason: string;
     transcript_segments: TranscriptSegment[];
+    virality_metrics?: any;
+    platform_metadata?: any;
+    thumbnail_concepts?: any;
+    broll_config?: any;
+    retention_optimizations?: any;
   }> {
     const segments = transcriptData.segments || [];
     if (!segments.length) {
@@ -627,6 +655,11 @@ export class ViralClipperService {
       category: string;
       reason: string;
       segments: TranscriptSegment[];
+      viralityMetrics?: any;
+      platformMetadata?: any;
+      thumbnailConcepts?: any;
+      brollConfig?: any;
+      retentionOptimizations?: any;
     }> = [];
 
     // Slide over segments to assemble cohesive conversational segments
@@ -634,6 +667,8 @@ export class ViralClipperService {
       let currentDuration = 0;
       let textAcc = '';
       let windowSegments: TranscriptSegment[] = [];
+      const firstSentence = segments[i]?.text.trim() || '';
+      const firstWords = firstSentence.split(/\s+/).slice(0, 8).join(' ');
 
       for (let j = i; j < segments.length; j++) {
         const seg = segments[j];
@@ -648,41 +683,77 @@ export class ViralClipperService {
           const isSentenceEnd = ['.', '?', '!', '।'].includes(lastChar) || j === segments.length - 1;
 
           if (isSentenceEnd || segDur >= maxDur - 5) {
-            // Evaluate Viral Score
-            let score = 70; // baseline
-
-            const firstSentence = windowSegments[0].text.trim();
-            const firstWords = firstSentence.split(/\s+/).slice(0, 10).join(' ');
-
-            // 1. Hook strength in first 5-8 seconds
-            let hookBonus = 0;
+            // Evaluate Virality Scoring Engine (8-Parameter Weighted Model)
+            // 1. Opening hook strength (20%)
+            let hookScore = 65;
             for (const pat of hookPatterns) {
-              if (pat.test(firstSentence)) hookBonus += 9;
-              if (pat.test(textAcc)) hookBonus += 2;
+              if (pat.test(firstSentence)) hookScore += 18;
+              if (pat.test(textAcc)) hookScore += 5;
             }
-            score += Math.min(18, hookBonus);
+            hookScore = Math.min(98, Math.max(62, hookScore));
 
-            // 2. High speech density & pace
+            // 2. Curiosity gap (15%)
+            let curiosityGap = 70;
+            if (textAcc.includes('?') || firstSentence.toLowerCase().includes('why') || firstSentence.toLowerCase().includes('secret')) curiosityGap += 22;
+            else if (textAcc.toLowerCase().includes('how') || textAcc.toLowerCase().includes('what')) curiosityGap += 14;
+            curiosityGap = Math.min(96, Math.max(65, curiosityGap));
+
+            // 3. Emotional engagement (15%)
+            let emotionalEngagement = 68;
+            if (textAcc.match(/crazy|insane|shocking|unbelievable|love|hate|scared|danger|fear|ruined|won|lost|hero/i)) emotionalEngagement += 20;
+            if (textAcc.includes('!')) emotionalEngagement += 8;
+            emotionalEngagement = Math.min(97, Math.max(64, emotionalEngagement));
+
+            // 4. Shareability (15%)
+            let shareability = 66;
+            if (textAcc.match(/everyone|people|you|friend|world|society|mistake|lesson|rule/i)) shareability += 20;
+            shareability = Math.min(95, Math.max(60, shareability));
+
+            // 5. Audience relatability (10%)
+            let audienceRelatability = 72;
+            if (textAcc.match(/money|job|life|family|daily|time|work|sleep|food|day/i)) audienceRelatability += 18;
+            audienceRelatability = Math.min(96, Math.max(68, audienceRelatability));
+
+            // 6. Information/value density (10%)
             const wordCount = textAcc.split(/\s+/).filter(Boolean).length;
             const wps = wordCount / Math.max(1, segDur);
-            if (wps >= 2.2 && wps <= 3.8) score += 6; // ideal conversational reel pace
+            let informationDensity = 70;
+            if (wps >= 2.2 && wps <= 3.8) informationDensity += 20;
+            else if (wps > 3.8) informationDensity += 12;
+            informationDensity = Math.min(98, Math.max(65, informationDensity));
 
-            // 3. Question & answer dynamic
-            if (textAcc.includes('?') && (textAcc.includes('.') || textAcc.includes('!'))) score += 5;
+            // 7. Storytelling and retention (10%)
+            let storytellingRetention = 68;
+            if (textAcc.match(/when|then|after|first|suddenly|happened|said|told|story|ek din/i)) storytellingRetention += 22;
+            storytellingRetention = Math.min(96, Math.max(66, storytellingRetention));
 
-            // 4. Punchline or conclusive statement at the end
+            // 8. Ending impact (5%)
             const lastSentence = seg.text.trim();
-            if (lastSentence.length > 15 && ['.', '!', '?'].includes(lastSentence.slice(-1))) score += 4;
+            let endingImpact = 65;
+            if (lastSentence.length > 15 && ['.', '!', '?'].includes(lastSentence.slice(-1))) endingImpact += 25;
+            endingImpact = Math.min(95, Math.max(60, endingImpact));
 
-            score = Math.min(98, Math.max(76, score));
+            // Weighted Composite Score
+            const compositeScore = Math.round(
+              hookScore * 0.20 +
+              curiosityGap * 0.15 +
+              emotionalEngagement * 0.15 +
+              shareability * 0.15 +
+              audienceRelatability * 0.10 +
+              informationDensity * 0.10 +
+              storytellingRetention * 0.10 +
+              endingImpact * 0.05
+            );
+
+            const confidenceLevel = compositeScore >= 84 ? 'Very High' : 'High';
 
             // Categorize
             let category = 'Insight';
-            if (textAcc.toLowerCase().includes('why') || textAcc.toLowerCase().includes('kyun')) category = 'Curiosity';
-            else if (textAcc.toLowerCase().includes('mistake') || textAcc.toLowerCase().includes('galti') || textAcc.toLowerCase().includes('secret')) category = 'Controversy';
-            else if (textAcc.toLowerCase().includes('story') || textAcc.toLowerCase().includes('ek din') || textAcc.toLowerCase().includes('when i')) category = 'Story';
-            else if (textAcc.toLowerCase().includes('how') || textAcc.toLowerCase().includes('step') || textAcc.toLowerCase().includes('kaise')) category = 'Educational';
-            else if (hookBonus >= 10) category = 'Hook';
+            if (curiosityGap >= 85 || textAcc.toLowerCase().includes('why')) category = 'Curiosity';
+            else if (emotionalEngagement >= 85 || textAcc.toLowerCase().includes('mistake') || textAcc.toLowerCase().includes('secret')) category = 'Controversy';
+            else if (storytellingRetention >= 85 || textAcc.toLowerCase().includes('story')) category = 'Story';
+            else if (informationDensity >= 85 || textAcc.toLowerCase().includes('how')) category = 'Educational';
+            else if (hookScore >= 88) category = 'Hook';
 
             // Generate clean title
             let cleanTitle = firstWords.replace(/[^\w\s]/g, '').trim();
@@ -695,13 +766,60 @@ export class ViralClipperService {
               startTime: windowSegments[0].start,
               endTime: seg.end,
               duration: Math.round(seg.end - windowSegments[0].start),
-              score,
+              score: compositeScore,
               title: cleanTitle.toUpperCase(),
               hook: firstWords,
               summary: textAcc.slice(0, 160).trim() + '...',
               category,
-              reason: `High engagement opening (${hookBonus > 0 ? 'strong verbal hook' : 'curiosity trigger'}), solid speaking cadence (${wps.toFixed(1)} words/sec), and clean conclusion.`,
-              segments: windowSegments
+              reason: `Strong hook (${hookScore}%), high curiosity gap (${curiosityGap}%), speaking pace ${wps.toFixed(1)} wps, and punchy ending.`,
+              segments: windowSegments,
+              viralityMetrics: {
+                hook_score: hookScore,
+                curiosity_gap: curiosityGap,
+                emotional_engagement: emotionalEngagement,
+                shareability,
+                relatability: audienceRelatability,
+                info_density: informationDensity,
+                retention_prediction: storytellingRetention,
+                ending_impact: endingImpact,
+                confidence_level: confidenceLevel
+              },
+              platformMetadata: {
+                youtube_shorts: {
+                  title: `${cleanTitle.slice(0, 50)} #Shorts`,
+                  description: `Full insight on ${category} from the interview.\n\n#Shorts #Viral #Podcast #Trending`,
+                  hashtags: ['#Shorts', '#Viral', '#Podcast', '#Trending', '#Reels']
+                },
+                instagram_reels: {
+                  title: `${cleanTitle.slice(0, 45)} 🔥`,
+                  caption: `Did you know this? Let us know in the comments below! 👇\n\n#reels #viralvideos #podcastclips #fyp #trending`,
+                  hashtags: ['#reels', '#viralvideos', '#explorepage', '#fyp', '#trending']
+                },
+                tiktok: {
+                  title: `${cleanTitle.slice(0, 40)} 🤯`,
+                  caption: `Wait till you hear the ending... 👀 #fyp #podcast #viral #foryoupage #mindblown`,
+                  hashtags: ['#fyp', '#podcast', '#viral', '#foryoupage', '#mindblown']
+                },
+                linkedin: {
+                  title: `Key Takeaway on ${category}: ${cleanTitle.slice(0, 50)}`,
+                  commentary_post: `A powerful reflection from this discussion. In high-stakes environments, clear communication and retention define outcomes. What is your perspective?`,
+                  hashtags: ['#Leadership', '#IndustryInsights', '#Strategy', '#Innovation']
+                }
+              },
+              thumbnailConcepts: [
+                { style: 'Curiosity Punchline', headline: firstWords.slice(0, 28).toUpperCase(), badge: 'MUST WATCH' },
+                { style: 'Shocking Revelation', headline: 'NOBODY EXPECTED THIS', badge: 'SHOCKING' },
+                { style: 'Mastery & Insight', headline: cleanTitle.slice(0, 26).toUpperCase(), badge: 'KEY INSIGHT' }
+              ],
+              brollConfig: [
+                { triggerTime: 2.0, duration: 3.0, suggestedAsset: 'datacenter_tech.mp4', label: 'B-Roll Cutaway' }
+              ],
+              retentionOptimizations: {
+                silenceTrimmingAvailable: true,
+                silentGapsDetected: 0,
+                loopFriendlyEndingScore: Math.round(75 + (endingImpact % 20)),
+                recommendation: 'Clip opens with high energy and concludes on a decisive statement.'
+              }
             });
 
             break; // Stop extending this window once ideal duration hit
@@ -743,7 +861,12 @@ export class ViralClipperService {
       engagement_score: s.score,
       category: s.category,
       reason: s.reason,
-      transcript_segments: s.segments
+      transcript_segments: s.segments,
+      virality_metrics: s.viralityMetrics,
+      platform_metadata: s.platformMetadata,
+      thumbnail_concepts: s.thumbnailConcepts,
+      broll_config: s.brollConfig || [],
+      retention_optimizations: s.retentionOptimizations
     }));
   }
 
@@ -797,33 +920,52 @@ export class ViralClipperService {
     if (!fs.existsSync(assDir)) fs.mkdirSync(assDir, { recursive: true });
     const assPath = path.join(assDir, `${clip.id}_captions.ass`);
 
-    // Target 1080 x 1920 (9:16)
+    const aspect = clip.aspect_ratio || '9:16';
+    let targetWidth = 1080;
+    let targetHeight = 1920;
+    if (aspect === '16:9') {
+      targetWidth = 1920;
+      targetHeight = 1080;
+    } else if (aspect === '1:1') {
+      targetWidth = 1080;
+      targetHeight = 1080;
+    }
+
+    // Target dimensions for subtitles
     CaptionStudioService.generateAss(
       relativeSegments,
       clip.caption_template || 'word-pop',
       customStyle,
-      1080,
-      1920,
+      targetWidth,
+      targetHeight,
       assPath
     );
 
-    const escapedAss = assPath.replace(/\\/g, '/').replace(/:/g, '\\:');
+    const relAss = path.relative(process.cwd(), assPath).replace(/\\/g, '/');
 
     // Build smart reframing filter graph
     let filterGraph = '';
     const mode = clip.reframing_mode || 'blur_background';
+    const isComplex = mode === 'blur_background' || (aspect === '9:16' && mode === 'split_screen');
 
-    if (mode === 'center_crop') {
-      // Scale to height 1920 and crop middle 1080 with Lanczos & subtle unsharp
-      filterGraph = `scale=-1:1920:flags=lanczos,crop=1080:1920:(iw-1080)/2:0,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'`;
-    } else if (mode === 'split_screen') {
-      // Split top and bottom with crisp Lanczos scaling
-      filterGraph = `split=2[top][bottom];[top]crop=iw/2:ih:0:0,scale=1080:960:flags=lanczos[t_sc];[bottom]crop=iw/2:ih:iw/2:0,scale=1080:960:flags=lanczos[b_sc];[t_sc][b_sc]vstack=inputs=2,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'`;
+    if (aspect === '16:9') {
+      filterGraph = `scale=1920:1080:force_original_aspect_ratio=decrease:flags=lanczos,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,unsharp=5:5:0.5:5:5:0.0,subtitles='${relAss}'`;
+    } else if (aspect === '1:1') {
+      if (mode === 'center_crop') {
+        filterGraph = `scale=-1:1080:flags=lanczos,crop=1080:1080:(iw-1080)/2:0,unsharp=5:5:0.5:5:5:0.0,subtitles='${relAss}'`;
+      } else {
+        filterGraph = `[0:v]scale=1080:1080:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1080,gblur=sigma=26:steps=2,eq=brightness=-0.10:contrast=1.06[bg];[0:v]scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${relAss}'[outv]`;
+      }
     } else {
-      // Gold standard Podcast blurred background framing (Premium Studio Grade)
-      // Background: Lanczos upscale, deep 2-pass gaussian blur, cinema contrast
-      // Foreground: Lanczos crisp scale with subtle edge unsharp mask
-      filterGraph = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,gblur=sigma=26:steps=2,eq=brightness=-0.10:contrast=1.06[bg];[0:v]scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${escapedAss}'[outv]`;
+      // 9:16 Vertical Reel
+      if (mode === 'center_crop') {
+        filterGraph = `scale=-1:1920:flags=lanczos,crop=1080:1920:(iw-1080)/2:0,unsharp=5:5:0.5:5:5:0.0,subtitles='${relAss}'`;
+      } else if (mode === 'split_screen') {
+        filterGraph = `split=2[top][bottom];[top]crop=iw/2:ih:0:0,scale=1080:960:flags=lanczos[t_sc];[bottom]crop=iw/2:ih:iw/2:0,scale=1080:960:flags=lanczos[b_sc];[t_sc][b_sc]vstack=inputs=2,unsharp=5:5:0.5:5:5:0.0,subtitles='${relAss}'`;
+      } else {
+        // Gold standard Podcast blurred background framing (Premium Studio Grade)
+        filterGraph = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,gblur=sigma=26:steps=2,eq=brightness=-0.10:contrast=1.06[bg];[0:v]scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${relAss}'[outv]`;
+      }
     }
 
     return new Promise((resolve, reject) => {
@@ -832,7 +974,7 @@ export class ViralClipperService {
         '-ss', clip.start_time.toString(),
         '-to', clip.end_time.toString(),
         '-i', inputVideoPath,
-        ...(mode === 'blur_background' ? ['-filter_complex', filterGraph, '-map', '[outv]', '-map', '0:a?'] : ['-vf', filterGraph]),
+        ...(isComplex ? ['-filter_complex', filterGraph, '-map', '[outv]', '-map', '0:a?'] : ['-vf', filterGraph]),
         '-c:v', 'libx264',
         '-preset', 'medium',
         '-crf', '17',

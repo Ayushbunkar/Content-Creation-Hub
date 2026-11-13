@@ -219,6 +219,18 @@ export function initDatabase(): Promise<void> {
       `, (err) => {
         if (err) return reject(err);
 
+        // Safe migrations for Advanced AI Viral Clipping Studio
+        const clipperColumns = [
+          `ALTER TABLE clipper_clips ADD COLUMN aspect_ratio TEXT DEFAULT '9:16'`,
+          `ALTER TABLE clipper_clips ADD COLUMN virality_metrics TEXT`,
+          `ALTER TABLE clipper_clips ADD COLUMN broll_config TEXT`,
+          `ALTER TABLE clipper_clips ADD COLUMN audio_settings TEXT`,
+          `ALTER TABLE clipper_clips ADD COLUMN retention_optimizations TEXT`,
+          `ALTER TABLE clipper_clips ADD COLUMN platform_metadata TEXT`,
+          `ALTER TABLE clipper_clips ADD COLUMN thumbnail_concepts TEXT`
+        ];
+        clipperColumns.forEach(sql => db.run(sql, () => {}));
+
         // Persistent Asset Registry table for Copyright and Asset Licensing Management
         db.run(`
           CREATE TABLE IF NOT EXISTS asset_registry (
