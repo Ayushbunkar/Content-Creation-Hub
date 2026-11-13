@@ -54,6 +54,8 @@ export type VisualShotType =
   | 'layered_parallax'
   | 'cinematic_hook'
   | 'video_footage'
+  | 'kinetic_title_card'
+  | 'actual_video'
   | 'archival_document'
   | 'ai_video';
 
@@ -149,12 +151,55 @@ export interface SceneData {
     leftLabel?: string;
     rightLabel?: string;
   };
+  kinetic_title_data?: {
+    line1: string;
+    line2: string;
+    highlightWord?: string;
+    highlightColor?: string;
+    flarePosition?: number;
+    particles?: 'embers' | 'dust_motes' | 'digital_noise';
+  };
   audio?: {
     music_volume?: number;
     sfx?: string;
     ambient?: string;
   };
   quality_status?: 'approved' | 'auto_enhanced';
+}
+
+export interface SfxCue {
+  id: string;
+  name: string;
+  src: string;
+  startFrame: number;
+  volume: number;
+}
+
+export type EditorialStylePreset =
+  | 'cinematic_investigative'
+  | 'fast_documentary'
+  | 'breaking_news'
+  | 'geopolitical'
+  | 'tech_explainer'
+  | 'minimal'
+  | 'clipping';
+
+export interface MasterTimeline {
+  id: string;
+  projectId: string;
+  title: string;
+  topic: string;
+  category: string;
+  durationFrames: number;
+  fps: number;
+  width: number;
+  height: number;
+  scenes: SceneData[];
+  sfxCues: SfxCue[];
+  musicTrack: string;
+  narrationTrack: string;
+  subtitlesCues: any[];
+  stylePreset: EditorialStylePreset;
 }
 
 export interface EnhancementSettings {

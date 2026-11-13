@@ -5,6 +5,7 @@ import {
   Easing,
   AbsoluteFill,
   Img,
+  Video,
   staticFile,
 } from "remotion";
 import { AudioTrackGroup } from "../audio/AudioTrack";
@@ -31,6 +32,8 @@ export type VisualShotType =
   | 'layered_parallax'
   | 'cinematic_hook'
   | 'video_footage'
+  | 'kinetic_title_card'
+  | 'actual_video'
   | 'archival_document'
   | 'ai_video';
 
@@ -72,6 +75,14 @@ export interface CinematicSceneData {
     organization?: string;
     location?: string;
   };
+  kineticTitleData?: {
+    line1: string;
+    line2: string;
+    highlightWord?: string;
+    highlightColor?: string;
+    flarePosition?: number;
+    particles?: 'embers' | 'dust_motes' | 'digital_noise';
+  };
   newspaperData?: {
     headline: string;
     publication: string;
@@ -112,6 +123,13 @@ export interface CinematicDocumentaryProps {
   narrationSrc?: string;
   musicSrc?: string;
   subtitlesData?: { cues: SubtitleCueData[] };
+  sfxCues?: Array<{
+    id: string;
+    name: string;
+    src: string;
+    startFrame: number;
+    volume: number;
+  }>;
   captionTemplate?: string;
   scenes?: CinematicSceneData[];
   durationInFrames?: number;
@@ -1022,6 +1040,223 @@ const CinematicHookScene: FC<{ scene: CinematicSceneData; sceneFrame: number; to
 };
 
 // ==========================================
+// 13B. COMPONENT: KINETIC TITLE CARD (Reference Video Style)
+// ==========================================
+const KineticTitleCardScene: FC<{
+  scene: CinematicSceneData;
+  sceneFrame: number;
+  durationFrames: number;
+  topic?: string;
+}> = ({ scene, sceneFrame, durationFrames, topic }) => {
+  const data = scene.kineticTitleData || {
+    line1: 'THE SILICON TRAP',
+    line2: 'NVIDIA CEO RESIGNS',
+    highlightWord: 'NVIDIA',
+    highlightColor: '#ff2a2a',
+  };
+
+  // Explosive impact entrance
+  const scale = interpolate(sceneFrame, [0, 8, 25, durationFrames], [1.18, 0.98, 1.0, 1.05], {
+    extrapolateRight: 'clamp',
+    easing: Easing.out(Easing.cubic)
+  });
+
+  const opacity = interpolate(sceneFrame, [0, 5], [0, 1], { extrapolateRight: 'clamp' });
+  
+  // Specular lens flare sweep across text
+  const flareX = interpolate(sceneFrame, [8, 35], [-30, 130], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp'
+  });
+
+  // Floating burning embers
+  const embers = useMemo(() => {
+    return Array.from({ length: 35 }).map((_, i) => ({
+      left: `${(i * 17) % 100}%`,
+      speed: 0.8 + ((i % 5) * 0.4),
+      size: 3 + (i % 4),
+      offset: (i * 23) % 100,
+      color: i % 3 === 0 ? '#ff4500' : (i % 3 === 1 ? '#ffae19' : '#ff2a2a'),
+    }));
+  }, []);
+
+  const line2Words = data.line2.split(/\s+/);
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#030712', overflow: 'hidden' }}>
+      {/* Dark textured grunge background with subtle vignette */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'radial-gradient(circle at center, #111827 0%, #030712 85%)',
+          opacity: 0.95
+        }}
+      />
+
+      {/* Floating Ember Sparks */}
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 10 }}>
+        {embers.map((emb, idx) => {
+          const yPos = (100 - ((sceneFrame * emb.speed + emb.offset) % 120));
+          return (
+            <div
+              key={idx}
+              style={{
+                position: 'absolute',
+                left: emb.left,
+                top: `${yPos}%`,
+                width: emb.size,
+                height: emb.size,
+                borderRadius: '50%',
+                backgroundColor: emb.color,
+                boxShadow: `0 0 10px ${emb.color}, 0 0 20px ${emb.color}`,
+                opacity: 0.85
+              }}
+            />
+          );
+        })}
+      </div>
+
+      {/* Central 3D Kinetic Typography Container */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transform: `scale(${scale})`,
+          opacity,
+          padding: '0 40px',
+          textAlign: 'center',
+          zIndex: 20
+        }}
+      >
+        {/* Line 1: Bold Metallic Bevel 3D Header */}
+        <div style={{ position: 'relative', overflow: 'hidden', padding: '10px 30px' }}>
+          <h1
+            style={{
+              fontFamily: "'Montserrat', 'Inter', system-ui, sans-serif",
+              fontSize: '88px',
+              fontWeight: 900,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              color: '#ffffff',
+              lineHeight: 1.05,
+              margin: 0,
+              textShadow: '0 6px 18px rgba(0,0,0,0.95), 0 1px 3px rgba(255,255,255,0.4)',
+              WebkitTextStroke: '1px rgba(255,255,255,0.2)',
+            }}
+          >
+            {data.line1}
+          </h1>
+
+          {/* Lens Flare Specular Gleam Sweep */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: `${flareX}%`,
+              width: '100px',
+              background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.85), transparent)',
+              transform: 'skewX(-25deg)',
+              pointerEvents: 'none',
+              filter: 'blur(4px)'
+            }}
+          />
+        </div>
+
+        {/* Line 2: High-Alert Red Keyword Highlight ("NVIDIA" in red, rest in white) */}
+        <div style={{ marginTop: '20px' }}>
+          <h2
+            style={{
+              fontFamily: "'Montserrat', 'Inter', system-ui, sans-serif",
+              fontSize: '60px',
+              fontWeight: 900,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              lineHeight: 1.1,
+              margin: 0,
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+              gap: '18px'
+            }}
+          >
+            {line2Words.map((word, wIdx) => {
+              const isHighlight = data.highlightWord && word.toUpperCase().includes(data.highlightWord.toUpperCase());
+              return (
+                <span
+                  key={wIdx}
+                  style={{
+                    color: isHighlight ? (data.highlightColor || '#ff2a2a') : '#ffffff',
+                    textShadow: isHighlight
+                      ? '0 0 25px rgba(255,42,42,0.9), 0 0 50px rgba(255,42,42,0.6)'
+                      : '0 4px 14px rgba(0,0,0,0.85)',
+                  }}
+                >
+                  {word}
+                </span>
+              );
+            })}
+          </h2>
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// ==========================================
+// 13C. COMPONENT: ACTUAL VIDEO FOOTAGE SCENE
+// ==========================================
+const ActualVideoScene: FC<{
+  scene: CinematicSceneData;
+  sceneFrame: number;
+  durationFrames: number;
+}> = ({ scene, sceneFrame, durationFrames }) => {
+  const panScale = interpolate(sceneFrame, [0, durationFrames], [1.02, 1.12], {
+    extrapolateRight: 'clamp',
+    easing: Easing.out(Easing.quad)
+  });
+
+  const panX = interpolate(sceneFrame, [0, durationFrames], [0, -25], {
+    extrapolateRight: 'clamp'
+  });
+
+  const rawUrl = scene.mediaUrl || '/videos/library/datacenter_tech.mp4';
+  const resolvedSrc = (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:'))
+    ? rawUrl
+    : staticFile(rawUrl.replace(/^\//, ''));
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#020617', overflow: 'hidden' }}>
+      <Video
+        src={resolvedSrc}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          transform: `scale(${panScale}) translate(${panX}px, 0px)`,
+          filter: 'contrast(1.08) saturate(1.1) brightness(0.95)',
+        }}
+        volume={0}
+      />
+      {/* Cinematic Vignette */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.65) 100%)',
+          pointerEvents: 'none'
+        }}
+      />
+    </AbsoluteFill>
+  );
+};
+
+// ==========================================
 // 14. CLOSED CAPTIONS (CC)
 // ==========================================
 const SubtitlesRenderer: FC<{ cues: SubtitleCueData[]; frame: number }> = ({ cues, frame }) => {
@@ -1073,6 +1308,7 @@ export const CinematicDocumentary: FC<CinematicDocumentaryProps> = ({
   narrationSrc = "/audio/narration.wav",
   musicSrc = "/audio/bgm/ambient_documentary.wav",
   subtitlesData,
+  sfxCues = [],
   scenes = [],
 }) => {
   const { width, height, durationInFrames, fps } = useVideoConfig();
@@ -1114,6 +1350,12 @@ export const CinematicDocumentary: FC<CinematicDocumentaryProps> = ({
         fadeOut: 30,
         premountFor: fps,
       } : undefined}
+      soundEffects={sfxCues?.map((cue, idx) => ({
+        src: cue.src,
+        startFrom: cue.startFrame,
+        volume: cue.volume || 0.5,
+        premountFor: fps,
+      })) || []}
     />
   );
 
@@ -1132,6 +1374,12 @@ export const CinematicDocumentary: FC<CinematicDocumentaryProps> = ({
         let sceneContent: React.ReactNode = null;
 
         switch (scene.type) {
+          case 'kinetic_title_card':
+            sceneContent = <KineticTitleCardScene scene={scene} sceneFrame={currentSceneFrame} durationFrames={durFrames} topic={topic} />;
+            break;
+          case 'actual_video':
+            sceneContent = <ActualVideoScene scene={scene} sceneFrame={currentSceneFrame} durationFrames={durFrames} />;
+            break;
           case 'person_intro':
             sceneContent = <PersonIntroScene scene={scene} sceneFrame={currentSceneFrame} durationFrames={durFrames} />;
             break;

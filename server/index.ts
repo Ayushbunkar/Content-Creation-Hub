@@ -13,6 +13,7 @@ import { ViralClipperService } from './viralClipper';
 import { DocumentaryResearchService } from './documentaryResearch';
 import { DocumentaryNarrativeEngine } from './documentaryNarrative';
 import { VideoEnhancerService } from './videoEnhancer';
+import { CinematicEditorialEngine } from './cinematicEditorialEngine';
 
 const app = express();
 const server = http.createServer(app);
@@ -391,6 +392,23 @@ app.put('/api/projects/:id/scenes/:sceneId', async (req, res) => {
     await runQuery('UPDATE projects SET scene_data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [JSON.stringify(scenes), id]);
 
     res.json({ message: 'Scene updated', scene: scenes[idx] });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5d. Master Editorial Timeline (Cuts, Kinetic Typography & Sound Design)
+app.get('/api/projects/:id/editorial-timeline', async (req, res) => {
+  try {
+    const p = await getQuery<any>('SELECT * FROM projects WHERE id = ?', [req.params.id]);
+    if (!p) return res.status(404).json({ error: 'Project not found' });
+    const timeline = CinematicEditorialEngine.composeMasterTimeline(
+      p,
+      p.script || '',
+      p.duration || 120,
+      (p.visual_style as any) || 'cinematic_investigative'
+    );
+    res.json(timeline);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

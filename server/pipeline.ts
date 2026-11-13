@@ -1,10 +1,11 @@
-import { VideoProject, SceneData, PipelineStage, ResearchSummary, SocialCaptions, VisualShotType, MediaSource, CameraMovement } from './types';
+import { VideoProject, SceneData, PipelineStage, ResearchSummary, SocialCaptions, VisualShotType, MediaSource, CameraMovement, SfxCue } from './types';
 import { runQuery, getQuery } from './db';
 import { MediaSourceManager, QualityChecker } from './mediaSource';
 import { DocumentaryResearchService, ResearchDossier } from './documentaryResearch';
 import { DocumentaryNarrativeEngine } from './documentaryNarrative';
 import { SceneIntelligenceEngine } from './sceneIntelligence';
 import { VideoEnhancerService } from './videoEnhancer';
+import { CinematicEditorialEngine, SoundDesignEngine } from './cinematicEditorialEngine';
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
@@ -274,69 +275,17 @@ export class PipelineManager {
   }
 
   private static async planScenes(project: VideoProject, script: string): Promise<SceneData[]> {
-    // Fast-Paced Visual Storytelling: Segment narration into rapid 1.5s - 2.5s visual beats
-    const shotTexts = SceneIntelligenceEngine.segmentScriptIntoBeats(script, project.duration || 120);
+    const audioPath = path.join(process.cwd(), 'public', 'audio', `narration_${project.id}.wav`);
+    const audioDur = fs.existsSync(audioPath) ? await this.probeAudioDuration(audioPath) : (project.duration || 120);
 
-    const plannedScenes: SceneData[] = [];
-    const usedMediaUrls = new Set<string>();
-    let lastMovement: CameraMovement | undefined = undefined;
+    const timeline = CinematicEditorialEngine.composeMasterTimeline(
+      project,
+      script,
+      audioDur,
+      (project.visual_style as any) || 'cinematic_investigative'
+    );
 
-    for (let idx = 0; idx < shotTexts.length; idx++) {
-      const narration = shotTexts[idx];
-      const wordCount = narration.trim().split(/\s+/).length;
-      // Fast paced 1.5s - 3.2s duration per visual beat
-      const durationSec = Math.max(1.8, Math.min(3.5, Number((wordCount / 2.4).toFixed(1))));
-
-      // Module 5: Contextual Scene Intelligence
-      const context = SceneIntelligenceEngine.analyzeNarration(
-        narration,
-        project.topic || 'Strategic Intelligence',
-        project.category || 'Geopolitics',
-        idx,
-        lastMovement
-      );
-      lastMovement = context.cameraMovement;
-
-      // Module 4: Deduplicated Image Selection (IMAGE-ONLY — No video footage)
-      let mediaUrl = MediaSourceManager.searchLocalLibraryFootage(narration, project.category);
-      usedMediaUrls.add(mediaUrl);
-
-      plannedScenes.push({
-        id: `shot_${String(idx + 1).padStart(3, '0')}`,
-        shot_number: idx + 1,
-        title: context.title,
-        narration,
-        duration: durationSec,
-        visual_type: context.visualType,
-        media_source: context.mediaSource,
-        badge: context.badge,
-        media_url: mediaUrl,
-        camera_movement: context.cameraMovement,
-        transition: context.transition || (idx % 3 === 1 ? 'whip_pan' : 'crossfade'),
-        visual_description: `Dynamic beat #${idx + 1} (${context.badge}) with ${context.cameraMovement} movement and fast shift.`,
-        location: context.location,
-        coordinates: context.coordinates,
-        layers: {
-          particles: idx % 2 === 0 ? 'dust_motes' : 'light_leaks'
-        },
-        archival_data: context.archivalData,
-        person_data: context.personData,
-        newspaper_data: context.newspaperData,
-        comparison_data: context.comparisonData,
-        data_metric: context.dataMetric,
-        map_config: {
-          region: 'Global',
-          targetName: (project.topic || 'THEATER').toUpperCase(),
-          highlighted_countries: ['US', 'CN', 'RU', 'IN']
-        },
-        audio: {
-          music_volume: 0.14,
-          sfx: idx === 0 ? 'braam-impact' : 'tactical-whoosh'
-        }
-      });
-    }
-
-    return plannedScenes;
+    return timeline.scenes;
   }
 
   /**
@@ -569,8 +518,18 @@ export class PipelineManager {
       musicTrack = '/audio/bgm/ambient_documentary.wav';
     }
 
-    // Distribute shots across duration proportionally matched to narrative word count
-    const rawScenes: any[] = project?.scene_data ? JSON.parse(project.scene_data) : [];
+    // Compose master timeline with complete synchronized sound effects and kinetic typography
+    const timeline = CinematicEditorialEngine.composeMasterTimeline(
+      project,
+      project.script || '',
+      audioDurSec,
+      (project.visual_style as any) || 'cinematic_investigative'
+    );
+
+    const rawScenes: any[] = (project?.scene_data && JSON.parse(project.scene_data).length > 0)
+      ? JSON.parse(project.scene_data)
+      : timeline.scenes;
+
     const numScenes = Math.max(1, rawScenes.length);
     const totalWords = rawScenes.reduce((acc, s) => acc + (s.narration?.trim().split(/\s+/).length || 4), 0);
     let accumulatedFrames = 0;
@@ -587,7 +546,7 @@ export class PipelineManager {
       return {
         id: s.id || `shot_${idx + 1}`,
         type: s.visual_type || 'archival_photo',
-        badge: s.badge || '[Archival Photo]',
+        badge: s.badge || '[Cinematic Beat]',
         mediaUrl: s.media_url || 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1920&q=85',
         cameraMovement: s.camera_movement || 'dolly_in',
         transition: s.transition || 'fade',
@@ -598,8 +557,9 @@ export class PipelineManager {
         narration: s.narration,
         startFrame: startF,
         durationFrames: shotDurFrames,
-        layers: s.layers || { particles: idx % 2 === 0 ? 'dust_motes' : 'light_leaks' },
+        layers: s.layers || { particles: (s.visual_type === 'kinetic_title_card' || idx % 2 === 0) ? 'embers' : 'dust_motes' },
         personData: s.person_data,
+        kineticTitleData: s.kinetic_title_data,
         newspaperData: s.newspaper_data,
         comparisonData: s.comparison_data,
         archivalData: s.archival_data || (s.visual_type === 'newspaper_headline' || s.visual_type === 'archival_document' ? {
@@ -618,6 +578,9 @@ export class PipelineManager {
       };
     });
 
+    // Sound effects generation from scenes
+    const sfxCues = SoundDesignEngine.generateSfxCues(cinematicScenes, totalFrames);
+
     return new Promise((resolve, reject) => {
       const relPropsPath = path.join('public', `props_${projectId}.json`);
       const absPropsPath = path.join(process.cwd(), relPropsPath);
@@ -627,9 +590,10 @@ export class PipelineManager {
         category: project.category || 'Geopolitics',
         topic: project.topic,
         narrationSrc: `/audio/narration_${projectId}.wav`,
-        musicSrc: musicTrack,
+        musicSrc: timeline.musicTrack || musicTrack,
         subtitlesData: { cues: subtitleCues },
         captionTemplate: project.caption_template || 'karaoke-highlight',
+        sfxCues: sfxCues,
         scenes: cinematicScenes,
         durationInFrames: totalFrames
       };
