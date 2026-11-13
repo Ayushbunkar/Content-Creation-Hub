@@ -75,12 +75,12 @@ export class PipelineManager {
     // 3. FACT CHECKING
     await this.updateStage(projectId, 'FACT_CHECKING', 30);
 
-    // 4. SCENE PLANNING (Granular Shot Division: 3-5s per shot)
+    // 4. SCENE PLANNING (Granular Shot Division: strictly 3.0 - 3.8s per shot)
     await this.updateStage(projectId, 'SCENE_PLANNING', 40);
-    const refreshedProject = await getQuery<any>('SELECT scene_data, mode, review_approved FROM projects WHERE id = ?', [projectId]);
-    const initialSceneData = (refreshedProject?.scene_data)
-      ? JSON.parse(refreshedProject.scene_data)
-      : await this.planScenes(project, script);
+    const initialSceneData = await this.planScenes(project, script);
+    await runQuery('UPDATE projects SET scene_data = ? WHERE id = ?', [JSON.stringify(initialSceneData), projectId]);
+
+    const refreshedProject = await getQuery<any>('SELECT mode, review_approved FROM projects WHERE id = ?', [projectId]);
 
     // If project is in Review Mode and not approved yet, PAUSE for user review
     if (refreshedProject?.mode === 'review' && !refreshedProject?.review_approved) {
@@ -90,7 +90,7 @@ export class PipelineManager {
         stage: 'REVIEW_PAUSED',
         progress: 45,
         status: 'draft',
-        message: 'Research, Claim Ledger, and Script complete. Ready for review and approval in Documentary Studio.'
+        message: 'Research, Claim Ledger, Script, and 3-4s Storyboard complete. Ready for review and approval in Documentary Studio.'
       });
       return; // Pause pipeline until user clicks Approve in UI
     }
@@ -147,10 +147,14 @@ export class PipelineManager {
     }
     await runQuery('UPDATE projects SET subtitles_file = ? WHERE id = ?', [`/subtitles_${projectId}.srt`, projectId]);
 
-    // 8. QUALITY CHECK & AUTOMATIC ENHANCEMENT (Zero Static Slides)
+    // 8. QUALITY CHECK & AUTOMATIC ENHANCEMENT (Strict 3-4s Rule & Zero Static Slides)
     await this.updateStage(projectId, 'QUALITY_CHECK', 80);
-    const { scenes: verifiedScenes } = QualityChecker.inspectAndUpgrade(initialSceneData, project.category);
-    await runQuery('UPDATE projects SET scene_data = ? WHERE id = ?', [JSON.stringify(verifiedScenes), projectId]);
+    const { scenes: verifiedScenes, report: qcReport } = QualityChecker.inspectAndUpgrade(initialSceneData, project.category);
+    await runQuery('UPDATE projects SET scene_data = ?, qc_report = ? WHERE id = ?', [
+      JSON.stringify(verifiedScenes),
+      JSON.stringify(qcReport),
+      projectId
+    ]);
 
     // 9. SOCIAL CAPTIONS GENERATION
     const socialCaptions = this.generateSocialCaptions(project, script);
@@ -565,24 +569,28 @@ export class PipelineManager {
       : timeline.scenes;
 
     const numScenes = Math.max(1, rawScenes.length);
-    const totalWords = rawScenes.reduce((acc, s) => acc + (s.narration?.trim().split(/\s+/).length || 4), 0);
     let accumulatedFrames = 0;
 
     const cinematicScenes = rawScenes.map((s, idx) => {
-      const words = s.narration?.trim().split(/\s+/).length || 4;
-      const shotDurFrames = idx === numScenes - 1
-        ? Math.max(45, totalFrames - accumulatedFrames)
-        : Math.max(45, Math.round((words / totalWords) * totalFrames));
+      // Strictly enforce granular 2.6s - 4.1s duration per shot
+      const rawDur = s.durationFrames || Math.round((s.duration || 3.3) * 30);
+      let shotDurFrames = Math.max(78, Math.min(125, rawDur));
+
+      if (idx === numScenes - 1) {
+        shotDurFrames = Math.max(60, totalFrames - accumulatedFrames);
+      } else if (accumulatedFrames + shotDurFrames > totalFrames - 60) {
+        shotDurFrames = Math.max(60, totalFrames - accumulatedFrames);
+      }
 
       const startF = accumulatedFrames;
       accumulatedFrames += shotDurFrames;
 
       return {
         id: s.id || `shot_${idx + 1}`,
-        type: s.visual_type || 'archival_photo',
+        type: s.visual_type || s.type || 'archival_photo',
         badge: s.badge || '[Cinematic Beat]',
-        mediaUrl: s.media_url || 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1920&q=85',
-        cameraMovement: s.camera_movement || 'dolly_in',
+        mediaUrl: s.media_url || s.mediaUrl || 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1920&q=85',
+        cameraMovement: s.camera_movement || s.cameraMovement || 'dolly_in',
         transition: s.transition || 'fade',
         title: s.title || project.title,
         subtitle: s.narration ? `${s.narration.slice(0, 80)}...` : 'Strategic analysis and territorial assessment.',
@@ -592,18 +600,18 @@ export class PipelineManager {
         startFrame: startF,
         durationFrames: shotDurFrames,
         layers: s.layers || { particles: (s.visual_type === 'kinetic_title_card' || idx % 2 === 0) ? 'embers' : 'dust_motes' },
-        personData: s.person_data,
-        kineticTitleData: s.kinetic_title_data,
-        newspaperData: s.newspaper_data,
-        comparisonData: s.comparison_data,
-        archivalData: s.archival_data || (s.visual_type === 'newspaper_headline' || s.visual_type === 'archival_document' ? {
+        personData: s.person_data || s.personData,
+        kineticTitleData: s.kinetic_title_data || s.kineticTitleData,
+        newspaperData: s.newspaper_data || s.newspaperData,
+        comparisonData: s.comparison_data || s.comparisonData,
+        archivalData: s.archival_data || s.archivalData || ((s.visual_type === 'newspaper_headline' || s.visual_type === 'archival_document') ? {
           headline: (s.title || project.title).toUpperCase(),
           publication: 'THE GEOPOLITICAL HISTORICAL RECORD',
           date: 'OCTOBER 1973 // STRATEGIC DISPATCH',
           snippet: s.narration || '',
           highlightPhrase: 'Critical strategic corridor under international maritime scrutiny.'
         } : undefined),
-        visualData: {
+        visualData: s.visualData || {
           targetName: (project.topic || 'TACTICAL THEATER').toUpperCase(),
           statNumber: s.data_metric?.statNumber || (idx === 2 ? '21,000,000' : undefined),
           statLabel: s.data_metric?.statLabel || (idx === 2 ? 'BARRELS PER DAY' : undefined),

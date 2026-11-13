@@ -1338,7 +1338,7 @@ app.post('/api/clipper/clips/:clipId/render', async (req, res) => {
   try {
     const clipId = String(req.params.clipId);
     const outputRel = await ViralClipperService.renderClip(clipId);
-    res.json({ success: true, videoUrl: `/${outputRel}` });
+    res.json({ success: true, videoUrl: `/${outputRel}`, exportedVideo: outputRel });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

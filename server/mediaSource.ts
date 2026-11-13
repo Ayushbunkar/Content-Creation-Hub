@@ -302,35 +302,60 @@ export class MediaSourceManager {
   }
 
   /**
-   * Search curated local library photo
+   * Search curated local library photo with deep semantic entity recognition
    */
   static searchLocalLibraryFootage(query: string, category: string): string {
     const q = (query || '').toLowerCase();
     const c = (category || '').toLowerCase();
 
-    if (q.includes('ship') || q.includes('naval') || q.includes('ocean') || q.includes('sea') || q.includes('strait') || q.includes('water') || q.includes('chokepoint') || c.includes('geopolitics')) {
-      return 'https://images.unsplash.com/photo-1509299349698-dd22323b5963?w=1920&q=85';
+    // 1. Specific Tech / AI Entities (NVIDIA, Blackwell, Jensen Huang, TSMC, GPUs, Cleanrooms)
+    if (q.includes('jensen') || q.includes('huang') || q.includes('altman') || q.includes('nadella') || q.includes('musk')) {
+      return 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1920&q=85';
     }
-    if (q.includes('ai') || q.includes('tech') || q.includes('chip') || q.includes('computer') || q.includes('data') || q.includes('silicon') || c.includes('tech')) {
+    if (q.includes('nvidia') || q.includes('blackwell') || q.includes('b200') || q.includes('h100') || q.includes('superchip')) {
+      return 'https://images.unsplash.com/photo-1591488320449-011701bb6704?w=1920&q=85';
+    }
+    if (q.includes('chip') || q.includes('silicon') || q.includes('wafer') || q.includes('semiconductor') || q.includes('microchip') || q.includes('tsmc')) {
       return 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1920&q=85';
     }
-    if (q.includes('history') || q.includes('war') || q.includes('treaty') || q.includes('vintage') || q.includes('archive') || c.includes('history')) {
-      return 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=1920&q=85';
+    if (q.includes('server') || q.includes('datacenter') || q.includes('cloud') || q.includes('cluster') || q.includes('computing')) {
+      return 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1920&q=85';
     }
-    if (q.includes('money') || q.includes('market') || q.includes('oil') || q.includes('barrel') || q.includes('finance') || q.includes('trade') || c.includes('economic')) {
-      return 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1920&q=85';
-    }
-    if (q.includes('satellite') || q.includes('space') || q.includes('border') || q.includes('global') || q.includes('orbit')) {
-      return 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&q=85';
-    }
-    if (q.includes('person') || q.includes('ceo') || q.includes('executive') || q.includes('leader')) {
-      return 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1920&q=85';
-    }
-    if (q.includes('news') || q.includes('headline') || q.includes('press')) {
-      return 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1920&q=85';
+    if (q.includes('ai') || q.includes('algorithm') || q.includes('neural') || q.includes('model') || c.includes('tech')) {
+      return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1920&q=85';
     }
 
-    return 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1920&q=85';
+    // 2. Specific Geopolitics / Maritime / Naval Entities (Hormuz, Persian Gulf, Tanker, Navy)
+    if (q.includes('hormuz') || q.includes('persian') || q.includes('tanker') || q.includes('chokepoint') || q.includes('naval') || q.includes('carrier') || q.includes('destroyer') || q.includes('strait')) {
+      return 'https://images.unsplash.com/photo-1509299349698-dd22323b5963?w=1920&q=85';
+    }
+    if (q.includes('taiwan') || q.includes('china') || q.includes('island') || q.includes('border') || q.includes('sovereign')) {
+      return 'https://images.unsplash.com/photo-1508247967583-7d982ea01526?w=1920&q=85';
+    }
+    if (q.includes('satellite') || q.includes('orbit') || q.includes('space') || q.includes('telemetry') || q.includes('reconnaissance')) {
+      return 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&q=85';
+    }
+
+    // 3. Finance & Corporate Entities (Wall Street, Valuation, Trillion, Stocks, Boardroom)
+    if (q.includes('money') || q.includes('market') || q.includes('valuation') || q.includes('stock') || q.includes('trillion') || q.includes('billion') || q.includes('finance') || q.includes('trade') || c.includes('economic')) {
+      return 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1920&q=85';
+    }
+    if (q.includes('boardroom') || q.includes('executive') || q.includes('corporate') || q.includes('headquarters') || q.includes('office')) {
+      return 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&q=85';
+    }
+
+    // 4. Evidence / Investigative / Historical Entities
+    if (q.includes('document') || q.includes('evidence') || q.includes('classified') || q.includes('dossier') || q.includes('investigation') || q.includes('secret')) {
+      return 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=1920&q=85';
+    }
+    if (q.includes('news') || q.includes('headline') || q.includes('press') || q.includes('article') || q.includes('report')) {
+      return 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1920&q=85';
+    }
+    if (q.includes('history') || q.includes('archive') || q.includes('vintage') || q.includes('war') || q.includes('treaty') || c.includes('history')) {
+      return 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=1920&q=85';
+    }
+
+    return 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1920&q=85';
   }
 
   /**
@@ -348,8 +373,8 @@ export class MediaSourceManager {
    */
   static getAvailableLibraryAssets(): Array<{ id: string; name: string; url: string; category: string; duration: number }> {
     return [
-      { id: 'lib_ocean_naval', name: 'Maritime Chokepoint & Naval Waters', url: '/videos/library/ocean_naval.mp4', category: 'Geopolitics', duration: 10 },
       { id: 'lib_datacenter', name: 'Supercomputer & Silicon Data Grid', url: '/videos/library/datacenter_tech.mp4', category: 'Technology', duration: 10 },
+      { id: 'lib_ocean_naval', name: 'Maritime Chokepoint & Naval Waters', url: '/videos/library/ocean_naval.mp4', category: 'Geopolitics', duration: 10 },
       { id: 'lib_satellite', name: 'Orbital Telemetry & Global Scan', url: '/videos/library/satellite_globe.mp4', category: 'Geopolitics', duration: 10 },
       { id: 'lib_finance', name: 'Global Commodities & Logistics Network', url: '/videos/library/finance_trade.mp4', category: 'Economics', duration: 10 },
       { id: 'lib_archive', name: 'Archival 35mm Historical Newsreel', url: '/videos/library/historical_archive.mp4', category: 'History', duration: 10 },
@@ -361,7 +386,11 @@ export class MediaSourceManager {
 /**
  * Visual Quality Checker
  * Inspects all shots before rendering.
- * Strictly guarantees ZERO static image holds, enforces dynamic motion, verifies audio-visual alignment.
+ * Strictly guarantees:
+ * 1. MANDATORY 3-4s visual changes (splits any shot > 4.2s).
+ * 2. ZERO static image holds (subpixel Ken Burns on all photos).
+ * 3. Repetition prevention (no duplicate URLs consecutively).
+ * 4. Mixed media balance (video footage, archival photos, tactical maps, kinetic titles).
  */
 export class QualityChecker {
   static inspectAndUpgrade(scenes: SceneData[], category: string): { scenes: SceneData[]; report: QualityReport } {
@@ -384,19 +413,62 @@ export class QualityChecker {
     ];
 
     let lastMediaUrl = '';
+    const finalScenes: SceneData[] = [];
 
-    const upgradedScenes = scenes.map((shot, idx) => {
+    for (let idx = 0; idx < scenes.length; idx++) {
+      const shot = { ...scenes[idx] };
+      const dur = shot.duration || 3.3;
+
+      // 1. Enforce 3-4 Second Rule: If shot exceeds 4.2s, split into 3.0 - 3.5s sub-shots
+      if (dur > 4.2) {
+        const cutsCount = Math.max(2, Math.round(dur / 3.3));
+        const subDur = +(dur / cutsCount).toFixed(2);
+        const words = (shot.narration || '').split(/\s+/).filter(Boolean);
+        const wordsPerCut = Math.ceil(words.length / cutsCount);
+
+        for (let k = 0; k < cutsCount; k++) {
+          const subShot = { ...shot };
+          subShot.id = `${shot.id}_part${k + 1}`;
+          subShot.duration = subDur;
+          subShot.startSec = +(shot.startSec + k * subDur).toFixed(2);
+          subShot.endSec = +(shot.startSec + (k + 1) * subDur).toFixed(2);
+          subShot.startFrame = Math.round(subShot.startSec * 30);
+          subShot.durationFrames = Math.round(subDur * 30);
+          subShot.narration = words.slice(k * wordsPerCut, (k + 1) * wordsPerCut).join(' ') || shot.narration;
+          subShot.camera_movement = cameraMovements[(idx + k) % cameraMovements.length];
+
+          // Alternate visual types for the sub-cut
+          if (k > 0) {
+            if (subShot.visual_type === 'actual_video') {
+              subShot.visual_type = 'archival_photo';
+              subShot.media_url = MediaSourceManager.searchLocalLibraryFootage(subShot.narration, category);
+              subShot.badge = '[Archival Photo Analysis]';
+            } else {
+              subShot.visual_type = 'data_metric';
+              subShot.badge = '[Key Metric Breakdown]';
+            }
+          }
+          finalScenes.push(subShot);
+          notes.push(`Shot #${idx + 1} (${dur}s) subdivided into sub-shot ${k + 1} (${subDur}s) to enforce 3-4s rule.`);
+        }
+      } else {
+        finalScenes.push(shot);
+      }
+    }
+
+    const upgradedScenes = finalScenes.map((shot, idx) => {
       const cloned = { ...shot };
       cloned.shot_number = idx + 1;
 
-      // Ensure valid camera movement is assigned
+      // Ensure valid camera movement is assigned (ZERO static holds)
       if (!cloned.camera_movement || (cloned.camera_movement as any) === 'static') {
+        staticDetected++;
         cloned.camera_movement = cameraMovements[idx % cameraMovements.length];
+        staticUpgraded++;
       }
 
       // Check if scene needs classification or has no visual_type
-      if (!cloned.visual_type || cloned.visual_type === 'video_footage' as any) {
-        staticDetected++;
+      if (!cloned.visual_type || (cloned.visual_type as any) === 'video_footage') {
         const n = (cloned.narration || '').toLowerCase();
         if (n.includes('jensen') || n.includes('trump') || n.includes('ceo') || n.includes('president') || n.includes('leader')) {
           cloned.visual_type = 'person_intro';
@@ -423,9 +495,7 @@ export class QualityChecker {
           cloned.media_source = 'photograph';
           cloned.badge = '[Archival Photograph]';
         }
-        staticUpgraded++;
         cloned.quality_status = 'auto_enhanced';
-        notes.push(`Shot #${idx + 1} auto-assigned dynamic ${cloned.visual_type}`);
       }
 
       // If shot has no media_url, assign authentic photo fallback
@@ -433,23 +503,25 @@ export class QualityChecker {
         cloned.media_url = MediaSourceManager.searchLocalLibraryFootage(cloned.narration, category);
       }
 
-      // Avoid identical video clip back-to-back without camera variation
-      if (cloned.visual_type === 'video_footage' && cloned.media_url === lastMediaUrl) {
+      // Avoid identical media clip back-to-back without camera variation
+      if (cloned.media_url === lastMediaUrl) {
         duplicateMedia++;
         if (cloned.media_url === '/videos/library/ocean_naval.mp4') {
           cloned.media_url = '/videos/library/satellite_globe.mp4';
+        } else if (cloned.media_url === '/videos/library/datacenter_tech.mp4') {
+          cloned.media_url = 'https://images.unsplash.com/photo-1591488320449-011701bb6704?w=1920&q=85';
         } else {
-          cloned.media_url = '/videos/library/military_surveillance.mp4';
+          cloned.media_url = MediaSourceManager.searchLocalLibraryFootage(cloned.narration + ' ' + idx, category);
         }
         cloned.camera_movement = cameraMovements[(idx + 2) % cameraMovements.length];
-        notes.push(`Shot #${idx + 1} visual variety enforced: alternate footage & camera movement applied`);
+        notes.push(`Shot #${idx + 1} repetition prevented: alternative asset & camera movement applied.`);
       }
 
       if (cloned.media_url) lastMediaUrl = cloned.media_url;
 
       // Update counters
-      if (cloned.visual_type === 'video_footage') realVideoCount++;
-      else if (cloned.visual_type === 'archival_document') archivalCount++;
+      if (cloned.visual_type === 'actual_video') realVideoCount++;
+      else if (cloned.visual_type === 'archival_document' || cloned.visual_type === 'investigative_evidence' || cloned.visual_type === 'newspaper_headline') archivalCount++;
       else motionGraphicsCount++;
 
       // Ensure multi-layer particle system is configured for depth

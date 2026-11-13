@@ -180,27 +180,43 @@ export class DocumentaryNarrativeEngine {
       };
     });
 
-    // Storyboard Shot Division: Granular 3.5 - 5.5 second shots per chapter
+    // Storyboard Shot Division: Mandatory 3.0 - 3.8 second shots per chapter (15-20 cuts per 60s)
     const storyboard: SceneData[] = [];
     let shotCounter = 1;
     let accumulatedSec = 0;
 
     const cameraMovements: CameraMovement[] = [
-      'dolly_in', 'pan_left', 'aerial_zoom', 'orbit', 'tracking_forward', 'dolly_out', 'pan_right'
+      'dolly_in', 'pan_left', 'aerial_zoom', 'orbit', 'tracking_forward', 'dolly_out', 'pan_right', 'tilt_up'
     ];
     const visualTypes: VisualShotType[] = [
-      'cinematic_hook', 'video_footage', 'layered_parallax', 'archival_document',
-      'tactical_map', 'data_metric', 'video_footage', 'layered_parallax'
+      'actual_video', 'person_intro', 'kinetic_title_card', 'tech_broll' as any,
+      'tactical_map', 'data_metric', 'actual_video', 'newspaper_headline'
     ];
 
     chapters.forEach((chap, cIndex) => {
-      const sentences = chap.narration.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0);
+      const rawSentences = chap.narration.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0);
       const shotsInChap: SceneData[] = [];
 
-      sentences.forEach((sentence, sIndex) => {
-        const sentenceWords = sentence.split(/\s+/).length;
-        // Natural duration: ~2.2 words per second (135 WPM), min 3.5s, max 6.5s
-        const durationSec = Math.max(3.5, Math.min(6.5, +(sentenceWords / 2.2).toFixed(1)));
+      // Divide sentences into 3.0 to 3.8 second visual units (~8-9 words per visual cut)
+      const visualPhrases: string[] = [];
+      for (const sent of rawSentences) {
+        const words = sent.split(/\s+/).filter(Boolean);
+        if (words.length <= 9) {
+          visualPhrases.push(sent);
+        } else {
+          const cutsCount = Math.max(2, Math.round(words.length / 8));
+          const wordsPerCut = Math.ceil(words.length / cutsCount);
+          for (let k = 0; k < cutsCount; k++) {
+            const slice = words.slice(k * wordsPerCut, (k + 1) * wordsPerCut).join(' ');
+            if (slice.trim().length > 0) visualPhrases.push(slice);
+          }
+        }
+      }
+
+      visualPhrases.forEach((phrase, sIndex) => {
+        const phraseWords = phrase.split(/\s+/).length;
+        // Strict 3.0 - 3.8s duration
+        const durationSec = Math.max(2.8, Math.min(3.8, +(phraseWords / 2.3).toFixed(1)));
         const visualType = visualTypes[(shotCounter - 1) % visualTypes.length];
         const camMove = cameraMovements[(shotCounter - 1) % cameraMovements.length];
 

@@ -1431,6 +1431,11 @@
           const data = await res.json();
           setIsClipperBusy(false);
           if (data.success && activeClipperProject) {
+            const exportedPath = data.exportedVideo || (data.videoUrl ? data.videoUrl.replace(/^\//, '') : null);
+            if (exportedPath) {
+              setSelectedClip(prev => prev && prev.id === id ? { ...prev, exported_video: exportedPath, status: 'ready' } : prev);
+              setClipperClips(prev => prev.map(c => c.id === id ? { ...c, exported_video: exportedPath, status: 'ready' } : c));
+            }
             loadClipperProject(activeClipperProject.id);
           } else if (data.error) {
             alert('Render failed: ' + data.error);

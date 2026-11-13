@@ -964,20 +964,24 @@ export class ViralClipperService {
         filterGraph = `split=2[top][bottom];[top]crop=iw/2:ih:0:0,scale=1080:960:flags=lanczos[t_sc];[bottom]crop=iw/2:ih:iw/2:0,scale=1080:960:flags=lanczos[b_sc];[t_sc][b_sc]vstack=inputs=2,unsharp=5:5:0.5:5:5:0.0,subtitles='${relAss}'`;
       } else {
         // Gold standard Podcast blurred background framing (Premium Studio Grade)
-        filterGraph = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,gblur=sigma=26:steps=2,eq=brightness=-0.10:contrast=1.06[bg];[0:v]scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${relAss}'[outv]`;
+        const escapedAss = relAss.replace(/:/g, '\\\\:');
+        filterGraph = `[0:v]scale=360:640:force_original_aspect_ratio=increase:flags=fast_bilinear,crop=360:640,boxblur=luma_radius=16:luma_power=3,scale=1080:1920:flags=lanczos,eq=brightness=-0.12:contrast=1.08[bg];[0:v]scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${escapedAss}'[outv]`;
       }
     }
+
+    const duration = Math.max(1, clip.end_time - clip.start_time);
 
     return new Promise((resolve, reject) => {
       const args = [
         '-y',
         '-ss', clip.start_time.toString(),
-        '-to', clip.end_time.toString(),
         '-i', inputVideoPath,
+        '-t', duration.toString(),
+        '-avoid_negative_ts', 'make_zero',
         ...(isComplex ? ['-filter_complex', filterGraph, '-map', '[outv]', '-map', '0:a?'] : ['-vf', filterGraph]),
         '-c:v', 'libx264',
-        '-preset', 'medium',
-        '-crf', '17',
+        '-preset', 'fast',
+        '-crf', '18',
         '-tune', 'film',
         '-pix_fmt', 'yuv420p',
         '-color_primaries', 'bt709',
