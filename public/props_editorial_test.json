@@ -1,0 +1,89 @@
+{
+  "title": "THE SILICON TRAP: NVIDIA CEO RESIGNS",
+  "subtitle": "SPECIAL INVESTIGATIVE DOCUMENTARY // HIGH TECH CRISIS",
+  "category": "Technology Architecture",
+  "topic": "The Silicon Trap: NVIDIA CEO Resigns",
+  "narrationSrc": "/audio/sound-effects/low-rumble.wav",
+  "musicSrc": "/audio/bgm/tech_cyber.wav",
+  "sfxCues": [
+    {
+      "id": "sfx_1",
+      "name": "low-rumble",
+      "src": "/audio/sound-effects/low-rumble.wav",
+      "startFrame": 0,
+      "volume": 0.4
+    },
+    {
+      "id": "sfx_2",
+      "name": "whoosh",
+      "src": "/audio/sound-effects/whoosh.wav",
+      "startFrame": 45,
+      "volume": 0.5
+    },
+    {
+      "id": "sfx_3",
+      "name": "riser",
+      "src": "/audio/sound-effects/riser.wav",
+      "startFrame": 90,
+      "volume": 0.6
+    },
+    {
+      "id": "sfx_4",
+      "name": "sub-bass-impact",
+      "src": "/audio/sound-effects/sub-bass-impact.wav",
+      "startFrame": 120,
+      "volume": 0.85
+    }
+  ],
+  "scenes": [
+    {
+      "id": "shot_001",
+      "type": "person_intro",
+      "badge": "[Executive Portrait]",
+      "mediaUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1920&q=85",
+      "cameraMovement": "dolly_in",
+      "title": "JENSEN HUANG",
+      "subtitle": "Chief Executive Officer • NVIDIA",
+      "location": "SILICON VALLEY, CA",
+      "narration": "One man built a multi-trillion dollar AI empire.",
+      "startFrame": 0,
+      "durationFrames": 60,
+      "personData": {
+        "name": "JENSEN HUANG",
+        "title": "CHIEF EXECUTIVE OFFICER",
+        "organization": "NVIDIA CORPORATION",
+        "location": "SANTA CLARA, CA"
+      }
+    },
+    {
+      "id": "shot_002",
+      "type": "actual_video",
+      "badge": "[4K Datacenter B-Roll]",
+      "mediaUrl": "/videos/library/datacenter_tech.mp4",
+      "cameraMovement": "tracking_forward",
+      "title": "CRITICAL SILICON INFRASTRUCTURE",
+      "subtitle": "Supercomputing architectures powering global military and AI defense networks.",
+      "narration": "Behind closed doors, the most sensitive technological secrets of the 21st century intersect with sovereign defense.",
+      "startFrame": 60,
+      "durationFrames": 60
+    },
+    {
+      "id": "shot_003",
+      "type": "kinetic_title_card",
+      "badge": "[3D Kinetic Title Card]",
+      "cameraMovement": "orbit",
+      "title": "THE SILICON TRAP",
+      "narration": "This is the real story behind the Silicon Trap.",
+      "startFrame": 120,
+      "durationFrames": 90,
+      "kineticTitleData": {
+        "line1": "THE SILICON TRAP",
+        "line2": "NVIDIA CEO RESIGNS",
+        "highlightWord": "NVIDIA",
+        "highlightColor": "#ff2a2a",
+        "particles": "embers"
+      }
+    }
+  ],
+  "durationInFrames": 210
+}

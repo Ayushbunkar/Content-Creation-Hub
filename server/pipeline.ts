@@ -6,6 +6,7 @@ import { DocumentaryNarrativeEngine } from './documentaryNarrative';
 import { SceneIntelligenceEngine } from './sceneIntelligence';
 import { VideoEnhancerService } from './videoEnhancer';
 import { CinematicEditorialEngine, SoundDesignEngine } from './cinematicEditorialEngine';
+import { CopyrightLicenseManager } from './copyrightService';
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
@@ -105,7 +106,8 @@ export class PipelineManager {
           project.category,
           shotId,
           shot.duration || 4,
-          project.aspect_ratio || '16:9'
+          project.aspect_ratio || '16:9',
+          projectId
         );
       }
       const progressPct = Math.round(50 + ((i + 1) / Math.max(1, totalShots)) * 5);
@@ -124,6 +126,13 @@ export class PipelineManager {
       }
     }
     await runQuery('UPDATE projects SET narration_file = ? WHERE id = ?', [`/audio/narration_${projectId}.wav`, projectId]);
+
+    // Register voice narration in persistent Copyright & Licensing registry
+    try {
+      await CopyrightLicenseManager.registerNarrationTrack(projectId, project.voice || 'af_heart', narrationWav);
+    } catch (e: any) {
+      console.warn(`[Pipeline] Voice narration copyright registration note:`, e?.message);
+    }
 
     // 7. SUBTITLE GENERATION (Whisper base)
     await this.updateStage(projectId, 'SUBTITLE_GENERATION', 75);
@@ -177,7 +186,25 @@ export class PipelineManager {
         }
       }
 
-      // Module 8: Quality Control Inspection
+      // Generate Comprehensive YouTube Copyright & Asset Licensing Report
+      try {
+        const copyrightReport = await CopyrightLicenseManager.generateYouTubeCopyrightReport(projectId);
+        console.log(`[Pipeline] YouTube Copyright Report generated for ${projectId}: Status = ${copyrightReport.summary.overallClearance}, ${copyrightReport.summary.commercialClearedPercent}% cleared`);
+
+        // Automatically append copyright and licensing attribution to YouTube description
+        const currentProject = await getQuery<any>('SELECT social_captions FROM projects WHERE id = ?', [projectId]);
+        if (currentProject?.social_captions) {
+          try {
+            const sc = JSON.parse(currentProject.social_captions);
+            if (sc.youtube_description && !sc.youtube_description.includes('RIGHTS & USAGE NOTICE')) {
+              sc.youtube_description = `${sc.youtube_description}\n\n${copyrightReport.youtubeDescriptionCredits}`;
+              await runQuery('UPDATE projects SET social_captions = ? WHERE id = ?', [JSON.stringify(sc), projectId]);
+            }
+          } catch (scErr) {}
+        }
+      } catch (crErr: any) {
+        console.warn(`[Pipeline] Copyright report generation note:`, crErr?.message);
+      }
       try {
         const audioPath = path.join(process.cwd(), 'public', 'audio', `narration_${projectId}.wav`);
         const audioDur = await this.probeAudioDuration(audioPath);
@@ -580,6 +607,14 @@ export class PipelineManager {
 
     // Sound effects generation from scenes
     const sfxCues = SoundDesignEngine.generateSfxCues(cinematicScenes, totalFrames);
+
+    // Register BGM and SFX in persistent Copyright & Licensing Registry
+    try {
+      await CopyrightLicenseManager.registerProjectMusic(projectId, timeline.musicTrack || musicTrack);
+      await CopyrightLicenseManager.registerProjectSfx(projectId, sfxCues.map((c: any) => c.file));
+    } catch (e: any) {
+      console.warn(`[Pipeline] Audio copyright registration note:`, e?.message);
+    }
 
     return new Promise((resolve, reject) => {
       const relPropsPath = path.join('public', `props_${projectId}.json`);

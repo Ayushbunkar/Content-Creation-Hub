@@ -14,6 +14,7 @@ import { DocumentaryResearchService } from './documentaryResearch';
 import { DocumentaryNarrativeEngine } from './documentaryNarrative';
 import { VideoEnhancerService } from './videoEnhancer';
 import { CinematicEditorialEngine } from './cinematicEditorialEngine';
+import { CopyrightLicenseManager } from './copyrightService';
 
 const app = express();
 const server = http.createServer(app);
@@ -1512,6 +1513,128 @@ app.post('/api/projects/:id/apply-enhancements', async (req, res) => {
     );
 
     res.json({ success: true, message: 'Enhancement settings saved successfully' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =========================================================================
+// COPYRIGHT & ASSET LICENSING MANAGEMENT SYSTEM ENDPOINTS
+// =========================================================================
+
+// 1. Get YouTube Copyright & Licensing Report for a Project
+app.get('/api/projects/:id/copyright-report', async (req, res) => {
+  try {
+    const projectId = String(req.params.id);
+    const proj = await getQuery<any>('SELECT copyright_report FROM projects WHERE id = ?', [projectId]);
+    if (!proj) return res.status(404).json({ error: 'Project not found' });
+
+    let report = proj.copyright_report ? JSON.parse(proj.copyright_report) : null;
+    if (!report) {
+      report = await CopyrightLicenseManager.generateYouTubeCopyrightReport(projectId);
+    }
+
+    const mdPath = path.join(process.cwd(), 'output', `${projectId}_copyright_report.md`);
+    const markdown = fs.existsSync(mdPath) ? fs.readFileSync(mdPath, 'utf-8') : '';
+
+    res.json({ success: true, report, markdown });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Trigger fresh Copyright & Licensing Audit for a Project
+app.post('/api/projects/:id/copyright-check', async (req, res) => {
+  try {
+    const projectId = String(req.params.id);
+    const report = await CopyrightLicenseManager.generateYouTubeCopyrightReport(projectId);
+    const mdPath = path.join(process.cwd(), 'output', `${projectId}_copyright_report.md`);
+    const markdown = fs.existsSync(mdPath) ? fs.readFileSync(mdPath, 'utf-8') : '';
+
+    res.json({ success: true, report, markdown, message: 'Copyright audit completed successfully' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Query Persistent Asset Registry
+app.get('/api/assets/registry', async (req, res) => {
+  try {
+    const { projectId, assetType, sourcePlatform, verifiedStatus } = req.query;
+    let sql = 'SELECT * FROM asset_registry WHERE 1=1';
+    const params: any[] = [];
+
+    if (projectId) {
+      sql += ' AND project_id = ?';
+      params.push(String(projectId));
+    }
+    if (assetType) {
+      sql += ' AND asset_type = ?';
+      params.push(String(assetType));
+    }
+    if (sourcePlatform) {
+      sql += ' AND source_platform = ?';
+      params.push(String(sourcePlatform));
+    }
+    if (verifiedStatus) {
+      sql += ' AND verified_status = ?';
+      params.push(String(verifiedStatus));
+    }
+
+    sql += ' ORDER BY created_at DESC LIMIT 200';
+    const rows = await allQuery(sql, params);
+    res.json({ success: true, assets: rows });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Manually Register or Update Asset Licensing Metadata
+app.post('/api/assets/register', async (req, res) => {
+  try {
+    const {
+      assetId,
+      projectId,
+      assetType,
+      sourcePlatform,
+      originalUrl,
+      downloadUrl,
+      creatorName,
+      creatorProfileUrl,
+      licenseType,
+      licenseUrl,
+      commercialUse,
+      attributionRequired,
+      attributionText,
+      usageRestrictions,
+      verifiedStatus,
+      rightsFlags
+    } = req.body;
+
+    if (!assetId || !assetType || !sourcePlatform) {
+      return res.status(400).json({ error: 'assetId, assetType, and sourcePlatform are required fields.' });
+    }
+
+    const record = await CopyrightLicenseManager.registerAsset({
+      assetId,
+      projectId,
+      assetType,
+      sourcePlatform,
+      originalUrl,
+      downloadUrl,
+      creatorName,
+      creatorProfileUrl,
+      licenseType,
+      licenseUrl,
+      commercialUse: commercialUse !== undefined ? !!commercialUse : true,
+      attributionRequired: attributionRequired !== undefined ? !!attributionRequired : false,
+      attributionText,
+      usageRestrictions,
+      verifiedStatus,
+      rightsFlags
+    });
+
+    res.json({ success: true, asset: record });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

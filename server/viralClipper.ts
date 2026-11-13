@@ -3,6 +3,7 @@ import fs from 'fs';
 import { spawn } from 'child_process';
 import { runQuery, getQuery, allQuery } from './db';
 import { CaptionStudioService, TranscriptSegment, MediaProbeInfo } from './captionStudio';
+import { CopyrightLicenseManager } from './copyrightService';
 
 export interface ClipperProject {
   id: string;
@@ -168,6 +169,27 @@ export class ViralClipperService {
 
     try {
       let videoPath = path.isAbsolute(project.video_path) ? project.video_path : path.join(process.cwd(), project.video_path);
+
+      // Register source footage in persistent Copyright & Licensing Registry
+      try {
+        await CopyrightLicenseManager.registerAsset({
+          assetId: `clipper_src_${projectId}`,
+          projectId,
+          assetType: 'video',
+          sourcePlatform: project.source_type === 'youtube' ? 'youtube' : 'user_upload',
+          originalUrl: project.source_url || project.video_path,
+          downloadUrl: project.video_path,
+          creatorName: project.title || 'Original Video Creator',
+          creatorProfileUrl: project.source_url || '',
+          licenseType: project.source_type === 'youtube' ? 'Standard YouTube License / Fair Use Editorial' : 'User Certified License',
+          commercialUse: project.source_type !== 'youtube',
+          attributionRequired: project.source_type === 'youtube',
+          attributionText: `Original footage: "${project.title}" (${project.source_url || 'User Provided'})`,
+          usageRestrictions: project.source_type === 'youtube' ? 'Fair Use excerpt for commentary, criticism, or news reporting.' : 'Authorized by user for video clipping.'
+        });
+      } catch (e: any) {
+        console.warn('[ViralClipper] Asset registry note:', e?.message);
+      }
 
       // Stage 1: Download if YouTube URL and file not yet downloaded
       if (project.source_type === 'youtube' && project.source_url && !fs.existsSync(videoPath)) {

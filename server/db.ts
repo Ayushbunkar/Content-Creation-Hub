@@ -56,6 +56,7 @@ export function initDatabase(): Promise<void> {
           `ALTER TABLE projects ADD COLUMN documentary_chapters TEXT`,
           `ALTER TABLE projects ADD COLUMN enhancement_settings TEXT`,
           `ALTER TABLE projects ADD COLUMN qc_report TEXT`,
+          `ALTER TABLE projects ADD COLUMN copyright_report TEXT`,
           `ALTER TABLE projects ADD COLUMN color_profile TEXT DEFAULT 'cinematic_documentary'`,
           `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`
         ];
@@ -89,6 +90,7 @@ export function initDatabase(): Promise<void> {
           `ALTER TABLE projects ADD COLUMN documentary_chapters TEXT`,
           `ALTER TABLE projects ADD COLUMN enhancement_settings TEXT`,
           `ALTER TABLE projects ADD COLUMN qc_report TEXT`,
+          `ALTER TABLE projects ADD COLUMN copyright_report TEXT`,
           `ALTER TABLE projects ADD COLUMN color_profile TEXT DEFAULT 'cinematic_documentary'`,
           `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`
         ];
@@ -130,6 +132,7 @@ export function initDatabase(): Promise<void> {
           `ALTER TABLE projects ADD COLUMN documentary_chapters TEXT`,
           `ALTER TABLE projects ADD COLUMN enhancement_settings TEXT`,
           `ALTER TABLE projects ADD COLUMN qc_report TEXT`,
+          `ALTER TABLE projects ADD COLUMN copyright_report TEXT`,
           `ALTER TABLE projects ADD COLUMN color_profile TEXT DEFAULT 'cinematic_documentary'`,
           `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`
         ];
@@ -173,6 +176,7 @@ export function initDatabase(): Promise<void> {
           `ALTER TABLE projects ADD COLUMN documentary_chapters TEXT`,
           `ALTER TABLE projects ADD COLUMN enhancement_settings TEXT`,
           `ALTER TABLE projects ADD COLUMN qc_report TEXT`,
+          `ALTER TABLE projects ADD COLUMN copyright_report TEXT`,
           `ALTER TABLE projects ADD COLUMN color_profile TEXT DEFAULT 'cinematic_documentary'`,
           `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`
         ];
@@ -206,7 +210,38 @@ export function initDatabase(): Promise<void> {
         )
       `, (err) => {
         if (err) return reject(err);
-        resolve();
+
+        // Persistent Asset Registry table for Copyright and Asset Licensing Management
+        db.run(`
+          CREATE TABLE IF NOT EXISTS asset_registry (
+            id TEXT PRIMARY KEY,
+            asset_id TEXT NOT NULL,
+            project_id TEXT,
+            asset_type TEXT NOT NULL,
+            source_platform TEXT NOT NULL,
+            original_url TEXT,
+            download_url TEXT,
+            creator_name TEXT,
+            creator_profile_url TEXT,
+            license_type TEXT NOT NULL,
+            license_url TEXT,
+            commercial_use INTEGER DEFAULT 1,
+            attribution_required INTEGER DEFAULT 0,
+            attribution_text TEXT,
+            usage_restrictions TEXT,
+            verified_status TEXT DEFAULT 'verified',
+            rights_flags TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `, (regErr) => {
+          if (regErr) return reject(regErr);
+          // Indices for quick lookup and deduplication
+          db.run(`CREATE INDEX IF NOT EXISTS idx_asset_reg_asset_id ON asset_registry(asset_id)`, () => {});
+          db.run(`CREATE INDEX IF NOT EXISTS idx_asset_reg_project_id ON asset_registry(project_id)`, () => {});
+          db.run(`CREATE INDEX IF NOT EXISTS idx_asset_reg_original_url ON asset_registry(original_url)`, () => {});
+          resolve();
+        });
       });
     });
   });

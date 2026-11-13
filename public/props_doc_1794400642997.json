@@ -1,0 +1,1338 @@
+{
+  "title": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE",
+  "subtitle": "STRATEGIC GEOPOLITICS // SPECIAL INTELLIGENCE REPORT",
+  "category": "Documentary Studio",
+  "topic": "NVIDIA Blackwell AI Superchip Architecture",
+  "narrationSrc": "/audio/narration_doc_1794400642997.wav",
+  "musicSrc": "/audio/bgm/epic_geopolitics.wav",
+  "subtitlesData": {
+    "cues": [
+      {
+        "index": 1,
+        "startTime": 0,
+        "endTime": 7.5,
+        "text": "In modern geopolitics and international corporate power, the most dangerous moments rarely begin with an army marching across a border.",
+        "startFrame": 0,
+        "endFrame": 225,
+        "durationFrames": 225
+      },
+      {
+        "index": 2,
+        "startTime": 7.5,
+        "endTime": 19.1,
+        "text": "They begin quietly behind closed doors, where the most sensitive technological secrets of the 21st century intersect with personal relationships, corporate governance, and foreign intelligence.",
+        "startFrame": 225,
+        "endFrame": 573,
+        "durationFrames": 348
+      },
+      {
+        "index": 3,
+        "startTime": 19.1,
+        "endTime": 23.1,
+        "text": "This is the real story behind NVIDIA RTX Spark.",
+        "startFrame": 573,
+        "endFrame": 693,
+        "durationFrames": 120
+      },
+      {
+        "index": 4,
+        "startTime": 23.6,
+        "endTime": 33.6,
+        "text": "An investigation that reached the highest echelons of global industry, triggered independent corporate inquiries, and raised a question that world governments are still trying to answer.",
+        "startFrame": 708,
+        "endFrame": 1008,
+        "durationFrames": 300
+      },
+      {
+        "index": 5,
+        "startTime": 33.6,
+        "endTime": 38.6,
+        "text": "Can personal vulnerability compromise the most powerful technology on Earth?",
+        "startFrame": 1008,
+        "endFrame": 1158,
+        "durationFrames": 150
+      },
+      {
+        "index": 6,
+        "startTime": 38.6,
+        "endTime": 45.6,
+        "text": "To understand why this matter commands international scrutiny, we must first examine what is actually at stake.",
+        "startFrame": 1158,
+        "endFrame": 1368,
+        "durationFrames": 210
+      },
+      {
+        "index": 7,
+        "startTime": 45.6,
+        "endTime": 58.6,
+        "text": "We are living in an era where strategic dominance is no longer determined solely by naval fleets or oil reserves, but by advanced computing, high-density silicon architectures, and artificial intelligence models.",
+        "startFrame": 1368,
+        "endFrame": 1758,
+        "durationFrames": 390
+      },
+      {
+        "index": 8,
+        "startTime": 58.6,
+        "endTime": 66.599,
+        "text": "Blackwell, micro-architecture, and global technology and security institutions do not merely operate as commercial enterprises.",
+        "startFrame": 1758,
+        "endFrame": 1998,
+        "durationFrames": 240
+      },
+      {
+        "index": 9,
+        "startTime": 66.599,
+        "endTime": 73.599,
+        "text": "They form the foundational backbone of sovereign defense networks, financial stability, and international competitiveness.",
+        "startFrame": 1998,
+        "endFrame": 2208,
+        "durationFrames": 210
+      },
+      {
+        "index": 10,
+        "startTime": 73.599,
+        "endTime": 82.599,
+        "text": "Public documentation and financial filings reveal that disruptions at this level can send seismic shockwaves through international markets overnight.",
+        "startFrame": 2208,
+        "endFrame": 2478,
+        "durationFrames": 270
+      },
+      {
+        "index": 11,
+        "startTime": 82.599,
+        "endTime": 91.599,
+        "text": "When allegations surfaced concerning key leadership, it was not treated as a private matter, but as an immediate matter of strategic national security.",
+        "startFrame": 2478,
+        "endFrame": 2748,
+        "durationFrames": 270
+      },
+      {
+        "index": 12,
+        "startTime": 91.599,
+        "endTime": 101.599,
+        "text": "At the epicenter of this developing controversy, stand distinct figures and organizations operating across very different legal and intelligence jurisdictions.",
+        "startFrame": 2748,
+        "endFrame": 3048,
+        "durationFrames": 300
+      },
+      {
+        "index": 13,
+        "startTime": 101.599,
+        "endTime": 111.599,
+        "text": "Foremost is Blackwell, micro-architecture, and executive whose decisions have shaped the modern technological landscape over decades of leadership.",
+        "startFrame": 3048,
+        "endFrame": 3348,
+        "durationFrames": 300
+      },
+      {
+        "index": 14,
+        "startTime": 111.599,
+        "endTime": 123.599,
+        "text": "Operating in parallel are international entities including global technology and security institutions, specialized technology partners across East Asia, and security agencies whose mandate is counterintelligence.",
+        "startFrame": 3348,
+        "endFrame": 3708,
+        "durationFrames": 360
+      },
+      {
+        "index": 15,
+        "startTime": 123.599,
+        "endTime": 135.599,
+        "text": "Investigators emphasize a crucial distinction. In high stakes corporate reporting, the existence of personal association does not automatically establish complicity in foreign espionage.",
+        "startFrame": 3708,
+        "endFrame": 4068,
+        "durationFrames": 360
+      },
+      {
+        "index": 16,
+        "startTime": 135.599,
+        "endTime": 145.599,
+        "text": "Yet within the intelligence community, counterintelligence doctrines warn that human relationships have historically served as the primary entry point for strategic surveillance.",
+        "startFrame": 4068,
+        "endFrame": 4368,
+        "durationFrames": 300
+      },
+      {
+        "index": 17,
+        "startTime": 146.599,
+        "endTime": 160.599,
+        "text": "How did the timeline actually unfold according to established public records? According to investigative reporting published by major international outlets, inquiries were initiated following reports concerning executive conduct and foreign intelligence interest.",
+        "startFrame": 4398,
+        "endFrame": 4818,
+        "durationFrames": 420
+      },
+      {
+        "index": 18,
+        "startTime": 160.599,
+        "endTime": 172.599,
+        "text": "The earliest reports indicated that counterintelligence officials had placed specific associations under review, monitoring travel, institutional contacts, and communication corridors.",
+        "startFrame": 4818,
+        "endFrame": 5178,
+        "durationFrames": 360
+      },
+      {
+        "index": 19,
+        "startTime": 172.599,
+        "endTime": 184.599,
+        "text": "Then informal communications addressed to employees and board members leadership directly acknowledged personal indiscretions, issuing a public apology while confirming full cooperation with governance reviews.",
+        "startFrame": 5178,
+        "endFrame": 5538,
+        "durationFrames": 360
+      },
+      {
+        "index": 20,
+        "startTime": 184.599,
+        "endTime": 195.599,
+        "text": "Shortly thereafter, corporate boards launched independent inquiries led by external legal and security council to examine whether corporate oversight standards had been maintained.",
+        "startFrame": 5538,
+        "endFrame": 5868,
+        "durationFrames": 330
+      },
+      {
+        "index": 21,
+        "startTime": 196.599,
+        "endTime": 205.599,
+        "text": "Every step in this timeline reveals an institution balancing public transparency against the intense pressure of global geopolitical scrutiny.",
+        "startFrame": 5898,
+        "endFrame": 6168,
+        "durationFrames": 270
+      },
+      {
+        "index": 22,
+        "startTime": 205.599,
+        "endTime": 214.599,
+        "text": "To evaluate the true credibility of these concerns, one must understand how modern intelligence operations actually target global technology firms.",
+        "startFrame": 6168,
+        "endFrame": 6438,
+        "durationFrames": 270
+      },
+      {
+        "index": 23,
+        "startTime": 214.599,
+        "endTime": 229.599,
+        "text": "Contrary to cinematic fiction, intelligence services do not rely solely on rogue cyber hacks. Instead, security experts document the practice of human source targeting often referred to as social engineering or compromise operations.",
+        "startFrame": 6438,
+        "endFrame": 6888,
+        "durationFrames": 450
+      },
+      {
+        "index": 24,
+        "startTime": 229.599,
+        "endTime": 243.599,
+        "text": "The objective is rarely to walk away with an entire supercomputer. Rather, it is to obtain subtle insights, upcoming chip road maps, internal corporate debates, supplier bottlenecks or personal leverage over key decision makers.",
+        "startFrame": 6888,
+        "endFrame": 7308,
+        "durationFrames": 420
+      },
+      {
+        "index": 25,
+        "startTime": 243.599,
+        "endTime": 255.599,
+        "text": "In an industry where an advanced notice of three months can reshape a multi-billion dollar export policy, access to executive decision makers is regarded by foreign intelligence as invaluable currency.",
+        "startFrame": 7308,
+        "endFrame": 7668,
+        "durationFrames": 360
+      },
+      {
+        "index": 26,
+        "startTime": 255.599,
+        "endTime": 261.6,
+        "text": "A rigorous investigative documentary must separate confirmed events from unproven speculation.",
+        "startFrame": 7668,
+        "endFrame": 7848,
+        "durationFrames": 180
+      },
+      {
+        "index": 27,
+        "startTime": 261.6,
+        "endTime": 272.6,
+        "text": "Crucially, independent investigators and official statements emphasize that while controversy exists, there is no verified evidence that company secrets or national security were breached.",
+        "startFrame": 7848,
+        "endFrame": 8178,
+        "durationFrames": 330
+      },
+      {
+        "index": 28,
+        "startTime": 273.6,
+        "endTime": 281.6,
+        "text": "In formal statements, the company affirmed that rigorous internal data protections remained uncompromised throughout the period in question.",
+        "startFrame": 8208,
+        "endFrame": 8448,
+        "durationFrames": 240
+      },
+      {
+        "index": 29,
+        "startTime": 281.6,
+        "endTime": 292.6,
+        "text": "Furthermore, in diplomatic briefings, foreign representatives rejected the espionage allegations, describing claims of state intelligence orchestration as baseless political theater.",
+        "startFrame": 8448,
+        "endFrame": 8778,
+        "durationFrames": 330
+      },
+      {
+        "index": 30,
+        "startTime": 292.6,
+        "endTime": 303.6,
+        "text": "Political leaders and industry allies also voiced strong support, cautioning against allowing unsubstantiated rumors to destabilize vital domestic technology champions.",
+        "startFrame": 8778,
+        "endFrame": 9108,
+        "durationFrames": 330
+      },
+      {
+        "index": 31,
+        "startTime": 303.6,
+        "endTime": 312.6,
+        "text": "These counterpoints underscore that personal mistakes must not be conflated with treason or institutional espionage in the absence of verified facts.",
+        "startFrame": 9108,
+        "endFrame": 9378,
+        "durationFrames": 270
+      },
+      {
+        "index": 32,
+        "startTime": 312.6,
+        "endTime": 320.6,
+        "text": "Regardless of how future legal or board reviews conclude, the wider repercussions across the technology sector are already undeniable.",
+        "startFrame": 9378,
+        "endFrame": 9618,
+        "durationFrames": 240
+      },
+      {
+        "index": 33,
+        "startTime": 321.6,
+        "endTime": 328.6,
+        "text": "Around the globe, sovereign governments are actively re-evaluating corporate governance rules for critical infrastructure executives.",
+        "startFrame": 9648,
+        "endFrame": 9858,
+        "durationFrames": 210
+      },
+      {
+        "index": 34,
+        "startTime": 328.6,
+        "endTime": 338.6,
+        "text": "Security briefings that were once confined to defense contractors are now becoming mandatory protocol across Silicon Valley, Taiwan, Japan, and Europe.",
+        "startFrame": 9858,
+        "endFrame": 10158,
+        "durationFrames": 300
+      },
+      {
+        "index": 35,
+        "startTime": 338.6,
+        "endTime": 347.6,
+        "text": "Export control frameworks, supply chain verification treaties, and executive personal security protocols are undergoing comprehensive overhalls.",
+        "startFrame": 10158,
+        "endFrame": 10428,
+        "durationFrames": 270
+      },
+      {
+        "index": 36,
+        "startTime": 347.6,
+        "endTime": 352.6,
+        "text": "The controversy surrounding Nvidia RTX Spark has served as an urgent wake-up call.",
+        "startFrame": 10428,
+        "endFrame": 10578,
+        "durationFrames": 150
+      },
+      {
+        "index": 37,
+        "startTime": 352.6,
+        "endTime": 361.6,
+        "text": "In the 21st century, multinational technology companies are no longer just private businesses. They are vital strategic sovereign assets.",
+        "startFrame": 10578,
+        "endFrame": 10848,
+        "durationFrames": 270
+      },
+      {
+        "index": 38,
+        "startTime": 361.6,
+        "endTime": 366.6,
+        "text": "As we step back and review the full evidence, several fundamental questions remain open.",
+        "startFrame": 10848,
+        "endFrame": 10998,
+        "durationFrames": 150
+      },
+      {
+        "index": 39,
+        "startTime": 366.6,
+        "endTime": 375.6,
+        "text": "Will the ongoing independent corporate and regulatory reviews uncover additional details or confirm that company integrity held firm?",
+        "startFrame": 10998,
+        "endFrame": 11268,
+        "durationFrames": 270
+      },
+      {
+        "index": 40,
+        "startTime": 375.6,
+        "endTime": 382.6,
+        "text": "How will global technology leaders navigate an era where personal privacy and national security increasingly collide?",
+        "startFrame": 11268,
+        "endFrame": 11478,
+        "durationFrames": 210
+      },
+      {
+        "index": 41,
+        "startTime": 382.6,
+        "endTime": 391.6,
+        "text": "The verified facts establish personal admissions and formal oversight inquiries. The allegations of state espionage remain unproven and vigorously contested.",
+        "startFrame": 11478,
+        "endFrame": 11748,
+        "durationFrames": 270
+      },
+      {
+        "index": 42,
+        "startTime": 391.6,
+        "endTime": 398.6,
+        "text": "What is certain is that the world of technology and the world of international intelligence are now permanently entwined.",
+        "startFrame": 11748,
+        "endFrame": 11958,
+        "durationFrames": 210
+      },
+      {
+        "index": 43,
+        "startTime": 398.6,
+        "endTime": 406.6,
+        "text": "And in that high stakes arena, the truth is not determined by dramatic headlines, but by the careful verified evidence left behind.",
+        "startFrame": 11958,
+        "endFrame": 12198,
+        "durationFrames": 240
+      }
+    ]
+  },
+  "captionTemplate": "cinematic-editorial",
+  "scenes": [
+    {
+      "id": "shot_001",
+      "type": "cinematic_hook",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/library/datacenter_tech.mp4",
+      "cameraMovement": "dolly_in",
+      "transition": "crossfade",
+      "title": "Chapter 1: The Central Question: Shot 1",
+      "subtitle": "In modern geopolitics and international corporate power, the most dangerous mome...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "In modern geopolitics and international corporate power, the most dangerous moments rarely begin with an army marching across a border.",
+      "startFrame": 0,
+      "durationFrames": 281,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_002",
+      "type": "video_footage",
+      "badge": "[Real B-Roll Footage]",
+      "mediaUrl": "/videos/cache/enhanced_doc_1794400642997_shot_002.mp4",
+      "cameraMovement": "pan_left",
+      "transition": "crossfade",
+      "title": "Chapter 1: The Central Question: Shot 2",
+      "subtitle": "They begin quietly, behind closed doors, where the most sensitive technological ...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "They begin quietly, behind closed doors, where the most sensitive technological secrets of the twenty-first century intersect with personal relationships, corporate governance, and foreign intelligence.",
+      "startFrame": 281,
+      "durationFrames": 351,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_003",
+      "type": "layered_parallax",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/cache/asset_doc_1794400642997_shot_003.jpg",
+      "cameraMovement": "aerial_zoom",
+      "transition": "crossfade",
+      "title": "Chapter 1: The Central Question: Shot 3",
+      "subtitle": "This is the real story behind Nvidia RTX Spark....",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "This is the real story behind Nvidia RTX Spark.",
+      "startFrame": 632,
+      "durationFrames": 126,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE",
+        "statNumber": "21,000,000",
+        "statLabel": "BARRELS PER DAY",
+        "statSubtext": "Over 20% of international petroleum trade flows through this single corridor."
+      }
+    },
+    {
+      "id": "shot_004",
+      "type": "archival_document",
+      "badge": "[Verified Document]",
+      "mediaUrl": "/videos/library/historical_archive.mp4",
+      "cameraMovement": "orbit",
+      "transition": "whip_pan",
+      "title": "Chapter 1: The Central Question: Shot 4",
+      "subtitle": "An investigation that reached the highest echelons of global industry, triggered...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "An investigation that reached the highest echelons of global industry, triggered independent corporate inquiries, and raised a question that world governments are still trying to answer: Can personal vulnerability compromise the most powerful technology on Earth?",
+      "startFrame": 758,
+      "durationFrames": 505,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "archivalData": {
+        "headline": "International authorities and foreign governments rejected allega",
+        "publication": "International Intelligence & Regulatory Press",
+        "date": "2026-11",
+        "snippet": "An investigation that reached the highest echelons of global industry, triggered independent corporate inquiries, and raised a question that world governments are still trying to answer: Can personal vulnerability compromise the most powerful technology on Earth?",
+        "highlightPhrase": "An investigation that reached"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_005",
+      "type": "tactical_map",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/library/datacenter_tech.mp4",
+      "cameraMovement": "tracking_forward",
+      "transition": "crossfade",
+      "title": "Chapter 2: The Subject & Global Stakes: Shot 1",
+      "subtitle": "To understand why this matter commands international scrutiny, we must first exa...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "To understand why this matter commands international scrutiny, we must first examine what is actually at stake.",
+      "startFrame": 1263,
+      "durationFrames": 238,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_006",
+      "type": "data_metric",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/cache/asset_doc_1794400642997_shot_006.jpg",
+      "cameraMovement": "dolly_out",
+      "transition": "crossfade",
+      "title": "Chapter 2: The Subject & Global Stakes: Shot 2",
+      "subtitle": "We are living in an era where strategic dominance is no longer determined solely...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "We are living in an era where strategic dominance is no longer determined solely by naval fleets or oil reserves, but by advanced computing, high-density silicon architectures, and artificial intelligence models.",
+      "startFrame": 1501,
+      "durationFrames": 435,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE",
+        "statNumber": "$500B+",
+        "statLabel": "Critical Silicon Infrastructure Value",
+        "statSubtext": "Strategic National Security Market Exposure"
+      }
+    },
+    {
+      "id": "shot_007",
+      "type": "video_footage",
+      "badge": "[Real B-Roll Footage]",
+      "mediaUrl": "/videos/cache/enhanced_doc_1794400642997_shot_007.mp4",
+      "cameraMovement": "pan_right",
+      "transition": "crossfade",
+      "title": "Chapter 2: The Subject & Global Stakes: Shot 3",
+      "subtitle": "Blackwell (microarchitecture) and Global Technology & Security Institutions do n...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Blackwell (microarchitecture) and Global Technology & Security Institutions do not merely operate as commercial enterprises; they form the foundational backbone of sovereign defense networks, financial stability, and international competitiveness.",
+      "startFrame": 1936,
+      "durationFrames": 407,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_008",
+      "type": "layered_parallax",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/cache/asset_doc_1794400642997_shot_008.jpg",
+      "cameraMovement": "dolly_in",
+      "transition": "whip_pan",
+      "title": "Chapter 2: The Subject & Global Stakes: Shot 4",
+      "subtitle": "Public documentation and financial filings reveal that disruptions at this level...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Public documentation and financial filings reveal that disruptions at this level can send seismic shockwaves through international markets overnight.",
+      "startFrame": 2343,
+      "durationFrames": 266,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_009",
+      "type": "cinematic_hook",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/library/datacenter_tech.mp4",
+      "cameraMovement": "pan_left",
+      "transition": "crossfade",
+      "title": "Chapter 2: The Subject & Global Stakes: Shot 5",
+      "subtitle": "When allegations surfaced concerning key leadership, it was not treated as a pri...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "When allegations surfaced concerning key leadership, it was not treated as a private matter, but as an immediate matter of strategic national security.",
+      "startFrame": 2609,
+      "durationFrames": 323,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_010",
+      "type": "video_footage",
+      "badge": "[Real B-Roll Footage]",
+      "mediaUrl": "/videos/cache/enhanced_doc_1794400642997_shot_010.mp4",
+      "cameraMovement": "aerial_zoom",
+      "transition": "crossfade",
+      "title": "Chapter 3: The Key Players & Organisations: Shot 1",
+      "subtitle": "At the epicenter of this developing controversy stand distinct figures and organ...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "At the epicenter of this developing controversy stand distinct figures and organizations operating across very different legal and intelligence jurisdictions.",
+      "startFrame": 2932,
+      "durationFrames": 281,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_011",
+      "type": "layered_parallax",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/cache/asset_doc_1794400642997_shot_011.jpg",
+      "cameraMovement": "orbit",
+      "transition": "crossfade",
+      "title": "Chapter 3: The Key Players & Organisations: Shot 2",
+      "subtitle": "Foremost is Blackwell (microarchitecture), an executive whose decisions have sha...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Foremost is Blackwell (microarchitecture), an executive whose decisions have shaped the modern technological landscape over decades of leadership.",
+      "startFrame": 3213,
+      "durationFrames": 252,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_012",
+      "type": "archival_document",
+      "badge": "[Verified Document]",
+      "mediaUrl": "/videos/library/historical_archive.mp4",
+      "cameraMovement": "tracking_forward",
+      "transition": "whip_pan",
+      "title": "Chapter 3: The Key Players & Organisations: Shot 3",
+      "subtitle": "Operating in parallel are international entities including Global Technology & S...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Operating in parallel are international entities including Global Technology & Security Institutions, specialized technology partners across East Asia, and security agencies whose mandate is counterintelligence.",
+      "startFrame": 3465,
+      "durationFrames": 351,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "archivalData": {
+        "headline": "The core organizations, executives, and technologies at the cente",
+        "publication": "International Intelligence & Regulatory Press",
+        "date": "2026-11",
+        "snippet": "Operating in parallel are international entities including Global Technology & Security Institutions, specialized technology partners across East Asia, and security agencies whose mandate is counterintelligence.",
+        "highlightPhrase": "Operating in parallel are"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_013",
+      "type": "tactical_map",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/library/datacenter_tech.mp4",
+      "cameraMovement": "dolly_out",
+      "transition": "crossfade",
+      "title": "Chapter 3: The Key Players & Organisations: Shot 4",
+      "subtitle": "Investigators emphasize a crucial distinction: in high-stakes corporate reportin...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Investigators emphasize a crucial distinction: in high-stakes corporate reporting, the existence of personal association does not automatically establish complicity in foreign espionage.",
+      "startFrame": 3816,
+      "durationFrames": 309,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_014",
+      "type": "data_metric",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/cache/asset_doc_1794400642997_shot_014.jpg",
+      "cameraMovement": "pan_right",
+      "transition": "crossfade",
+      "title": "Chapter 3: The Key Players & Organisations: Shot 5",
+      "subtitle": "Yet within the intelligence community, counterintelligence doctrines warn that h...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Yet within the intelligence community, counterintelligence doctrines warn that human relationships have historically served as the primary entry point for strategic surveillance.",
+      "startFrame": 4125,
+      "durationFrames": 309,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE",
+        "statNumber": "$500B+",
+        "statLabel": "Critical Silicon Infrastructure Value",
+        "statSubtext": "Strategic National Security Market Exposure"
+      }
+    },
+    {
+      "id": "shot_015",
+      "type": "video_footage",
+      "badge": "[Real B-Roll Footage]",
+      "mediaUrl": "/videos/cache/enhanced_doc_1794400642997_shot_015.mp4",
+      "cameraMovement": "dolly_in",
+      "transition": "crossfade",
+      "title": "Chapter 4: The Investigative Timeline & Evidence: Shot 1",
+      "subtitle": "How did the timeline actually unfold according to established public records?...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "How did the timeline actually unfold according to established public records?",
+      "startFrame": 4434,
+      "durationFrames": 154,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_016",
+      "type": "layered_parallax",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/cache/asset_doc_1794400642997_shot_016.jpg",
+      "cameraMovement": "pan_left",
+      "transition": "whip_pan",
+      "title": "Chapter 4: The Investigative Timeline & Evidence: Shot 2",
+      "subtitle": "According to investigative reporting published by major international outlets, i...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "According to investigative reporting published by major international outlets, inquiries were initiated following reports concerning executive conduct and foreign intelligence interest.",
+      "startFrame": 4588,
+      "durationFrames": 295,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_017",
+      "type": "cinematic_hook",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/library/datacenter_tech.mp4",
+      "cameraMovement": "aerial_zoom",
+      "transition": "crossfade",
+      "title": "Chapter 4: The Investigative Timeline & Evidence: Shot 3",
+      "subtitle": "The earliest reports indicated that counterintelligence officials had placed spe...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "The earliest reports indicated that counterintelligence officials had placed specific associations under review, monitoring travel, institutional contacts, and communication corridors.",
+      "startFrame": 4883,
+      "durationFrames": 281,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_018",
+      "type": "video_footage",
+      "badge": "[Real B-Roll Footage]",
+      "mediaUrl": "/videos/cache/enhanced_doc_1794400642997_shot_018.mp4",
+      "cameraMovement": "orbit",
+      "transition": "crossfade",
+      "title": "Chapter 4: The Investigative Timeline & Evidence: Shot 4",
+      "subtitle": "Then, in formal communications addressed to employees and board members, leaders...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Then, in formal communications addressed to employees and board members, leadership directly acknowledged personal indiscretions, issuing a public apology while confirming full cooperation with governance reviews.",
+      "startFrame": 5164,
+      "durationFrames": 365,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_019",
+      "type": "layered_parallax",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/cache/asset_doc_1794400642997_shot_019.jpg",
+      "cameraMovement": "tracking_forward",
+      "transition": "crossfade",
+      "title": "Chapter 4: The Investigative Timeline & Evidence: Shot 5",
+      "subtitle": "Shortly thereafter, corporate boards launched independent inquiries led by exter...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Shortly thereafter, corporate boards launched independent inquiries led by external legal and security counsel to examine whether corporate oversight standards had been maintained.",
+      "startFrame": 5529,
+      "durationFrames": 323,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_020",
+      "type": "archival_document",
+      "badge": "[Verified Document]",
+      "mediaUrl": "/videos/library/historical_archive.mp4",
+      "cameraMovement": "dolly_out",
+      "transition": "whip_pan",
+      "title": "Chapter 4: The Investigative Timeline & Evidence: Shot 6",
+      "subtitle": "Every step in this timeline reveals an institution balancing public transparency...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Every step in this timeline reveals an institution balancing public transparency against the intense pressure of global geopolitical scrutiny.",
+      "startFrame": 5852,
+      "durationFrames": 266,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "archivalData": {
+        "headline": "Claims suggesting corporate secrets, proprietary hardware schemat",
+        "publication": "International Intelligence & Regulatory Press",
+        "date": "2026-11",
+        "snippet": "Every step in this timeline reveals an institution balancing public transparency against the intense pressure of global geopolitical scrutiny.",
+        "highlightPhrase": "Every step in this"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_021",
+      "type": "tactical_map",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/library/datacenter_tech.mp4",
+      "cameraMovement": "pan_right",
+      "transition": "crossfade",
+      "title": "Chapter 5: How It Works — The Core Mechanism: Shot 1",
+      "subtitle": "To evaluate the true credibility of these concerns, one must understand how mode...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "To evaluate the true credibility of these concerns, one must understand how modern intelligence operations actually target global technology firms.",
+      "startFrame": 6118,
+      "durationFrames": 281,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_022",
+      "type": "data_metric",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/cache/asset_doc_1794400642997_shot_022.jpg",
+      "cameraMovement": "dolly_in",
+      "transition": "crossfade",
+      "title": "Chapter 5: How It Works — The Core Mechanism: Shot 2",
+      "subtitle": "Contrary to cinematic fiction, intelligence services do not rely solely on rogue...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Contrary to cinematic fiction, intelligence services do not rely solely on rogue cyber hacks.",
+      "startFrame": 6399,
+      "durationFrames": 196,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE",
+        "statNumber": "$500B+",
+        "statLabel": "Critical Silicon Infrastructure Value",
+        "statSubtext": "Strategic National Security Market Exposure"
+      }
+    },
+    {
+      "id": "shot_023",
+      "type": "video_footage",
+      "badge": "[Real B-Roll Footage]",
+      "mediaUrl": "/videos/cache/enhanced_doc_1794400642997_shot_023.mp4",
+      "cameraMovement": "pan_left",
+      "transition": "crossfade",
+      "title": "Chapter 5: How It Works — The Core Mechanism: Shot 3",
+      "subtitle": "Instead, security experts document the practice of human-source targeting—often ...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Instead, security experts document the practice of human-source targeting—often referred to as social engineering or compromise operations.",
+      "startFrame": 6595,
+      "durationFrames": 238,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_024",
+      "type": "layered_parallax",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/cache/asset_doc_1794400642997_shot_024.jpg",
+      "cameraMovement": "aerial_zoom",
+      "transition": "whip_pan",
+      "title": "Chapter 5: How It Works — The Core Mechanism: Shot 4",
+      "subtitle": "The objective is rarely to walk away with an entire supercomputer; rather, it is...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "The objective is rarely to walk away with an entire supercomputer; rather, it is to obtain subtle insights: upcoming chip roadmaps, internal corporate debates, supplier bottlenecks, or personal leverage over key decision-makers.",
+      "startFrame": 6833,
+      "durationFrames": 449,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_025",
+      "type": "cinematic_hook",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/library/datacenter_tech.mp4",
+      "cameraMovement": "orbit",
+      "transition": "crossfade",
+      "title": "Chapter 5: How It Works — The Core Mechanism: Shot 5",
+      "subtitle": "In an industry where an advance notice of three months can reshape a multi-billi...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "In an industry where an advance notice of three months can reshape a multi-billion dollar export policy, access to executive decision-makers is regarded by foreign intelligence as invaluable currency.",
+      "startFrame": 7282,
+      "durationFrames": 407,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_026",
+      "type": "video_footage",
+      "badge": "[Real B-Roll Footage]",
+      "mediaUrl": "/videos/cache/enhanced_doc_1794400642997_shot_026.mp4",
+      "cameraMovement": "tracking_forward",
+      "transition": "crossfade",
+      "title": "Chapter 6: Responses, Denials & Counterpoints: Shot 1",
+      "subtitle": "A rigorous investigative documentary must separate confirmed events from unprove...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "A rigorous investigative documentary must separate confirmed events from unproven speculation.",
+      "startFrame": 7689,
+      "durationFrames": 154,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_027",
+      "type": "layered_parallax",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/cache/asset_doc_1794400642997_shot_027.jpg",
+      "cameraMovement": "dolly_out",
+      "transition": "crossfade",
+      "title": "Chapter 6: Responses, Denials & Counterpoints: Shot 2",
+      "subtitle": "Crucially, independent investigators and official statements emphasize that whil...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Crucially, independent investigators and official statements emphasize that while controversy exists, there is no verified evidence that company secrets or national security were breached.",
+      "startFrame": 7843,
+      "durationFrames": 337,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_028",
+      "type": "archival_document",
+      "badge": "[Verified Document]",
+      "mediaUrl": "/videos/library/historical_archive.mp4",
+      "cameraMovement": "pan_right",
+      "transition": "whip_pan",
+      "title": "Chapter 6: Responses, Denials & Counterpoints: Shot 3",
+      "subtitle": "In formal statements, the company affirmed that rigorous internal data protectio...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "In formal statements, the company affirmed that rigorous internal data protections remained uncompromised throughout the period in question.",
+      "startFrame": 8180,
+      "durationFrames": 252,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "archivalData": {
+        "headline": "International authorities and foreign governments rejected allega",
+        "publication": "International Intelligence & Regulatory Press",
+        "date": "2026-11",
+        "snippet": "In formal statements, the company affirmed that rigorous internal data protections remained uncompromised throughout the period in question.",
+        "highlightPhrase": "In formal statements, the"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_029",
+      "type": "tactical_map",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/library/datacenter_tech.mp4",
+      "cameraMovement": "dolly_in",
+      "transition": "crossfade",
+      "title": "Chapter 6: Responses, Denials & Counterpoints: Shot 4",
+      "subtitle": "Furthermore, in diplomatic briefings, foreign representatives rejected the espio...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Furthermore, in diplomatic briefings, foreign representatives rejected the espionage allegations, describing claims of state intelligence orchestration as baseless political theater.",
+      "startFrame": 8432,
+      "durationFrames": 281,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_030",
+      "type": "data_metric",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/cache/asset_doc_1794400642997_shot_030.jpg",
+      "cameraMovement": "pan_left",
+      "transition": "crossfade",
+      "title": "Chapter 6: Responses, Denials & Counterpoints: Shot 5",
+      "subtitle": "Political leaders and industry allies also voiced strong support, cautioning aga...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Political leaders and industry allies also voiced strong support, cautioning against allowing unsubstantiated rumors to destabilize vital domestic technology champions.",
+      "startFrame": 8713,
+      "durationFrames": 281,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE",
+        "statNumber": "$500B+",
+        "statLabel": "Critical Silicon Infrastructure Value",
+        "statSubtext": "Strategic National Security Market Exposure"
+      }
+    },
+    {
+      "id": "shot_031",
+      "type": "video_footage",
+      "badge": "[Real B-Roll Footage]",
+      "mediaUrl": "/videos/cache/enhanced_doc_1794400642997_shot_031.mp4",
+      "cameraMovement": "aerial_zoom",
+      "transition": "crossfade",
+      "title": "Chapter 6: Responses, Denials & Counterpoints: Shot 6",
+      "subtitle": "These counterpoints underscore that personal mistakes must not be conflated with...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "These counterpoints underscore that personal mistakes must not be conflated with treason or institutional espionage in the absence of verified facts.",
+      "startFrame": 8994,
+      "durationFrames": 295,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_032",
+      "type": "layered_parallax",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/cache/asset_doc_1794400642997_shot_032.jpg",
+      "cameraMovement": "orbit",
+      "transition": "whip_pan",
+      "title": "Chapter 7: Geopolitical & Industry Repercussions: Shot 1",
+      "subtitle": "Regardless of how future legal or board reviews conclude, the wider repercussion...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Regardless of how future legal or board reviews conclude, the wider repercussions across the technology sector are already undeniable.",
+      "startFrame": 9289,
+      "durationFrames": 266,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_033",
+      "type": "cinematic_hook",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/library/datacenter_tech.mp4",
+      "cameraMovement": "tracking_forward",
+      "transition": "crossfade",
+      "title": "Chapter 7: Geopolitical & Industry Repercussions: Shot 2",
+      "subtitle": "Around the globe, sovereign governments are actively re-evaluating corporate gov...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Around the globe, sovereign governments are actively re-evaluating corporate governance rules for critical infrastructure executives.",
+      "startFrame": 9555,
+      "durationFrames": 210,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_034",
+      "type": "video_footage",
+      "badge": "[Real B-Roll Footage]",
+      "mediaUrl": "/videos/cache/enhanced_doc_1794400642997_shot_034.mp4",
+      "cameraMovement": "dolly_out",
+      "transition": "crossfade",
+      "title": "Chapter 7: Geopolitical & Industry Repercussions: Shot 3",
+      "subtitle": "Security briefings that were once confined to defense contractors are now becomi...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Security briefings that were once confined to defense contractors are now becoming mandatory protocol across Silicon Valley, Taiwan, Japan, and Europe.",
+      "startFrame": 9765,
+      "durationFrames": 295,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_035",
+      "type": "layered_parallax",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/cache/asset_doc_1794400642997_shot_035.jpg",
+      "cameraMovement": "pan_right",
+      "transition": "crossfade",
+      "title": "Chapter 7: Geopolitical & Industry Repercussions: Shot 4",
+      "subtitle": "Export control frameworks, supply-chain verification treaties, and executive per...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Export control frameworks, supply-chain verification treaties, and executive personal security protocols are undergoing comprehensive overhauls.",
+      "startFrame": 10060,
+      "durationFrames": 210,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_036",
+      "type": "archival_document",
+      "badge": "[Verified Document]",
+      "mediaUrl": "/videos/library/historical_archive.mp4",
+      "cameraMovement": "dolly_in",
+      "transition": "whip_pan",
+      "title": "Chapter 7: Geopolitical & Industry Repercussions: Shot 5",
+      "subtitle": "The controversy surrounding Nvidia RTX Spark has served as an urgent wake-up cal...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "The controversy surrounding Nvidia RTX Spark has served as an urgent wake-up call: in the twenty-first century, multinational technology companies are no longer just private businesses; they are vital strategic sovereign assets.",
+      "startFrame": 10270,
+      "durationFrames": 449,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "archivalData": {
+        "headline": "The core organizations, executives, and technologies at the cente",
+        "publication": "International Intelligence & Regulatory Press",
+        "date": "2026-11",
+        "snippet": "The controversy surrounding Nvidia RTX Spark has served as an urgent wake-up call: in the twenty-first century, multinational technology companies are no longer just private businesses; they are vital strategic sovereign assets.",
+        "highlightPhrase": "The controversy surrounding Nvidia"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_037",
+      "type": "tactical_map",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/library/datacenter_tech.mp4",
+      "cameraMovement": "pan_left",
+      "transition": "crossfade",
+      "title": "Chapter 8: The Unanswered Questions & Closing: Shot 1",
+      "subtitle": "As we step back and review the full evidence, several fundamental questions rema...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "As we step back and review the full evidence, several fundamental questions remain open.",
+      "startFrame": 10719,
+      "durationFrames": 196,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_038",
+      "type": "data_metric",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/cache/asset_doc_1794400642997_shot_038.jpg",
+      "cameraMovement": "aerial_zoom",
+      "transition": "crossfade",
+      "title": "Chapter 8: The Unanswered Questions & Closing: Shot 2",
+      "subtitle": "Will the ongoing independent corporate and regulatory reviews uncover additional...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Will the ongoing independent corporate and regulatory reviews uncover additional details, or confirm that company integrity held firm?",
+      "startFrame": 10915,
+      "durationFrames": 252,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE",
+        "statNumber": "$500B+",
+        "statLabel": "Critical Silicon Infrastructure Value",
+        "statSubtext": "Strategic National Security Market Exposure"
+      }
+    },
+    {
+      "id": "shot_039",
+      "type": "video_footage",
+      "badge": "[Real B-Roll Footage]",
+      "mediaUrl": "/videos/cache/enhanced_doc_1794400642997_shot_039.mp4",
+      "cameraMovement": "orbit",
+      "transition": "crossfade",
+      "title": "Chapter 8: The Unanswered Questions & Closing: Shot 3",
+      "subtitle": "How will global technology leaders navigate an era where personal privacy and na...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "How will global technology leaders navigate an era where personal privacy and national security increasingly collide?",
+      "startFrame": 11167,
+      "durationFrames": 224,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_040",
+      "type": "layered_parallax",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/cache/asset_doc_1794400642997_shot_040.jpg",
+      "cameraMovement": "tracking_forward",
+      "transition": "whip_pan",
+      "title": "Chapter 8: The Unanswered Questions & Closing: Shot 4",
+      "subtitle": "The verified facts establish personal admissions and formal oversight inquiries;...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "The verified facts establish personal admissions and formal oversight inquiries; the allegations of state espionage remain unproven and vigorously contested.",
+      "startFrame": 11391,
+      "durationFrames": 281,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_041",
+      "type": "cinematic_hook",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/library/datacenter_tech.mp4",
+      "cameraMovement": "dolly_out",
+      "transition": "crossfade",
+      "title": "Chapter 8: The Unanswered Questions & Closing: Shot 5",
+      "subtitle": "What is certain is that the world of technology and the world of international i...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "What is certain is that the world of technology and the world of international intelligence are now permanently entwined.",
+      "startFrame": 11672,
+      "durationFrames": 266,
+      "layers": {
+        "particles": "dust_motes"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    },
+    {
+      "id": "shot_042",
+      "type": "video_footage",
+      "badge": "[Real B-Roll Footage]",
+      "mediaUrl": "/videos/cache/enhanced_doc_1794400642997_shot_042.mp4",
+      "cameraMovement": "pan_right",
+      "transition": "crossfade",
+      "title": "Chapter 8: The Unanswered Questions & Closing: Shot 6",
+      "subtitle": "And in that high-stakes arena, the truth is not determined by dramatic headlines...",
+      "location": "STRATEGIC MONITOR",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "And in that high-stakes arena, the truth is not determined by dramatic headlines, but by the careful, verified evidence left behind.",
+      "startFrame": 11938,
+      "durationFrames": 292,
+      "layers": {
+        "particles": "light_leaks"
+      },
+      "visualData": {
+        "targetName": "NVIDIA BLACKWELL AI SUPERCHIP ARCHITECTURE"
+      }
+    }
+  ],
+  "durationInFrames": 12230
+}

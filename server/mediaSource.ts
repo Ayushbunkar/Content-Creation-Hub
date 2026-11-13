@@ -3,6 +3,7 @@ import path from 'path';
 import { spawn, execFile } from 'child_process';
 import { promisify } from 'util';
 import { SceneData, QualityReport, CameraMovement } from './types';
+import { CopyrightLicenseManager, SourcePlatform } from './copyrightService';
 
 const execFileAsync = promisify(execFile);
 
@@ -178,7 +179,8 @@ export class MediaSourceManager {
     category: string,
     shotId = `shot_${Date.now()}`,
     durationSec = 4,
-    aspectRatio = '16:9'
+    aspectRatio = '16:9',
+    projectId?: string
   ): Promise<string> {
     await this.initMediaLibrary();
 
@@ -186,9 +188,31 @@ export class MediaSourceManager {
     const imageUrl = `/videos/cache/asset_${shotId}.jpg`;
     const videoOutput = path.join(this.cacheDir, `enhanced_${shotId}.mp4`);
     const videoUrl = `/videos/cache/enhanced_${shotId}.mp4`;
+    const metaFile = path.join(this.cacheDir, `asset_${shotId}.meta.json`);
 
     // Return if already cached and valid
     if (fs.existsSync(imageOutput) && fs.statSync(imageOutput).size > 10000) {
+      if (fs.existsSync(metaFile)) {
+        try {
+          const meta = JSON.parse(fs.readFileSync(metaFile, 'utf-8'));
+          await CopyrightLicenseManager.registerAsset({
+            assetId: shotId,
+            projectId,
+            assetType: 'image',
+            sourcePlatform: meta.source_platform || 'pollinations_ai',
+            originalUrl: meta.original_url || imageUrl,
+            downloadUrl: imageUrl,
+            creatorName: meta.creator_name,
+            creatorProfileUrl: meta.creator_profile_url,
+            licenseType: meta.license_type,
+            licenseUrl: meta.license_url,
+            commercialUse: meta.commercial_use !== false,
+            attributionRequired: !!meta.attribution_required,
+            attributionText: meta.attribution_text,
+            usageRestrictions: meta.usage_restrictions
+          });
+        } catch (e) {}
+      }
       return imageUrl;
     }
     if (fs.existsSync(videoOutput) && fs.statSync(videoOutput).size > 15000) {
@@ -229,6 +253,27 @@ export class MediaSourceManager {
       });
 
       if (fs.existsSync(imageOutput) && fs.statSync(imageOutput).size > 10000) {
+        if (fs.existsSync(metaFile)) {
+          try {
+            const meta = JSON.parse(fs.readFileSync(metaFile, 'utf-8'));
+            await CopyrightLicenseManager.registerAsset({
+              assetId: shotId,
+              projectId,
+              assetType: 'image',
+              sourcePlatform: meta.source_platform || 'pollinations_ai',
+              originalUrl: meta.original_url || imageUrl,
+              downloadUrl: imageUrl,
+              creatorName: meta.creator_name,
+              creatorProfileUrl: meta.creator_profile_url,
+              licenseType: meta.license_type,
+              licenseUrl: meta.license_url,
+              commercialUse: meta.commercial_use !== false,
+              attributionRequired: !!meta.attribution_required,
+              attributionText: meta.attribution_text,
+              usageRestrictions: meta.usage_restrictions
+            });
+          } catch (e) {}
+        }
         return imageUrl;
       }
     } catch (e) {
@@ -236,7 +281,24 @@ export class MediaSourceManager {
     }
 
     // 2. Guaranteed local library fallback
-    return this.searchLocalLibraryFootage(query, category);
+    const fallbackUrl = this.searchLocalLibraryFootage(query, category);
+    await CopyrightLicenseManager.registerAsset({
+      assetId: shotId,
+      projectId,
+      assetType: 'image',
+      sourcePlatform: 'unsplash',
+      originalUrl: fallbackUrl,
+      downloadUrl: fallbackUrl,
+      creatorName: 'Unsplash Curated Collection',
+      creatorProfileUrl: 'https://unsplash.com',
+      licenseType: 'Unsplash License',
+      licenseUrl: 'https://unsplash.com/license',
+      commercialUse: true,
+      attributionRequired: false,
+      attributionText: 'Photo via Unsplash Editorial Library',
+      usageRestrictions: 'Commercial documentary use permitted.'
+    });
+    return fallbackUrl;
   }
 
   /**
