@@ -1,0 +1,242 @@
+{
+  "title": "STRAIT OF HORMUZ STRATEGIC CHOKEPOINT",
+  "subtitle": "STRATEGIC GEOPOLITICS // SPECIAL INTELLIGENCE REPORT",
+  "category": "Geopolitics and Map Animation",
+  "topic": "Why the Strait of Hormuz is strategically important for global energy and trade",
+  "narrationSrc": "/audio/narration_proj_1793963597950.wav",
+  "musicSrc": "/audio/bgm/epic_geopolitics.wav",
+  "subtitlesData": {
+    "cues": [
+      {
+        "index": 1,
+        "startTime": 0,
+        "endTime": 3.2,
+        "text": "Across global geopolitics and maritime security,",
+        "startFrame": 0,
+        "endFrame": 96,
+        "durationFrames": 96
+      },
+      {
+        "index": 2,
+        "startTime": 3.2,
+        "endTime": 6.4,
+        "text": "no geographical chokepoint wields as much raw leverage",
+        "startFrame": 96,
+        "endFrame": 192,
+        "durationFrames": 96
+      },
+      {
+        "index": 3,
+        "startTime": 6.4,
+        "endTime": 8.199,
+        "text": "as the Strait of Hormuz.",
+        "startFrame": 192,
+        "endFrame": 246,
+        "durationFrames": 54
+      },
+      {
+        "index": 4,
+        "startTime": 8.199,
+        "endTime": 11.7,
+        "text": "Separating the rocky shores of Iran from the Arabian Peninsula,",
+        "startFrame": 246,
+        "endFrame": 351,
+        "durationFrames": 105
+      },
+      {
+        "index": 5,
+        "startTime": 11.7,
+        "endTime": 15.599,
+        "text": "this strategic passage narrows to barely 21 nautical miles",
+        "startFrame": 351,
+        "endFrame": 468,
+        "durationFrames": 117
+      },
+      {
+        "index": 6,
+        "startTime": 15.599,
+        "endTime": 17.4,
+        "text": "at its critical gateway.",
+        "startFrame": 468,
+        "endFrame": 522,
+        "durationFrames": 54
+      },
+      {
+        "index": 7,
+        "startTime": 17.4,
+        "endTime": 21.1,
+        "text": "Every single day, over 21 million barrels of petroleum",
+        "startFrame": 522,
+        "endFrame": 633,
+        "durationFrames": 111
+      },
+      {
+        "index": 8,
+        "startTime": 21.1,
+        "endTime": 24.4,
+        "text": "and liquefied natural gas traverse these waters,",
+        "startFrame": 633,
+        "endFrame": 732,
+        "durationFrames": 99
+      },
+      {
+        "index": 9,
+        "startTime": 24.4,
+        "endTime": 29.199,
+        "text": "accounting for more than 20 percent of total global petroleum consumption.",
+        "startFrame": 732,
+        "endFrame": 876,
+        "durationFrames": 144
+      },
+      {
+        "index": 10,
+        "startTime": 29.3,
+        "endTime": 34.1,
+        "text": "Under international maritime law and the UN Convention on the Law of the Sea,",
+        "startFrame": 879,
+        "endFrame": 1023,
+        "durationFrames": 144
+      },
+      {
+        "index": 11,
+        "startTime": 34.1,
+        "endTime": 37.1,
+        "text": "transit passage is technically guaranteed,",
+        "startFrame": 1023,
+        "endFrame": 1113,
+        "durationFrames": 90
+      },
+      {
+        "index": 12,
+        "startTime": 37.1,
+        "endTime": 40.299,
+        "text": "yet sovereign posturing and naval mind capabilities",
+        "startFrame": 1113,
+        "endFrame": 1209,
+        "durationFrames": 96
+      },
+      {
+        "index": 13,
+        "startTime": 40.299,
+        "endTime": 42.6,
+        "text": "create an enduring flashpoint.",
+        "startFrame": 1209,
+        "endFrame": 1278,
+        "durationFrames": 69
+      },
+      {
+        "index": 14,
+        "startTime": 42.6,
+        "endTime": 45.299,
+        "text": "For the superpowers and global markets alike,",
+        "startFrame": 1278,
+        "endFrame": 1359,
+        "durationFrames": 81
+      },
+      {
+        "index": 15,
+        "startTime": 45.299,
+        "endTime": 47.6,
+        "text": "any disruption in these contested waters",
+        "startFrame": 1359,
+        "endFrame": 1428,
+        "durationFrames": 69
+      },
+      {
+        "index": 16,
+        "startTime": 47.6,
+        "endTime": 51.299,
+        "text": "would immediately trigger catastrophic global energy inflation",
+        "startFrame": 1428,
+        "endFrame": 1539,
+        "durationFrames": 111
+      },
+      {
+        "index": 17,
+        "startTime": 51.299,
+        "endTime": 53.1,
+        "text": "and economic paralysis.",
+        "startFrame": 1539,
+        "endFrame": 1593,
+        "durationFrames": 54
+      }
+    ]
+  },
+  "captionTemplate": "karaoke-highlight",
+  "scenes": [
+    {
+      "id": "scene_001",
+      "type": "cinematic-hook",
+      "title": "Strait of Hormuz Strategic Chokepoint",
+      "subtitle": "Across global geopolitics and maritime security, no geographical chokepoint...",
+      "location": "GLOBAL ARCHIVE",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Across global geopolitics and maritime security, no geographical chokepoint wields as much raw leverage as the Strait of Hormuz.",
+      "startFrame": 0,
+      "durationFrames": 319,
+      "visualData": {
+        "targetName": "WHY THE STRAIT OF HORMUZ IS STRATEGICALLY IMPORTANT FOR GLOBAL ENERGY AND TRADE"
+      }
+    },
+    {
+      "id": "scene_002",
+      "type": "tactical-map",
+      "title": "Maritime Geography & Sovereign Borders",
+      "subtitle": "Separating the rocky shores of Iran from the Arabian Peninsula, this strate...",
+      "location": "PERSIAN GULF // STRAIT",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Separating the rocky shores of Iran from the Arabian Peninsula, this strategic passage narrows to barely twenty-one nautical miles at its critical gateway.",
+      "startFrame": 319,
+      "durationFrames": 319,
+      "visualData": {
+        "targetName": "WHY THE STRAIT OF HORMUZ IS STRATEGICALLY IMPORTANT FOR GLOBAL ENERGY AND TRADE"
+      }
+    },
+    {
+      "id": "scene_003",
+      "type": "data-metric",
+      "title": "Daily Petroleum Transit Volume",
+      "subtitle": "Every single day, over twenty-one million barrels of petroleum and liquefie...",
+      "location": "GLOBAL ENERGY METRIC",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Every single day, over twenty-one million barrels of petroleum and liquefied natural gas traverse these waters, accounting for more than twenty percent of total global petroleum consumption.",
+      "startFrame": 638,
+      "durationFrames": 319,
+      "visualData": {
+        "targetName": "WHY THE STRAIT OF HORMUZ IS STRATEGICALLY IMPORTANT FOR GLOBAL ENERGY AND TRADE",
+        "statNumber": "21,000,000",
+        "statLabel": "BARRELS PER DAY",
+        "statSubtext": "Over 20% of international petroleum trade flows through this single corridor."
+      }
+    },
+    {
+      "id": "scene_004",
+      "type": "tactical-map",
+      "title": "Defensive Perimeters & Strategic Verdict",
+      "subtitle": "Under international maritime law and the UN Convention on the Law of the Se...",
+      "location": "NAVAL INTEL COMMAND",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "Under international maritime law and the UN Convention on the Law of the Sea, transit passage is technically guaranteed, yet sovereign posturing and naval mine capabilities create an enduring flashpoint.",
+      "startFrame": 957,
+      "durationFrames": 319,
+      "visualData": {
+        "targetName": "WHY THE STRAIT OF HORMUZ IS STRATEGICALLY IMPORTANT FOR GLOBAL ENERGY AND TRADE"
+      }
+    },
+    {
+      "id": "scene_005",
+      "type": "tactical-map",
+      "title": "Defensive Perimeters & Strategic Verdict",
+      "subtitle": "For the superpowers and global markets alike, any disruption in these conte...",
+      "location": "NAVAL INTEL COMMAND",
+      "coordinates": "26°34'12\"N // 56°15'08\"E",
+      "narration": "For the superpowers and global markets alike, any disruption in these contested waters would immediately trigger catastrophic global energy inflation and economic paralysis.",
+      "startFrame": 1276,
+      "durationFrames": 322,
+      "visualData": {
+        "targetName": "WHY THE STRAIT OF HORMUZ IS STRATEGICALLY IMPORTANT FOR GLOBAL ENERGY AND TRADE"
+      }
+    }
+  ],
+  "durationInFrames": 1598
+}

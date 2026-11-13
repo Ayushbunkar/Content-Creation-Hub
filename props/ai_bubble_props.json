@@ -1,0 +1,113 @@
+{
+  "narrationSrc": "/audio/ai_bubble_mastered.wav",
+  "musicSrc": "/audio/bgm/tech_cyber.wav",
+  "subtitlesData": {
+    "cues": [
+      {
+        "index": 1,
+        "startTime": 0,
+        "endTime": 4.32,
+        "text": "The trillion dollar AI bubble is finally showing massive cracks.",
+        "startFrame": 0,
+        "endFrame": 130
+      },
+      {
+        "index": 2,
+        "startTime": 4.32,
+        "endTime": 9.12,
+        "text": "Behind closed doors, Silicon Valley is facing a brutal reality check.",
+        "startFrame": 130,
+        "endFrame": 274
+      },
+      {
+        "index": 3,
+        "startTime": 9.12,
+        "endTime": 12.96,
+        "text": "And,thropic, the creator of Claude, along with top AI giants,",
+        "startFrame": 274,
+        "endFrame": 389
+      },
+      {
+        "index": 4,
+        "startTime": 12.96,
+        "endTime": 15.679,
+        "text": "are bleeding billions in compute costs.",
+        "startFrame": 389,
+        "endFrame": 470
+      },
+      {
+        "index": 5,
+        "startTime": 15.679,
+        "endTime": 19.839,
+        "text": "Investors poured astronomical valuations into AI startups,",
+        "startFrame": 470,
+        "endFrame": 595
+      },
+      {
+        "index": 6,
+        "startTime": 19.839,
+        "endTime": 22.64,
+        "text": "betting on infinite exponential growth.",
+        "startFrame": 595,
+        "endFrame": 679
+      },
+      {
+        "index": 7,
+        "startTime": 22.64,
+        "endTime": 28.48,
+        "text": "Instead, training costs have exploded while real enterprise revenues lag far behind.",
+        "startFrame": 679,
+        "endFrame": 854
+      },
+      {
+        "index": 8,
+        "startTime": 28.559,
+        "endTime": 33.679,
+        "text": "Secondary market sales show private tech shares taking a staggering 40% haircut.",
+        "startFrame": 857,
+        "endFrame": 1010
+      },
+      {
+        "index": 9,
+        "startTime": 34.48,
+        "endTime": 37.359,
+        "text": "Wall Street is asking the trillion dollar question,",
+        "startFrame": 1034,
+        "endFrame": 1121
+      },
+      {
+        "index": 10,
+        "startTime": 37.359,
+        "endTime": 39.28,
+        "text": "when does anyone actually make a profit?",
+        "startFrame": 1121,
+        "endFrame": 1178
+      },
+      {
+        "index": 11,
+        "startTime": 40,
+        "endTime": 42.64,
+        "text": "The gold rush was hyped to change everything overnight.",
+        "startFrame": 1200,
+        "endFrame": 1279
+      },
+      {
+        "index": 12,
+        "startTime": 43.359,
+        "endTime": 47.6,
+        "text": "Now, the reckoning has arrived, and only the leonus survivors will make it through.",
+        "startFrame": 1301,
+        "endFrame": 1428
+      },
+      {
+        "index": 13,
+        "startTime": 48.32,
+        "endTime": 52.32,
+        "text": "Is the AI bubble bursting? Or is this just the first great reset?",
+        "startFrame": 1450,
+        "endFrame": 1570
+      }
+    ]
+  },
+  "durationInFrames": 1572
+}

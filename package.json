@@ -10,22 +10,35 @@
   "private": true,
   "dependencies": {
     "@remotion/cli": "4.0.541",
+    "@remotion/player": "^4.0.541",
     "@remotion/zod-types": "4.0.541",
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "remotion": "4.0.541",
+    "sqlite3": "^6.0.1",
+    "tsx": "^4.23.15",
+    "ws": "^8.22.1",
     "zod": "4.6.7"
   },
   "devDependencies": {
     "@remotion/eslint-config-flat": "4.0.541",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/react": "19.3.0",
+    "@types/sqlite3": "^3.1.11",
     "@types/web": "0.0.166",
+    "@types/ws": "^8.18.2",
     "eslint": "10.12.0",
     "prettier": "3.8.1",
     "typescript": "5.9.3"
   },
   "scripts": {
+    "setup": "setup.bat",
+    "desktop": "AI-Video-Studio.bat",
     "dev": "remotion studio",
+    "studio": "tsx server/index.ts",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc"

@@ -1,0 +1,209 @@
+{
+  "title": "THE SILICON FRONTIER // THE GLOBAL MICROCHIP RACE",
+  "subtitle": "SEMICONDUCTOR SOVEREIGNTY // SPECIAL STRATEGIC DOSSIER",
+  "category": "Technology",
+  "topic": "The Global Semiconductor War: TSMC, Nvidia & The Silicon Frontier",
+  "narrationSrc": "/audio/bgm/tech_cyber.wav",
+  "musicSrc": "/audio/bgm/tech_cyber.wav",
+  "captionTemplate": "karaoke-highlight",
+  "durationInFrames": 1200,
+  "subtitlesData": {
+    "cues": [
+      {
+        "index": 1,
+        "startTime": 0,
+        "endTime": 4.5,
+        "text": "The global contest for artificial intelligence is fought on the silicon frontier.",
+        "startFrame": 0,
+        "endFrame": 135,
+        "durationFrames": 135
+      },
+      {
+        "index": 2,
+        "startTime": 4.5,
+        "endTime": 9.2,
+        "text": "Over ninety percent of advanced microchips originate from a single concentrated supply corridor.",
+        "startFrame": 135,
+        "endFrame": 276,
+        "durationFrames": 141
+      },
+      {
+        "index": 3,
+        "startTime": 9.2,
+        "endTime": 14.8,
+        "text": "From high-bandwidth memory clusters to extreme ultraviolet lithography, control over silicon defines superpower deterrence.",
+        "startFrame": 276,
+        "endFrame": 444,
+        "durationFrames": 168
+      },
+      {
+        "index": 4,
+        "startTime": 14.8,
+        "endTime": 21.0,
+        "text": "Export controls, semiconductor embargoes, and sovereign fabrication clusters are rewriting global alliances.",
+        "startFrame": 444,
+        "endFrame": 630,
+        "durationFrames": 186
+      },
+      {
+        "index": 5,
+        "startTime": 21.0,
+        "endTime": 28.5,
+        "text": "As computing clusters scale exponentially, the nation commanding this supply chain commands the future of intelligence.",
+        "startFrame": 630,
+        "endFrame": 855,
+        "durationFrames": 225
+      },
+      {
+        "index": 6,
+        "startTime": 28.5,
+        "endTime": 36.0,
+        "text": "This is not merely commercial technology—this is the foundational architecture of global hegemony.",
+        "startFrame": 855,
+        "endFrame": 1080,
+        "durationFrames": 225
+      },
+      {
+        "index": 7,
+        "startTime": 36.0,
+        "endTime": 40.0,
+        "text": "The battle for tomorrow is etched in three nanometers.",
+        "startFrame": 1080,
+        "endFrame": 1200,
+        "durationFrames": 120
+      }
+    ]
+  },
+  "scenes": [
+    {
+      "id": "shot_001",
+      "type": "cinematic_hook",
+      "badge": "[Motion Graphics]",
+      "mediaUrl": "/videos/library/datacenter_tech.mp4",
+      "cameraMovement": "dolly_in",
+      "transition": "fade",
+      "title": "THE SILICON FRONTIER",
+      "subtitle": "The global contest for artificial intelligence is fought on the silicon frontier.",
+      "location": "HIGH TECH COMPUTE GRID",
+      "coordinates": "24°46'52\"N // 120°59'48\"E",
+      "narration": "The global contest for artificial intelligence is fought on the silicon frontier.",
+      "startFrame": 0,
+      "durationFrames": 150,
+      "layers": { "particles": "light_leaks" },
+      "visualData": { "targetName": "GLOBAL SILICON RACE" }
+    },
+    {
+      "id": "shot_002",
+      "type": "video_footage",
+      "badge": "[Real Video Footage]",
+      "mediaUrl": "/videos/library/datacenter_tech.mp4",
+      "cameraMovement": "tracking_forward",
+      "transition": "crossfade",
+      "title": "Compute Superclusters & Silicon Architecture",
+      "subtitle": "Over ninety percent of advanced microchips originate from a single concentrated supply corridor.",
+      "location": "FABRICATION CLUSTER",
+      "coordinates": "24°46'52\"N // 120°59'48\"E",
+      "narration": "Over ninety percent of advanced microchips originate from a single concentrated supply corridor.",
+      "startFrame": 150,
+      "durationFrames": 170,
+      "layers": { "particles": "dust_motes" }
+    },
+    {
+      "id": "shot_003",
+      "type": "data_metric",
+      "badge": "[Data Metric]",
+      "mediaUrl": "/videos/library/datacenter_tech.mp4",
+      "cameraMovement": "dolly_in",
+      "transition": "fade",
+      "title": "Extreme Lithography Precision",
+      "subtitle": "Transistor gate precision reaching atomic physical limits.",
+      "location": "ATOMIC LITHOGRAPHY SCALE",
+      "coordinates": "24°46'52\"N // 120°59'48\"E",
+      "narration": "From high-bandwidth memory clusters to extreme ultraviolet lithography, control over silicon defines superpower deterrence.",
+      "startFrame": 320,
+      "durationFrames": 180,
+      "layers": { "particles": "light_leaks" },
+      "visualData": {
+        "statNumber": "3nm",
+        "statLabel": "FABRICATION PROCESS GATE",
+        "statSubtext": "Over 90% of sub-5nm AI processors worldwide are produced within a single island perimeter."
+      }
+    },
+    {
+      "id": "shot_004",
+      "type": "tactical_map",
+      "badge": "[Tactical Map]",
+      "mediaUrl": "/videos/library/satellite_globe.mp4",
+      "cameraMovement": "pan_right",
+      "transition": "crossfade",
+      "title": "Chokepoints Across The First Island Chain",
+      "subtitle": "Export controls, semiconductor embargoes, and sovereign fabrication clusters are rewriting global alliances.",
+      "location": "FIRST ISLAND CHAIN THEATER",
+      "coordinates": "24°46'52\"N // 120°59'48\"E",
+      "narration": "Export controls, semiconductor embargoes, and sovereign fabrication clusters are rewriting global alliances.",
+      "startFrame": 500,
+      "durationFrames": 200,
+      "layers": { "particles": "dust_motes" },
+      "visualData": {
+        "region": "East Asia",
+        "targetName": "SILICON SUPPLY CHOKEPOINT",
+        "highlightedEntities": ["TW", "US", "NL", "JP", "KR"]
+      }
+    },
+    {
+      "id": "shot_005",
+      "type": "video_footage",
+      "badge": "[Real Video Footage]",
+      "mediaUrl": "/videos/library/military_surveillance.mp4",
+      "cameraMovement": "pan_left",
+      "transition": "fade",
+      "title": "Export Controls & Technological Containment",
+      "subtitle": "As computing clusters scale exponentially, the nation commanding this supply chain commands the future.",
+      "location": "GLOBAL EXPORT SURVEILLANCE",
+      "coordinates": "38°53'51\"N // 77°02'11\"W",
+      "narration": "As computing clusters scale exponentially, the nation commanding this supply chain commands the future of intelligence.",
+      "startFrame": 700,
+      "durationFrames": 200,
+      "layers": { "particles": "light_leaks" }
+    },
+    {
+      "id": "shot_006",
+      "type": "archival_document",
+      "badge": "[Archival Document]",
+      "mediaUrl": "/videos/library/historical_archive.mp4",
+      "cameraMovement": "dolly_in",
+      "transition": "crossfade",
+      "title": "Strategic Export Restrictions Act",
+      "subtitle": "This is not merely commercial technology—this is the foundational architecture of global hegemony.",
+      "location": "INTERNATIONAL REGULATORY DOSSIER",
+      "coordinates": "GLOBAL ARCHIVE",
+      "narration": "This is not merely commercial technology—this is the foundational architecture of global hegemony.",
+      "startFrame": 900,
+      "durationFrames": 180,
+      "layers": { "particles": "dust_motes" },
+      "archivalData": {
+        "headline": "ADVANCED SEMICONDUCTOR SOVEREIGNTY TREATY",
+        "publication": "STRATEGIC TRADE INTELLIGENCE REPORT",
+        "date": "JANUARY 2026 // CLASSIFIED RECORD",
+        "snippet": "Control over photolithography optics and advanced foundry capacity represents the paramount axis of twenty-first century geopolitical deterrence.",
+        "highlightPhrase": "Paramount axis of twenty-first century geopolitical deterrence."
+      }
+    },
+    {
+      "id": "shot_007",
+      "type": "video_footage",
+      "badge": "[Real Video Footage]",
+      "mediaUrl": "/videos/library/satellite_globe.mp4",
+      "cameraMovement": "aerial_zoom",
+      "transition": "fade",
+      "title": "The Global Silicon Century",
+      "subtitle": "The battle for tomorrow is etched in three nanometers.",
+      "location": "ORBITAL TELEMETRY",
+      "coordinates": "ORBITAL SCAN // EARTH",
+      "narration": "The battle for tomorrow is etched in three nanometers.",
+      "startFrame": 1080,
+      "durationFrames": 120,
+      "layers": { "particles": "light_leaks" }
+    }
+  ]
+}

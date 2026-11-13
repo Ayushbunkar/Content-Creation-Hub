@@ -1,7 +1,33 @@
-node_modules
-dist
+node_modules/
+dist/
 .DS_Store
 .env
 
-# Ignore the output video from Git but not videos you import into src/.
-out
+# Output videos and renders
+out/
+output/
+
+# Temporary video render caches
+public/videos/cache/
+
+# Python virtual environment & caches
+.venv-tts/
+.venv/
+__pycache__/
+*.pyc
+
+# Local storage and temporary processing files
+storage/
+database.sqlite
+*.sqlite
+*.db
+
+# Generated audio and large media files
+public/audio/narration_*.wav
+public/audio/*.wav
+!public/audio/page-turn.wav
+!public/audio/bgm/
+
+# OS and IDE caches
+.claude/
+.agents/
