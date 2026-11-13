@@ -25,6 +25,7 @@ KEYWORD_FALLBACKS = {
     "tech": "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1920&q=85",
     "ai": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1920&q=85",
     "chip": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1920&q=85",
+    "silicon": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1920&q=85",
     "nvidia": "https://images.unsplash.com/photo-1591488320449-011701bb6704?w=1920&q=85",
     "market": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1920&q=85",
     "finance": "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1920&q=85",
@@ -32,6 +33,18 @@ KEYWORD_FALLBACKS = {
     "history": "https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=1920&q=85",
     "war": "https://images.unsplash.com/photo-1508614589041-895b88991e3e?w=1920&q=85",
     "satellite": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&q=85",
+    "newspaper": "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1920&q=85",
+    "headline": "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1920&q=85",
+    "press": "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1920&q=85",
+    "document": "https://images.unsplash.com/photo-1450133064473-71024230f91b?w=1920&q=85",
+    "classified": "https://images.unsplash.com/photo-1450133064473-71024230f91b?w=1920&q=85",
+    "executive": "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1920&q=85",
+    "boardroom": "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&q=85",
+    "ceo": "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1920&q=85",
+    "president": "https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=1920&q=85",
+    "taiwan": "https://images.unsplash.com/photo-1508247967583-7d982ea01526?w=1920&q=85",
+    "china": "https://images.unsplash.com/photo-1508804185872-d7badad00f7d?w=1920&q=85",
+    "court": "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1920&q=85",
 }
 
 def clean_query_text(text: str) -> str:

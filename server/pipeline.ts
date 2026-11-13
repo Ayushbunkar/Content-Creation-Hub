@@ -274,41 +274,8 @@ export class PipelineManager {
   }
 
   private static async planScenes(project: VideoProject, script: string): Promise<SceneData[]> {
-    const rawSentences = script.split(/(?<=[.!?।])\s+/).filter(s => s.trim().length > 0);
-    const shotTexts: string[] = [];
-
-    for (const sentence of rawSentences) {
-      const words = sentence.trim().split(/\s+/);
-      if (words.length > 8) {
-        // Fast Change: Split on comma, semicolon, dash or conjunction for dynamic 2.5-4s shot cuts
-        const clauses = sentence.split(/(?<=[,;:\-—])\s+/);
-        if (clauses.length > 1) {
-          for (const c of clauses) {
-            const cw = c.trim().split(/\s+/);
-            if (cw.length > 10) {
-              const mid = Math.floor(cw.length / 2);
-              shotTexts.push(cw.slice(0, mid).join(' '));
-              shotTexts.push(cw.slice(mid).join(' '));
-            } else if (c.trim().length > 0) {
-              shotTexts.push(c.trim());
-            }
-          }
-        } else {
-          const mid = Math.floor(words.length / 2);
-          shotTexts.push(words.slice(0, mid).join(' '));
-          shotTexts.push(words.slice(mid).join(' '));
-        }
-      } else {
-        shotTexts.push(sentence);
-      }
-    }
-
-    const t = (project.topic || '').toLowerCase();
-    const isHormuz = t.includes('hormuz') || t.includes('strait') || t.includes('persian gulf');
-
-    const cameraMovements: CameraMovement[] = [
-      'dolly_in', 'pan_left', 'tracking_forward', 'pan_right', 'tilt_up', 'aerial_zoom', 'dolly_out'
-    ];
+    // Fast-Paced Visual Storytelling: Segment narration into rapid 1.5s - 2.5s visual beats
+    const shotTexts = SceneIntelligenceEngine.segmentScriptIntoBeats(script, project.duration || 120);
 
     const plannedScenes: SceneData[] = [];
     const usedMediaUrls = new Set<string>();
@@ -317,7 +284,8 @@ export class PipelineManager {
     for (let idx = 0; idx < shotTexts.length; idx++) {
       const narration = shotTexts[idx];
       const wordCount = narration.trim().split(/\s+/).length;
-      const durationSec = Math.max(2.5, Math.min(5.0, Number((wordCount / 2.3).toFixed(1))));
+      // Fast paced 1.5s - 3.2s duration per visual beat
+      const durationSec = Math.max(1.8, Math.min(3.5, Number((wordCount / 2.4).toFixed(1))));
 
       // Module 5: Contextual Scene Intelligence
       const context = SceneIntelligenceEngine.analyzeNarration(
@@ -329,10 +297,8 @@ export class PipelineManager {
       );
       lastMovement = context.cameraMovement;
 
-      // Module 4: Deduplicated Stock Selection
-      let mediaUrl = context.mediaSource === 'real_video' || context.visualType === 'video_footage'
-        ? SceneIntelligenceEngine.selectBestStockClip(context.keywords, project.category || 'Geopolitics', usedMediaUrls).url
-        : MediaSourceManager.searchLocalLibraryFootage(narration, project.category);
+      // Module 4: Deduplicated Image Selection (IMAGE-ONLY — No video footage)
+      let mediaUrl = MediaSourceManager.searchLocalLibraryFootage(narration, project.category);
       usedMediaUrls.add(mediaUrl);
 
       plannedScenes.push({
@@ -347,13 +313,16 @@ export class PipelineManager {
         media_url: mediaUrl,
         camera_movement: context.cameraMovement,
         transition: context.transition || (idx % 3 === 1 ? 'whip_pan' : 'crossfade'),
-        visual_description: `Dynamic shot #${idx + 1} (${context.badge}) with ${context.cameraMovement} movement and fast shift.`,
+        visual_description: `Dynamic beat #${idx + 1} (${context.badge}) with ${context.cameraMovement} movement and fast shift.`,
         location: context.location,
         coordinates: context.coordinates,
         layers: {
           particles: idx % 2 === 0 ? 'dust_motes' : 'light_leaks'
         },
         archival_data: context.archivalData,
+        person_data: context.personData,
+        newspaper_data: context.newspaperData,
+        comparison_data: context.comparisonData,
         data_metric: context.dataMetric,
         map_config: {
           region: 'Global',
@@ -609,17 +578,17 @@ export class PipelineManager {
     const cinematicScenes = rawScenes.map((s, idx) => {
       const words = s.narration?.trim().split(/\s+/).length || 4;
       const shotDurFrames = idx === numScenes - 1
-        ? Math.max(60, totalFrames - accumulatedFrames)
-        : Math.max(60, Math.round((words / totalWords) * totalFrames));
+        ? Math.max(45, totalFrames - accumulatedFrames)
+        : Math.max(45, Math.round((words / totalWords) * totalFrames));
 
       const startF = accumulatedFrames;
       accumulatedFrames += shotDurFrames;
 
       return {
         id: s.id || `shot_${idx + 1}`,
-        type: s.visual_type || 'video_footage',
-        badge: s.badge || (s.visual_type === 'video_footage' ? '[Real Video Footage]' : '[Motion Graphics]'),
-        mediaUrl: s.media_url || '/videos/library/ocean_naval.mp4',
+        type: s.visual_type || 'archival_photo',
+        badge: s.badge || '[Archival Photo]',
+        mediaUrl: s.media_url || 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1920&q=85',
         cameraMovement: s.camera_movement || 'dolly_in',
         transition: s.transition || 'fade',
         title: s.title || project.title,
@@ -630,12 +599,15 @@ export class PipelineManager {
         startFrame: startF,
         durationFrames: shotDurFrames,
         layers: s.layers || { particles: idx % 2 === 0 ? 'dust_motes' : 'light_leaks' },
-        archivalData: s.archival_data || (s.visual_type === 'archival_document' ? {
+        personData: s.person_data,
+        newspaperData: s.newspaper_data,
+        comparisonData: s.comparison_data,
+        archivalData: s.archival_data || (s.visual_type === 'newspaper_headline' || s.visual_type === 'archival_document' ? {
           headline: (s.title || project.title).toUpperCase(),
           publication: 'THE GEOPOLITICAL HISTORICAL RECORD',
           date: 'OCTOBER 1973 // STRATEGIC DISPATCH',
           snippet: s.narration || '',
-        highlightPhrase: 'Critical strategic corridor under international maritime scrutiny.'
+          highlightPhrase: 'Critical strategic corridor under international maritime scrutiny.'
         } : undefined),
         visualData: {
           targetName: (project.topic || 'TACTICAL THEATER').toUpperCase(),

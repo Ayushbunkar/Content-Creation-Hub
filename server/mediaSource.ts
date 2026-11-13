@@ -240,29 +240,35 @@ export class MediaSourceManager {
   }
 
   /**
-   * Search curated local library footage
+   * Search curated local library photo
    */
   static searchLocalLibraryFootage(query: string, category: string): string {
     const q = (query || '').toLowerCase();
     const c = (category || '').toLowerCase();
 
     if (q.includes('ship') || q.includes('naval') || q.includes('ocean') || q.includes('sea') || q.includes('strait') || q.includes('water') || q.includes('chokepoint') || c.includes('geopolitics')) {
-      return '/videos/library/ocean_naval.mp4';
+      return 'https://images.unsplash.com/photo-1509299349698-dd22323b5963?w=1920&q=85';
     }
     if (q.includes('ai') || q.includes('tech') || q.includes('chip') || q.includes('computer') || q.includes('data') || q.includes('silicon') || c.includes('tech')) {
-      return '/videos/library/datacenter_tech.mp4';
+      return 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1920&q=85';
     }
     if (q.includes('history') || q.includes('war') || q.includes('treaty') || q.includes('vintage') || q.includes('archive') || c.includes('history')) {
-      return '/videos/library/historical_archive.mp4';
+      return 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=1920&q=85';
     }
     if (q.includes('money') || q.includes('market') || q.includes('oil') || q.includes('barrel') || q.includes('finance') || q.includes('trade') || c.includes('economic')) {
-      return '/videos/library/finance_trade.mp4';
+      return 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1920&q=85';
     }
     if (q.includes('satellite') || q.includes('space') || q.includes('border') || q.includes('global') || q.includes('orbit')) {
-      return '/videos/library/satellite_globe.mp4';
+      return 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&q=85';
+    }
+    if (q.includes('person') || q.includes('ceo') || q.includes('executive') || q.includes('leader')) {
+      return 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1920&q=85';
+    }
+    if (q.includes('news') || q.includes('headline') || q.includes('press')) {
+      return 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1920&q=85';
     }
 
-    return '/videos/library/military_surveillance.mp4';
+    return 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1920&q=85';
   }
 
   /**
@@ -326,14 +332,22 @@ export class QualityChecker {
         cloned.camera_movement = cameraMovements[idx % cameraMovements.length];
       }
 
-      // Check if scene was mistakenly configured as a static image
-      if ((cloned.visual_type as any) === 'image' || (cloned.visual_type as any) === 'illustration' || !cloned.visual_type) {
+      // Check if scene needs classification or has no visual_type
+      if (!cloned.visual_type || cloned.visual_type === 'video_footage' as any) {
         staticDetected++;
         const n = (cloned.narration || '').toLowerCase();
-        if (n.includes('treaty') || n.includes('document') || n.includes('law') || n.includes('signed') || n.includes('report') || n.includes('article')) {
-          cloned.visual_type = 'archival_document';
+        if (n.includes('jensen') || n.includes('trump') || n.includes('ceo') || n.includes('president') || n.includes('leader')) {
+          cloned.visual_type = 'person_intro';
+          cloned.media_source = 'photograph';
+          cloned.badge = '[Person Dossier]';
+        } else if (n.includes('news') || n.includes('headline') || n.includes('report') || n.includes('article') || n.includes('wsj')) {
+          cloned.visual_type = 'newspaper_headline';
           cloned.media_source = 'archival';
-          cloned.badge = '[Archival Document]';
+          cloned.badge = '[Press Headline]';
+        } else if (n.includes('treaty') || n.includes('document') || n.includes('law') || n.includes('classified') || n.includes('dossier')) {
+          cloned.visual_type = 'investigative_evidence';
+          cloned.media_source = 'archival';
+          cloned.badge = '[Classified Evidence]';
         } else if (n.includes('map') || n.includes('border') || n.includes('passage') || n.includes('strait') || n.includes('island')) {
           cloned.visual_type = 'tactical_map';
           cloned.media_source = 'motion_graphics';
@@ -343,18 +357,17 @@ export class QualityChecker {
           cloned.media_source = 'motion_graphics';
           cloned.badge = '[Data Metric]';
         } else {
-          cloned.visual_type = 'video_footage';
-          cloned.media_source = 'real_video';
-          cloned.badge = '[Real Video Footage]';
-          cloned.media_url = MediaSourceManager.searchLocalLibraryFootage(cloned.narration, category);
+          cloned.visual_type = 'archival_photo';
+          cloned.media_source = 'photograph';
+          cloned.badge = '[Archival Photograph]';
         }
         staticUpgraded++;
         cloned.quality_status = 'auto_enhanced';
-        notes.push(`Shot #${idx + 1} auto-upgraded from static image to dynamic ${cloned.visual_type}`);
+        notes.push(`Shot #${idx + 1} auto-assigned dynamic ${cloned.visual_type}`);
       }
 
-      // If video_footage has no media_url, assign authentic library clip
-      if (cloned.visual_type === 'video_footage' && !cloned.media_url) {
+      // If shot has no media_url, assign authentic photo fallback
+      if (!cloned.media_url) {
         cloned.media_url = MediaSourceManager.searchLocalLibraryFootage(cloned.narration, category);
       }
 

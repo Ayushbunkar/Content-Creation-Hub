@@ -44,18 +44,25 @@ export type PipelineStage =
   | 'READY_FOR_EDITING';
 
 export type VisualShotType =
-  | 'video_footage'
-  | 'layered_parallax'
-  | 'archival_document'
+  | 'archival_photo'
+  | 'person_intro'
+  | 'newspaper_headline'
   | 'tactical_map'
   | 'data_metric'
+  | 'investigative_evidence'
+  | 'comparison_split'
+  | 'layered_parallax'
   | 'cinematic_hook'
+  | 'video_footage'
+  | 'archival_document'
   | 'ai_video';
 
 export type MediaSource = 
+  | 'photograph'
+  | 'archival'
+  | 'motion_graphics'
+  | 'ai_image'
   | 'real_video' 
-  | 'motion_graphics' 
-  | 'archival' 
   | 'ai_video';
 
 export type CameraMovement = 
@@ -123,6 +130,24 @@ export interface SceneData {
     statNumber: string;
     statLabel: string;
     statSubtext: string;
+  };
+  person_data?: {
+    name: string;
+    title: string;
+    organization?: string;
+    location?: string;
+  };
+  newspaper_data?: {
+    headline: string;
+    publication: string;
+    date?: string;
+    snippet?: string;
+  };
+  comparison_data?: {
+    leftImage?: string;
+    rightImage?: string;
+    leftLabel?: string;
+    rightLabel?: string;
   };
   audio?: {
     music_volume?: number;
