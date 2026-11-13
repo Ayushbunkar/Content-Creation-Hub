@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
+import { spawn } from 'child_process';
 import { initDatabase, runQuery, getQuery, allQuery } from './db';
 import { VideoProject, SceneData } from './types';
 import { PipelineManager } from './pipeline';
@@ -15,6 +16,7 @@ import { DocumentaryNarrativeEngine } from './documentaryNarrative';
 import { VideoEnhancerService } from './videoEnhancer';
 import { CinematicEditorialEngine } from './cinematicEditorialEngine';
 import { CopyrightLicenseManager } from './copyrightService';
+import { AudioPoliceService } from './audioPolice';
 
 const app = express();
 const server = http.createServer(app);
@@ -1635,6 +1637,152 @@ app.post('/api/assets/register', async (req, res) => {
     });
 
     res.json({ success: true, asset: record });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =========================================================================
+// AUDIO COPYRIGHT POLICE — INSPECTION & ENFORCEMENT ENDPOINTS
+// =========================================================================
+
+// 1. Get Centralized Audio Asset Registry with Filters
+app.get('/api/audio-police/registry', async (req, res) => {
+  try {
+    const { projectId, audioType, sourcePlatform, riskScore } = req.query;
+    let sql = 'SELECT * FROM audio_asset_registry WHERE 1=1';
+    const params: any[] = [];
+
+    if (projectId) {
+      sql += ' AND (project_id = ? OR project_id IS NULL)';
+      params.push(String(projectId));
+    }
+    if (audioType) {
+      sql += ' AND audio_type = ?';
+      params.push(String(audioType));
+    }
+    if (sourcePlatform) {
+      sql += ' AND source_platform = ?';
+      params.push(String(sourcePlatform));
+    }
+    if (riskScore) {
+      sql += ' AND risk_score = ?';
+      params.push(String(riskScore));
+    }
+
+    sql += ' ORDER BY created_at DESC LIMIT 300';
+    const assets = await allQuery(sql, params);
+
+    // Compute summary stats
+    const total = assets.length;
+    const verified = assets.filter(a => a.verified_license === 1).length;
+    const aiGenerated = assets.filter(a => a.audio_type === 'ai_generated' || a.source_platform === 'ai_synthesis' || a.source_platform === 'kokoro_tts').length;
+    const unverified = assets.filter(a => a.verified_license === 0).length;
+    const highRisk = assets.filter(a => a.risk_score === 'HIGH').length;
+    const blocked = assets.filter(a => a.risk_score === 'BLOCKED').length;
+
+    res.json({
+      success: true,
+      stats: { total, verified, aiGenerated, unverified, highRisk, blocked },
+      assets
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Run / Get Audio Copyright Police Pre-Export Gate Report for a Project
+app.get('/api/audio-police/projects/:id/report', async (req, res) => {
+  try {
+    const projectId = String(req.params.id);
+    const report = await AudioPoliceService.runProjectPreExportGate(projectId);
+    const mdPath = path.join(process.cwd(), 'output', `${projectId}_audio_police_report.md`);
+    const markdown = fs.existsSync(mdPath) ? fs.readFileSync(mdPath, 'utf-8') : '';
+
+    res.json({ success: true, report, markdown });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Trigger Live Pre-Export Gate Check
+app.post('/api/audio-police/projects/:id/gate-check', async (req, res) => {
+  try {
+    const projectId = String(req.params.id);
+    const report = await AudioPoliceService.runProjectPreExportGate(projectId);
+    res.json({ success: true, report, message: 'Audio Copyright Police scan completed.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Smart Audio Replacement (Replaces High-Risk/Blocked track with pristine safe AI music)
+app.post('/api/audio-police/replace', async (req, res) => {
+  try {
+    const { projectId, offendingAssetId, preferredMood } = req.body;
+    if (!projectId || !offendingAssetId) {
+      return res.status(400).json({ error: 'projectId and offendingAssetId are required.' });
+    }
+
+    const result = await AudioPoliceService.smartReplaceAudio(projectId, offendingAssetId, preferredMood);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5. Documented Manual Review Override (for creators with direct sync licenses)
+app.post('/api/audio-police/override', async (req, res) => {
+  try {
+    const { assetId, projectId, reason } = req.body;
+    if (!assetId || !projectId || !reason) {
+      return res.status(400).json({ error: 'assetId, projectId, and reason are required.' });
+    }
+
+    await AudioPoliceService.applyManualOverride(assetId, projectId, reason);
+    res.json({ success: true, message: 'Manual override logged with audit reason.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 6. Generate Original AI Music On Demand
+app.post('/api/audio-police/generate-ai-music', async (req, res) => {
+  try {
+    const { mood, durationSec, projectId } = req.body;
+    const moodKey = mood || 'cinematic_documentary';
+    const dur = durationSec || 30;
+    const filename = `ai_synth_${moodKey}_${Date.now()}.wav`;
+    const relPath = path.join('public', 'audio', 'bgm', filename);
+    const absPath = path.join(process.cwd(), relPath);
+
+    const script = path.join(process.cwd(), 'scripts', 'generate_ai_audio.py');
+    await new Promise<void>((resolve, reject) => {
+      const p = spawn('python', [script, 'music', moodKey, absPath, '--duration', String(dur)]);
+      p.on('close', (code: number | null) => {
+        if (code === 0 && fs.existsSync(absPath)) resolve();
+        else reject(new Error(`AI generation exited with code ${code}`));
+      });
+      p.on('error', reject);
+    });
+
+    const record = await AudioPoliceService.registerAudio({
+      assetId: `ai_music_${Date.now()}`,
+      projectId: projectId || null,
+      audioType: 'ai_generated',
+      filePath: relPath,
+      sourcePlatform: 'ai_synthesis',
+      creatorArtist: 'Content-Creation-Hub AI Synthesis Engine',
+      audioTitle: `AI Generated: ${moodKey.replace(/_/g, ' ').toUpperCase()}`,
+      licenseType: 'Studio Original Royalty-Free / Creative Commons CC0 1.0',
+      licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
+      commercialUseAllowed: true,
+      attributionRequired: false,
+      modificationAllowed: true,
+      verifiedLicense: true
+    });
+
+    res.json({ success: true, asset: record, fileUrl: `/audio/bgm/${filename}` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

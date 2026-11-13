@@ -4,6 +4,7 @@ import { spawn } from 'child_process';
 import { runQuery, getQuery, allQuery } from './db';
 import { CaptionStudioService, TranscriptSegment, MediaProbeInfo } from './captionStudio';
 import { CopyrightLicenseManager } from './copyrightService';
+import { AudioPoliceService } from './audioPolice';
 
 export interface ClipperProject {
   id: string;
@@ -231,6 +232,26 @@ export class ViralClipperService {
       await CaptionStudioService.extractAudio(videoPath, audioPath);
       const relAudio = path.relative(process.cwd(), audioPath).replace(/\\/g, '/');
       await runQuery('UPDATE clipper_projects SET audio_path = ? WHERE id = ?', [relAudio, projectId]);
+
+      // Scan extracted audio with Audio Copyright Police
+      try {
+        await AudioPoliceService.registerAudio({
+          assetId: `clipper_audio_${projectId}`,
+          projectId,
+          audioType: 'extracted',
+          filePath: audioPath,
+          sourcePlatform: project.source_type === 'youtube' ? 'youtube_extract' : 'user_upload',
+          sourceUrl: project.source_url,
+          creatorArtist: project.title || 'Original Video Audio',
+          audioTitle: `Extracted Audio: ${project.title || projectId}`,
+          licenseType: project.source_type === 'youtube' ? 'Standard YouTube / Third-Party Extracted' : 'User Provided Media',
+          commercialUseAllowed: project.source_type !== 'youtube',
+          attributionRequired: project.source_type === 'youtube',
+          verifiedLicense: false
+        });
+      } catch (audErr: any) {
+        console.warn('[ViralClipper] Audio police scan note:', audErr?.message);
+      }
 
       // Stage 4: Subtitle Ingestion (Fast-Path YouTube Subtitles or Local Whisper)
       await runQuery('UPDATE clipper_projects SET status = ?, progress = 50, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [

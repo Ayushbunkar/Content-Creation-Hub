@@ -7,6 +7,7 @@ import { SceneIntelligenceEngine } from './sceneIntelligence';
 import { VideoEnhancerService } from './videoEnhancer';
 import { CinematicEditorialEngine, SoundDesignEngine } from './cinematicEditorialEngine';
 import { CopyrightLicenseManager } from './copyrightService';
+import { AudioPoliceService } from './audioPolice';
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
@@ -166,6 +167,12 @@ export class PipelineManager {
     let finalOutputPath = videoOutput;
 
     try {
+      // Mandatory Pre-Export Audio Copyright Police Inspection Gate
+      const audioGate = await AudioPoliceService.runProjectPreExportGate(projectId);
+      if (!audioGate.canExport) {
+        throw new Error(`Audio Copyright Police Gate Blocked Export: ${audioGate.blockReason}`);
+      }
+
       await this.renderVideo(projectId, videoOutput);
       await runQuery('UPDATE projects SET video_output = ? WHERE id = ?', [videoOutput, projectId]);
 

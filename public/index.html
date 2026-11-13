@@ -827,6 +827,151 @@
         setTimeout(() => setCopiedAttribution(false), 3000);
       };
 
+      // ================= AUDIO COPYRIGHT POLICE STATE & HANDLERS ================= //
+      const [audioPoliceAssets, setAudioPoliceAssets] = useState([]);
+      const [audioPoliceStats, setAudioPoliceStats] = useState({ total: 0, verified: 0, aiGenerated: 0, unverified: 0, highRisk: 0, blocked: 0 });
+      const [audioFilterType, setAudioFilterType] = useState('all');
+      const [audioFilterRisk, setAudioFilterRisk] = useState('all');
+      const [audioPoliceSearch, setAudioPoliceSearch] = useState('');
+      const [audioProjectReport, setAudioProjectReport] = useState(null);
+      const [isLoadingAudioPolice, setIsLoadingAudioPolice] = useState(false);
+      const [isReplacingAudio, setIsReplacingAudio] = useState(false);
+      const [isGeneratingAiMusic, setIsGeneratingAiMusic] = useState(false);
+      const [selectedReplaceAsset, setSelectedReplaceAsset] = useState(null);
+      const [overrideModalAsset, setOverrideModalAsset] = useState(null);
+      const [overrideReasonInput, setOverrideReasonInput] = useState('');
+      const [selectedDossierAsset, setSelectedDossierAsset] = useState(null);
+
+      const fetchAudioPoliceRegistry = async () => {
+        setIsLoadingAudioPolice(true);
+        try {
+          const params = new URLSearchParams();
+          if (audioFilterType !== 'all') params.append('audioType', audioFilterType);
+          if (audioFilterRisk !== 'all') params.append('riskScore', audioFilterRisk);
+          const res = await fetch(`/api/audio-police/registry?${params.toString()}`);
+          const data = await res.json();
+          if (data.success) {
+            setAudioPoliceAssets(data.assets || []);
+            setAudioPoliceStats(data.stats || { total: 0, verified: 0, aiGenerated: 0, unverified: 0, highRisk: 0, blocked: 0 });
+          }
+        } catch (e) {
+          console.error('Error fetching audio registry:', e);
+        } finally {
+          setIsLoadingAudioPolice(false);
+        }
+      };
+
+      const handleRunAudioPoliceGate = async (projId) => {
+        const targetId = projId || activeDocProject?.id || activeProject?.id;
+        if (!targetId) {
+          alert('Please select or create an active project first.');
+          return;
+        }
+        setIsLoadingAudioPolice(true);
+        try {
+          const res = await fetch(`/api/audio-police/projects/${targetId}/gate-check`, { method: 'POST' });
+          const data = await res.json();
+          if (data.success && data.report) {
+            setAudioProjectReport(data.report);
+            fetchAudioPoliceRegistry();
+          } else {
+            alert(data.message || 'Audio police scan could not be completed.');
+          }
+        } catch (err) {
+          alert('Error running audio gate: ' + err.message);
+        } finally {
+          setIsLoadingAudioPolice(false);
+        }
+      };
+
+      const handleSmartAudioReplace = async (offendingAssetId, preferredMood) => {
+        const targetId = activeDocProject?.id || activeProject?.id;
+        if (!targetId) {
+          alert('Select a project to replace audio.');
+          return;
+        }
+        setIsReplacingAudio(true);
+        try {
+          const res = await fetch('/api/audio-police/replace', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: targetId,
+              offendingAssetId,
+              preferredMood: preferredMood || 'cinematic_documentary'
+            })
+          });
+          const data = await res.json();
+          if (data.success) {
+            alert('✅ Smart Audio Replacement Successful!\n' + data.message);
+            setSelectedReplaceAsset(null);
+            fetchAudioPoliceRegistry();
+            handleRunAudioPoliceGate(targetId);
+          } else {
+            alert('Replacement failed: ' + (data.message || 'Unknown error'));
+          }
+        } catch (err) {
+          alert('Error replacing audio: ' + err.message);
+        } finally {
+          setIsReplacingAudio(false);
+        }
+      };
+
+      const handleApplyAudioOverride = async () => {
+        if (!overrideModalAsset || !overrideReasonInput.trim()) {
+          alert('Please enter a valid documented reason for this rights override.');
+          return;
+        }
+        const targetId = activeDocProject?.id || activeProject?.id;
+        try {
+          const res = await fetch('/api/audio-police/override', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              assetId: overrideModalAsset.asset_id || overrideModalAsset.id,
+              projectId: targetId,
+              reason: overrideReasonInput.trim()
+            })
+          });
+          const data = await res.json();
+          if (data.success) {
+            alert('✅ Manual rights override applied and logged.');
+            setOverrideModalAsset(null);
+            setOverrideReasonInput('');
+            fetchAudioPoliceRegistry();
+            if (targetId) handleRunAudioPoliceGate(targetId);
+          }
+        } catch (err) {
+          alert('Error applying override: ' + err.message);
+        }
+      };
+
+      const handleGenerateAiMusicTrack = async (mood) => {
+        setIsGeneratingAiMusic(true);
+        try {
+          const res = await fetch('/api/audio-police/generate-ai-music', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mood: mood || 'cinematic_documentary',
+              durationSec: 30,
+              projectId: activeDocProject?.id || activeProject?.id
+            })
+          });
+          const data = await res.json();
+          if (data.success) {
+            alert(`✅ Generated pristine AI composition "${data.asset.audio_title}" (CC0 Public Domain).`);
+            fetchAudioPoliceRegistry();
+          } else {
+            alert('Generation failed: ' + (data.error || 'Unknown error'));
+          }
+        } catch (err) {
+          alert('Error generating AI music: ' + err.message);
+        } finally {
+          setIsGeneratingAiMusic(false);
+        }
+      };
+
       const handleSaveEnhancementSettings = async () => {
         const targetProjId = activeDocProject?.id || activeProject?.id;
         if (!targetProjId) {
@@ -1248,12 +1393,17 @@
       }, []);
 
       useEffect(() => {
+        fetchAudioPoliceRegistry();
+      }, [audioFilterType, audioFilterRisk]);
+
+      useEffect(() => {
         fetchProjects();
         fetchCurated();
         fetchCaptionProjects();
         fetchOutputClips();
         fetchClipperProjects();
         fetchDocProjects();
+        fetchAudioPoliceRegistry();
 
         // WebSocket for live generation & transcription updates
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -1870,6 +2020,7 @@
                 {[
                   { id: 'documentary', label: 'Documentary Studio', badge: '8-Min AI Doc', icon: 'film' },
                   { id: 'enhancement', label: 'Video Quality & AI Pro', badge: '60 FPS ⚡', icon: 'zap' },
+                  { id: 'audio_police', label: 'Audio Copyright Police', badge: 'Police 🚨', icon: 'shield' },
                   { id: 'clipper', label: 'AI Viral Clipper', badge: 'Viral 🔥', icon: 'scissors' },
                   { id: 'captions', label: 'Caption Studio', badge: 'Pro', icon: 'type' },
                   { id: 'new', label: 'New AI Video', icon: 'plus-circle' },
@@ -1918,7 +2069,7 @@
               <div class="flex items-center space-x-3">
                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 <h2 class="text-sm font-bold tracking-wide text-slate-200 uppercase">
-                  {currentTab === 'documentary' ? 'Documentary Studio — Topic-to-Documentary AI Generator' : currentTab === 'enhancement' ? 'Video Quality & Cinematic Production Engine' : currentTab === 'clipper' ? 'AI Viral Clipper — YouTube & Podcast Auto-Shorts' : currentTab === 'captions' ? 'Caption Studio — Video & Animated Subtitles' : currentTab.toUpperCase()}
+                  {currentTab === 'documentary' ? 'Documentary Studio — Topic-to-Documentary AI Generator' : currentTab === 'enhancement' ? 'Video Quality & Cinematic Production Engine' : currentTab === 'audio_police' ? 'Audio Copyright Police — Pre-Export Gate & Asset Registry' : currentTab === 'clipper' ? 'AI Viral Clipper — YouTube & Podcast Auto-Shorts' : currentTab === 'captions' ? 'Caption Studio — Video & Animated Subtitles' : currentTab.toUpperCase()}
                 </h2>
               </div>
               <div class="text-xs text-slate-400 flex items-center space-x-4">
@@ -5241,6 +5392,504 @@
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* ========================================================================= */}
+              {/* AUDIO COPYRIGHT POLICE — PRE-EXPORT ENFORCEMENT & ASSET REGISTRY (TAB)   */}
+              {/* ========================================================================= */}
+              {currentTab === 'audio_police' && (
+                <div class="max-w-6xl mx-auto space-y-6 pb-16">
+                  {/* TOP BANNER */}
+                  <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                    <div class="flex items-center space-x-4">
+                      <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-rose-600 via-amber-500 to-emerald-500 flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-rose-500/20">
+                        🚨
+                      </div>
+                      <div>
+                        <div class="flex items-center space-x-2">
+                          <h2 class="text-lg font-black text-slate-100 tracking-tight">Audio Copyright Police</h2>
+                          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                            Acoustic Fingerprint Engine
+                          </span>
+                        </div>
+                        <p class="text-xs text-slate-400">
+                          Pre-render inspection, acoustic fingerprinting, duplicate detection, YouTube Content ID readiness & Smart Audio Replacement.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2.5">
+                      <button
+                        onClick={() => handleRunAudioPoliceGate(activeDocProject?.id || activeProject?.id)}
+                        disabled={isLoadingAudioPolice}
+                        class="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl transition shadow flex items-center space-x-1.5"
+                      >
+                        <span>{isLoadingAudioPolice ? '⏳ Scanning Gate...' : '🛡️ Scan Project Pre-Export Gate'}</span>
+                      </button>
+                      <button
+                        onClick={fetchAudioPoliceRegistry}
+                        disabled={isLoadingAudioPolice}
+                        class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition border border-slate-700"
+                        title="Refresh audio registry"
+                      >
+                        🔄 Refresh
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* STATS HUD ROW */}
+                  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center space-y-1">
+                      <div class="text-[10px] text-slate-400 uppercase font-semibold">Total Audio Tracks</div>
+                      <div class="text-xl font-black text-cyan-400">{audioPoliceStats.total}</div>
+                      <div class="text-[9px] text-slate-500">Tracked in Registry</div>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center space-y-1">
+                      <div class="text-[10px] text-slate-400 uppercase font-semibold">Verified Licensed</div>
+                      <div class="text-xl font-black text-emerald-400">{audioPoliceStats.verified}</div>
+                      <div class="text-[9px] text-emerald-500/80">Commercial Cleared</div>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center space-y-1">
+                      <div class="text-[10px] text-slate-400 uppercase font-semibold">AI / Procedural</div>
+                      <div class="text-xl font-black text-indigo-400">{audioPoliceStats.aiGenerated}</div>
+                      <div class="text-[9px] text-indigo-400/80">CC0 / Apache 2.0</div>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center space-y-1">
+                      <div class="text-[10px] text-slate-400 uppercase font-semibold">Unverified Audio</div>
+                      <div class="text-xl font-black text-amber-400">{audioPoliceStats.unverified}</div>
+                      <div class="text-[9px] text-amber-500/80">Audit Recommended</div>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center space-y-1">
+                      <div class="text-[10px] text-slate-400 uppercase font-semibold">High-Risk Tracks</div>
+                      <div class="text-xl font-black text-rose-400">{audioPoliceStats.highRisk}</div>
+                      <div class="text-[9px] text-rose-500/80">Content ID Alert</div>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center space-y-1">
+                      <div class="text-[10px] text-slate-400 uppercase font-semibold">Blocked from Gate</div>
+                      <div class="text-xl font-black text-red-500">{audioPoliceStats.blocked}</div>
+                      <div class="text-[9px] text-red-400/80">Non-Commercial / Match</div>
+                    </div>
+                  </div>
+
+                  {/* ACTIVE PROJECT PRE-EXPORT GATE STATUS (IF SCANNED) */}
+                  {audioProjectReport && (
+                    <div class={`border rounded-2xl p-5 space-y-4 shadow-xl ${
+                      audioProjectReport.gateStatus === 'PASSED'
+                        ? 'bg-slate-900/90 border-emerald-500/30'
+                        : audioProjectReport.gateStatus === 'WARNING_REVIEW_REQUIRED'
+                        ? 'bg-slate-900/90 border-amber-500/40'
+                        : 'bg-slate-900/90 border-rose-500/40'
+                    }`}>
+                      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                        <div class="space-y-0.5">
+                          <div class="flex items-center space-x-2">
+                            <span class="text-sm font-bold text-slate-100">Project Export Gate:</span>
+                            <span class="text-xs font-mono text-slate-300 font-bold">{audioProjectReport.projectTitle}</span>
+                          </div>
+                          <div class="text-xs text-slate-400">
+                            Pre-export inspection audited {audioProjectReport.summary.totalAudioTracks} composite audio stems (BGM, SFX cues, TTS narration).
+                          </div>
+                        </div>
+
+                        <div class="flex items-center space-x-3">
+                          <span class={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border ${
+                            audioProjectReport.gateStatus === 'PASSED'
+                              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                              : audioProjectReport.gateStatus === 'WARNING_REVIEW_REQUIRED'
+                              ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                              : 'bg-rose-500/20 text-rose-400 border-rose-500/40'
+                          }`}>
+                            Gate Status: {audioProjectReport.gateStatus.replace(/_/g, ' ')}
+                          </span>
+
+                          <span class={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+                            audioProjectReport.canExport
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-rose-600 text-white animate-pulse'
+                          }`}>
+                            {audioProjectReport.canExport ? '✅ CAN EXPORT' : '⛔ EXPORT BLOCKED'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {audioProjectReport.blockReason && (
+                        <div class="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 space-y-1">
+                          <div class="font-bold flex items-center space-x-1">
+                            <span>⛔ Export Gate Lockdown Active</span>
+                          </div>
+                          <p class="leading-relaxed">{audioProjectReport.blockReason}</p>
+                        </div>
+                      )}
+
+                      {/* SMART AUDIO REPLACEMENT CALLOUT */}
+                      {audioProjectReport.replacementRecommendations && audioProjectReport.replacementRecommendations.length > 0 && (
+                        <div class="p-4 bg-indigo-950/40 border border-indigo-500/30 rounded-xl space-y-3">
+                          <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-indigo-300 flex items-center space-x-1.5">
+                              <span>⚡ Smart Audio Replacement Recommendation</span>
+                            </span>
+                            <span class="text-[10px] text-indigo-400 font-mono">Preserves Narration & Sync</span>
+                          </div>
+
+                          <div class="space-y-2">
+                            {audioProjectReport.replacementRecommendations.map((rec, i) => (
+                              <div key={i} class="p-3 bg-slate-900 rounded-lg border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                <div class="space-y-0.5">
+                                  <div class="font-bold text-slate-200">Replace: "{rec.title}"</div>
+                                  <div class="text-[11px] text-amber-400">{rec.reason}</div>
+                                  <div class="text-[11px] text-slate-400">Target Safe Alternative: {rec.safeAlternative.name} ({rec.safeAlternative.license})</div>
+                                </div>
+                                <button
+                                  onClick={() => handleSmartAudioReplace(rec.offendingAssetId, rec.safeAlternative.mood)}
+                                  disabled={isReplacingAudio}
+                                  class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg transition shadow flex items-center space-x-1"
+                                >
+                                  <span>{isReplacingAudio ? '⏳ Synthesizing Safe Audio...' : '⚡ Smart Replace with Safe AI Track'}</span>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* YOUTUBE CONTENT ID READINESS & DISPUTE KIT */}
+                      <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2 text-xs">
+                        <div class="flex items-center justify-between">
+                          <span class="font-bold text-slate-200">YouTube Content ID Publishing Readiness</span>
+                          <span class="font-mono text-[11px] text-emerald-400">
+                            {audioProjectReport.youtubeContentIdReadiness.status}
+                          </span>
+                        </div>
+                        <p class="text-slate-400 text-[11px] leading-relaxed">
+                          {audioProjectReport.youtubeContentIdReadiness.advisory}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* AI MUSIC GENERATION QUICK SUITE */}
+                  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 shadow-lg">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <span class="text-xs font-bold text-slate-200 uppercase flex items-center space-x-1.5">
+                        <span>🎵 Original AI Music Generator (100% Royalty-Free & Content ID Safe)</span>
+                      </span>
+                      <span class="text-[10px] font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+                        Zero Copyright Risk
+                      </span>
+                    </div>
+                    <p class="text-xs text-slate-400">
+                      Synthesize original broadcast-quality audio tracks directly in code. Compositions are licensed under CC0 Public Domain / Studio Royalty-Free terms.
+                    </p>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-1">
+                      {[
+                        { mood: 'cinematic_documentary', label: 'Cinematic Doc', icon: '🎻' },
+                        { mood: 'corporate_tech', label: 'Tech & AI', icon: '💻' },
+                        { mood: 'suspense_investigative', label: 'Suspense Drone', icon: '🕵️' },
+                        { mood: 'geopolitics_epic', label: 'Epic Military', icon: '🌍' },
+                        { mood: 'emotional_storytelling', label: 'Emotional Narrative', icon: '🎹' },
+                        { mood: 'news_broadcast', label: 'Breaking News', icon: '📡' },
+                      ].map((m) => (
+                        <button
+                          key={m.mood}
+                          onClick={() => handleGenerateAiMusicTrack(m.mood)}
+                          disabled={isGeneratingAiMusic}
+                          class="p-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left transition space-y-1 group hover:border-indigo-500/40"
+                        >
+                          <div class="text-base">{m.icon}</div>
+                          <div class="text-xs font-bold text-slate-200 group-hover:text-indigo-400">{m.label}</div>
+                          <div class="text-[10px] text-slate-500">Original AI Track</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* CENTRALIZED AUDIO ASSET REGISTRY TABLE & FILTERS */}
+                  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                      <div>
+                        <h3 class="text-sm font-bold text-slate-100 uppercase tracking-wide">Centralized Audio Asset Registry</h3>
+                        <p class="text-xs text-slate-400">Audited audio assets across background music, sound effects, narration, uploads, and clippings.</p>
+                      </div>
+
+                      {/* FILTERS */}
+                      <div class="flex flex-wrap items-center gap-2">
+                        <select
+                          value={audioFilterType}
+                          onChange={(e) => setAudioFilterType(e.target.value)}
+                          class="bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
+                        >
+                          <option value="all">All Audio Types</option>
+                          <option value="bgm">Background Music (BGM)</option>
+                          <option value="sfx">Sound Effects (SFX)</option>
+                          <option value="voiceover">Voiceover / TTS</option>
+                          <option value="ai_generated">AI Generated</option>
+                          <option value="user_upload">User Uploaded</option>
+                          <option value="extracted">Extracted Audio</option>
+                        </select>
+
+                        <select
+                          value={audioFilterRisk}
+                          onChange={(e) => setAudioFilterRisk(e.target.value)}
+                          class="bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
+                        >
+                          <option value="all">All Risk Levels</option>
+                          <option value="LOW">Low Risk 🟢</option>
+                          <option value="MEDIUM">Medium Risk 🟡</option>
+                          <option value="HIGH">High Risk 🔴</option>
+                          <option value="BLOCKED">Blocked ⛔</option>
+                        </select>
+
+                        <input
+                          type="text"
+                          placeholder="Search title, artist or hash..."
+                          value={audioPoliceSearch}
+                          onChange={(e) => setAudioPoliceSearch(e.target.value)}
+                          class="bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 px-3 py-1.5 focus:outline-none focus:border-indigo-500 w-44"
+                        />
+                      </div>
+                    </div>
+
+                    {/* TABLE */}
+                    <div class="overflow-x-auto">
+                      <table class="w-full text-left text-xs text-slate-300">
+                        <thead class="text-[11px] text-slate-400 uppercase bg-slate-950/70 border-b border-slate-800">
+                          <tr>
+                            <th class="py-2.5 px-3">Type</th>
+                            <th class="py-2.5 px-3">Track & Creator</th>
+                            <th class="py-2.5 px-3">Source & Platform</th>
+                            <th class="py-2.5 px-3">License & Terms</th>
+                            <th class="py-2.5 px-3">Acoustic Hash</th>
+                            <th class="py-2.5 px-3">Risk Assessment</th>
+                            <th class="py-2.5 px-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800/60">
+                          {audioPoliceAssets
+                            .filter(a => {
+                              if (!audioPoliceSearch.trim()) return true;
+                              const q = audioPoliceSearch.toLowerCase();
+                              return (
+                                (a.audio_title || '').toLowerCase().includes(q) ||
+                                (a.creator_artist || '').toLowerCase().includes(q) ||
+                                (a.file_hash || '').toLowerCase().includes(q) ||
+                                (a.license_type || '').toLowerCase().includes(q)
+                              );
+                            })
+                            .map((asset) => {
+                              const reasons = asset.risk_reasons ? JSON.parse(asset.risk_reasons) : [];
+                              return (
+                                <tr key={asset.id} class="hover:bg-slate-800/40 transition">
+                                  <td class="py-3 px-3">
+                                    <span class={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                                      asset.audio_type === 'bgm' ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' :
+                                      asset.audio_type === 'sfx' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' :
+                                      asset.audio_type === 'voiceover' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
+                                      asset.audio_type === 'ai_generated' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                                      'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                    }`}>
+                                      {asset.audio_type}
+                                    </span>
+                                  </td>
+                                  <td class="py-3 px-3 max-w-[200px]">
+                                    <div class="font-bold text-slate-100 truncate" title={asset.audio_title || asset.original_filename}>
+                                      {asset.audio_title || asset.original_filename}
+                                    </div>
+                                    <div class="text-[11px] text-slate-400 truncate">{asset.creator_artist || 'Studio'}</div>
+                                  </td>
+                                  <td class="py-3 px-3">
+                                    <div class="font-mono text-[11px] text-slate-300">{asset.source_platform}</div>
+                                    <div class="text-[10px] text-slate-500">{asset.duration_sec ? `${asset.duration_sec}s` : 'audio'}</div>
+                                  </td>
+                                  <td class="py-3 px-3 max-w-[180px]">
+                                    <div class="font-semibold text-slate-200 truncate" title={asset.license_type}>{asset.license_type}</div>
+                                    <div class="text-[10px] flex items-center space-x-1.5">
+                                      <span class={asset.commercial_use_allowed ? 'text-emerald-400' : 'text-rose-400'}>
+                                        {asset.commercial_use_allowed ? 'Commercial OK' : 'Non-Commercial'}
+                                      </span>
+                                      {asset.attribution_required === 1 && (
+                                        <span class="text-amber-400">• Attr. Required</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td class="py-3 px-3 font-mono text-[10px] text-slate-400">
+                                    {asset.file_hash ? `${asset.file_hash.slice(0, 10)}...` : 'probed'}
+                                  </td>
+                                  <td class="py-3 px-3">
+                                    <span class={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider inline-block ${
+                                      asset.risk_score === 'LOW'
+                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                        : asset.risk_score === 'MEDIUM'
+                                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                        : asset.risk_score === 'HIGH'
+                                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                        : 'bg-red-600 text-white font-bold'
+                                    }`} title={reasons.join('\n')}>
+                                      {asset.risk_score}
+                                    </span>
+                                  </td>
+                                  <td class="py-3 px-3 text-right">
+                                    <div class="flex items-center justify-end space-x-1">
+                                      <button
+                                        onClick={() => setSelectedDossierAsset(asset)}
+                                        class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] font-semibold transition"
+                                        title="View Audio License Dossier"
+                                      >
+                                        Dossier
+                                      </button>
+                                      {(asset.risk_score === 'HIGH' || asset.risk_score === 'BLOCKED') && (
+                                        <>
+                                          <button
+                                            onClick={() => handleSmartAudioReplace(asset.asset_id)}
+                                            class="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[11px] font-bold transition shadow"
+                                            title="Smart Replace with Safe AI Track"
+                                          >
+                                            ⚡ Replace
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              setOverrideModalAsset(asset);
+                                              setOverrideReasonInput('');
+                                            }}
+                                            class="px-2 py-1 bg-amber-600/80 hover:bg-amber-500 text-white rounded text-[11px] font-semibold transition"
+                                            title="Documented Creator Override"
+                                          >
+                                            Override
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+
+                      {audioPoliceAssets.length === 0 && (
+                        <div class="py-8 text-center text-xs text-slate-500">
+                          No audio assets matched your filters. Click "Scan Project Pre-Export Gate" or generate an AI composition above.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* AUDIT DOSSIER MODAL */}
+                  {selectedDossierAsset && (
+                    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                      <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-5 shadow-2xl space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                          <div class="flex items-center space-x-2">
+                            <span class="text-sm font-bold text-slate-100">Audio License Dossier</span>
+                            <span class="text-xs px-2 py-0.5 rounded font-mono font-bold bg-slate-800 text-indigo-400">
+                              {selectedDossierAsset.asset_id}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => setSelectedDossierAsset(null)}
+                            class="text-slate-400 hover:text-slate-100 text-sm font-bold"
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        <div class="space-y-3 text-xs text-slate-300">
+                          <div class="p-3 bg-slate-950 rounded-xl space-y-1">
+                            <div class="font-bold text-slate-200 text-sm">{selectedDossierAsset.audio_title}</div>
+                            <div class="text-slate-400">Creator / Artist: <span class="text-slate-200">{selectedDossierAsset.creator_artist}</span></div>
+                            <div class="text-slate-400">Source Platform: <span class="font-mono text-slate-200">{selectedDossierAsset.source_platform}</span></div>
+                            <div class="text-slate-400">File Path: <span class="font-mono text-slate-400">{selectedDossierAsset.file_path}</span></div>
+                          </div>
+
+                          <div class="grid grid-cols-2 gap-2 text-center text-[11px]">
+                            <div class="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
+                              <div class="text-slate-400">Commercial Use</div>
+                              <div class={`font-bold ${selectedDossierAsset.commercial_use_allowed ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                {selectedDossierAsset.commercial_use_allowed ? '✅ Permitted' : '❌ Prohibited'}
+                              </div>
+                            </div>
+                            <div class="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
+                              <div class="text-slate-400">Attribution Required</div>
+                              <div class="font-bold text-slate-200">
+                                {selectedDossierAsset.attribution_required ? '⚠️ Yes (Required)' : '✅ Optional / None'}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="p-3 bg-slate-950 rounded-xl space-y-1">
+                            <div class="text-slate-400 text-[10px] uppercase font-bold">Bitstream SHA-256 Hash</div>
+                            <div class="font-mono text-[11px] text-cyan-400 break-all">{selectedDossierAsset.file_hash}</div>
+                          </div>
+
+                          <div class="p-3 bg-slate-950 rounded-xl space-y-1">
+                            <div class="text-slate-400 text-[10px] uppercase font-bold">Perceptual Acoustic Fingerprint</div>
+                            <div class="font-mono text-[10px] text-slate-400 break-all max-h-16 overflow-y-auto">
+                              {selectedDossierAsset.audio_fingerprint || 'Acoustic waveform signature'}
+                            </div>
+                          </div>
+
+                          <div class="p-3 bg-slate-950 rounded-xl space-y-1">
+                            <div class="text-slate-400 text-[10px] uppercase font-bold">Usage Restrictions & Redelivery Policy</div>
+                            <p class="text-slate-300 text-[11px] leading-relaxed">
+                              {selectedDossierAsset.redistribution_restrictions}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div class="flex justify-end pt-2 border-t border-slate-800">
+                          <button
+                            onClick={() => setSelectedDossierAsset(null)}
+                            class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-lg text-xs transition"
+                          >
+                            Close
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* MANUAL OVERRIDE MODAL */}
+                  {overrideModalAsset && (
+                    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                      <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                          <span class="text-sm font-bold text-slate-100">Documented Rights Override</span>
+                          <button onClick={() => setOverrideModalAsset(null)} class="text-slate-400 hover:text-slate-100">✕</button>
+                        </div>
+
+                        <p class="text-xs text-slate-400 leading-relaxed">
+                          Applying an override certifies that you own master or synchronization rights for this audio track. This creates an unalterable audit log entry.
+                        </p>
+
+                        <div class="space-y-1.5">
+                          <label class="text-[11px] font-bold text-slate-300 uppercase">Documented Reason / Sync License ID:</label>
+                          <textarea
+                            rows="3"
+                            value={overrideReasonInput}
+                            onChange={(e) => setOverrideReasonInput(e.target.value)}
+                            placeholder="e.g. Master sync license invoice #84920 from publisher / Artist written waiver for broadcast..."
+                            class="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                          />
+                        </div>
+
+                        <div class="flex items-center justify-end space-x-2 pt-2 border-t border-slate-800">
+                          <button
+                            onClick={() => setOverrideModalAsset(null)}
+                            class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold transition"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleApplyAudioOverride}
+                            class="px-4 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition shadow"
+                          >
+                            Confirm Override
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -57,6 +57,8 @@ export function initDatabase(): Promise<void> {
           `ALTER TABLE projects ADD COLUMN enhancement_settings TEXT`,
           `ALTER TABLE projects ADD COLUMN qc_report TEXT`,
           `ALTER TABLE projects ADD COLUMN copyright_report TEXT`,
+          `ALTER TABLE projects ADD COLUMN audio_police_report TEXT`,
+          `ALTER TABLE projects ADD COLUMN audio_gate_status TEXT DEFAULT 'PENDING'`,
           `ALTER TABLE projects ADD COLUMN color_profile TEXT DEFAULT 'cinematic_documentary'`,
           `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`
         ];
@@ -91,6 +93,8 @@ export function initDatabase(): Promise<void> {
           `ALTER TABLE projects ADD COLUMN enhancement_settings TEXT`,
           `ALTER TABLE projects ADD COLUMN qc_report TEXT`,
           `ALTER TABLE projects ADD COLUMN copyright_report TEXT`,
+          `ALTER TABLE projects ADD COLUMN audio_police_report TEXT`,
+          `ALTER TABLE projects ADD COLUMN audio_gate_status TEXT DEFAULT 'PENDING'`,
           `ALTER TABLE projects ADD COLUMN color_profile TEXT DEFAULT 'cinematic_documentary'`,
           `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`
         ];
@@ -133,6 +137,8 @@ export function initDatabase(): Promise<void> {
           `ALTER TABLE projects ADD COLUMN enhancement_settings TEXT`,
           `ALTER TABLE projects ADD COLUMN qc_report TEXT`,
           `ALTER TABLE projects ADD COLUMN copyright_report TEXT`,
+          `ALTER TABLE projects ADD COLUMN audio_police_report TEXT`,
+          `ALTER TABLE projects ADD COLUMN audio_gate_status TEXT DEFAULT 'PENDING'`,
           `ALTER TABLE projects ADD COLUMN color_profile TEXT DEFAULT 'cinematic_documentary'`,
           `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`
         ];
@@ -177,6 +183,8 @@ export function initDatabase(): Promise<void> {
           `ALTER TABLE projects ADD COLUMN enhancement_settings TEXT`,
           `ALTER TABLE projects ADD COLUMN qc_report TEXT`,
           `ALTER TABLE projects ADD COLUMN copyright_report TEXT`,
+          `ALTER TABLE projects ADD COLUMN audio_police_report TEXT`,
+          `ALTER TABLE projects ADD COLUMN audio_gate_status TEXT DEFAULT 'PENDING'`,
           `ALTER TABLE projects ADD COLUMN color_profile TEXT DEFAULT 'cinematic_documentary'`,
           `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`
         ];
@@ -240,7 +248,49 @@ export function initDatabase(): Promise<void> {
           db.run(`CREATE INDEX IF NOT EXISTS idx_asset_reg_asset_id ON asset_registry(asset_id)`, () => {});
           db.run(`CREATE INDEX IF NOT EXISTS idx_asset_reg_project_id ON asset_registry(project_id)`, () => {});
           db.run(`CREATE INDEX IF NOT EXISTS idx_asset_reg_original_url ON asset_registry(original_url)`, () => {});
-          resolve();
+
+          // Centralized Audio Asset Registry for Audio Copyright Police
+          db.run(`
+            CREATE TABLE IF NOT EXISTS audio_asset_registry (
+              id TEXT PRIMARY KEY,
+              asset_id TEXT NOT NULL,
+              project_id TEXT,
+              audio_type TEXT NOT NULL,
+              original_filename TEXT NOT NULL,
+              file_path TEXT NOT NULL,
+              source_url TEXT,
+              source_platform TEXT NOT NULL,
+              creator_artist TEXT,
+              audio_title TEXT,
+              duration_sec REAL DEFAULT 0,
+              sample_rate INTEGER DEFAULT 48000,
+              channels INTEGER DEFAULT 2,
+              file_hash TEXT,
+              audio_fingerprint TEXT,
+              license_type TEXT NOT NULL,
+              license_url TEXT,
+              commercial_use_allowed INTEGER DEFAULT 1,
+              attribution_required INTEGER DEFAULT 0,
+              modification_allowed INTEGER DEFAULT 1,
+              redistribution_restrictions TEXT,
+              verified_license INTEGER DEFAULT 0,
+              risk_score TEXT DEFAULT 'LOW',
+              risk_reasons TEXT,
+              detection_match_info TEXT,
+              manual_override INTEGER DEFAULT 0,
+              override_reason TEXT,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `, (audioErr) => {
+            if (audioErr) return reject(audioErr);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_audio_reg_asset_id ON audio_asset_registry(asset_id)`, () => {});
+            db.run(`CREATE INDEX IF NOT EXISTS idx_audio_reg_project_id ON audio_asset_registry(project_id)`, () => {});
+            db.run(`CREATE INDEX IF NOT EXISTS idx_audio_reg_file_hash ON audio_asset_registry(file_hash)`, () => {});
+            db.run(`CREATE INDEX IF NOT EXISTS idx_audio_reg_risk ON audio_asset_registry(risk_score)`, () => {});
+            db.run(`CREATE INDEX IF NOT EXISTS idx_audio_reg_type ON audio_asset_registry(audio_type)`, () => {});
+            resolve();
+          });
         });
       });
     });
