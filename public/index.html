@@ -81,16 +81,19 @@
     ];
 
     // ==========================================
+    // ==========================================
     // RETRO ARCADE FLAPPY BIRD (STUDIO EDITION)
     // Play while AI pipeline or render is running
     // ==========================================
     function FlappyBirdGame() {
       const canvasRef = React.useRef(null);
+      const jumpRef = React.useRef(() => {});
       const [score, setScore] = React.useState(0);
       const [highScore, setHighScore] = React.useState(() => {
         try { return parseInt(localStorage.getItem('flappy_hs') || '0', 10); } catch (e) { return 0; }
       });
-      const [gameState, setGameState] = React.useState('idle'); // idle, playing, over
+      const highScoreRef = React.useRef(highScore);
+      highScoreRef.current = highScore;
 
       React.useEffect(() => {
         const canvas = canvasRef.current;
@@ -99,157 +102,246 @@
         const W = canvas.width;
         const H = canvas.height;
 
-        let bird = { x: 55, y: H / 2, vy: 0, r: 13, rot: 0 };
+        const gravity = 0.22;
+        const jumpPower = -5.0;
+        const maxFallSpeed = 6.2;
+        const gap = 126;
+        const groundY = H - 36;
+        const hitboxMargin = 4;
+
+        let bird = { x: 60, y: H / 2 - 20, vy: 0, r: 12, rot: 0 };
         let pipes = [];
+        let particles = [];
         let frame = 0;
         let localScore = 0;
-        let state = 'idle';
+        let state = 'idle'; // 'idle', 'playing', 'over'
+        let deathTime = 0;
         let animId;
 
-        const gravity = 0.28;
-        const jump = -5.6;
-        const gap = 114;
-        const groundY = H - 36;
-
         const resetGame = () => {
-          bird = { x: 55, y: H / 2, vy: 0, r: 13, rot: 0 };
+          bird = { x: 60, y: H / 2 - 25, vy: jumpPower * 0.85, r: 12, rot: -0.2 };
           pipes = [];
+          particles = [];
           frame = 0;
           localScore = 0;
           setScore(0);
           state = 'playing';
-          setGameState('playing');
         };
 
         const jumpBird = () => {
-          if (state === 'idle' || state === 'over') {
+          const now = Date.now();
+          if (state === 'idle') {
             resetGame();
+          } else if (state === 'over') {
+            // Prevent accidental instant restart within 250ms of dying
+            if (now - deathTime > 250) {
+              resetGame();
+            }
           } else if (state === 'playing') {
-            bird.vy = jump;
+            bird.vy = jumpPower;
+            // Spawn little wind particles
+            for (let i = 0; i < 3; i++) {
+              particles.push({
+                x: bird.x - 10,
+                y: bird.y + (Math.random() * 8 - 4),
+                vx: -1.5 - Math.random(),
+                vy: Math.random() * 1.5 - 0.75,
+                alpha: 0.8,
+                color: '#fbbf24'
+              });
+            }
           }
         };
+
+        jumpRef.current = jumpBird;
 
         const loop = () => {
           frame++;
           ctx.clearRect(0, 0, W, H);
 
-          // 1. Background gradient (Night arcade)
+          // 1. Retro Night Sky Gradient
           const grad = ctx.createLinearGradient(0, 0, 0, H);
-          grad.addColorStop(0, '#090d16');
+          grad.addColorStop(0, '#0a0d17');
           grad.addColorStop(0.65, '#1e1b4b');
           grad.addColorStop(1, '#020617');
           ctx.fillStyle = grad;
           ctx.fillRect(0, 0, W, H);
 
-          // Stars
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-          for (let s = 0; s < 18; s++) {
-            const sx = ((s * 41) + (frame * 0.25)) % W;
-            const sy = (s * 29) % (groundY - 30);
+          // Starfield
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+          for (let s = 0; s < 22; s++) {
+            const sx = ((s * 43) + (frame * 0.25)) % W;
+            const sy = (s * 31) % (groundY - 30);
             ctx.fillRect(sx, sy, 1.5, 1.5);
           }
 
-          // 2. Ground
-          ctx.fillStyle = '#064e3b';
-          ctx.fillRect(0, groundY, W, 36);
-          ctx.fillStyle = '#10b981';
-          ctx.fillRect(0, groundY, W, 4);
-
-          // 3. Gameplay updates
+          // 2. Pipes & Collisions
           if (state === 'playing') {
-            bird.vy += gravity;
-            bird.y += bird.vy;
-            bird.rot = Math.min(Math.PI / 4, Math.max(-Math.PI / 4, bird.vy / 9));
-
-            // Pipe spawn
-            if (frame % 82 === 0) {
-              const topH = 35 + Math.random() * (groundY - gap - 70);
+            // First pipe spawns after frame 85, then every 95 frames
+            if (frame > 85 && (frame - 85) % 95 === 0) {
+              const minTop = 35;
+              const maxTop = groundY - gap - 40;
+              const topH = minTop + Math.random() * (maxTop - minTop);
               pipes.push({ x: W, top: topH, passed: false });
             }
 
-            for (let i = pipes.length - 1; i >= 0; i--) {
-              const p = pipes[i];
-              p.x -= 2.2;
+            // Update bird physics
+            bird.vy += gravity;
+            if (bird.vy > maxFallSpeed) bird.vy = maxFallSpeed;
+            bird.y += bird.vy;
+            bird.rot = Math.min(Math.PI / 4, Math.max(-Math.PI / 4, bird.vy * 0.12));
 
-              // Pass check
-              if (!p.passed && p.x + 40 < bird.x) {
-                p.passed = true;
-                localScore++;
-                setScore(localScore);
-                setHighScore(prev => {
-                  const newHs = Math.max(prev, localScore);
-                  try { localStorage.setItem('flappy_hs', newHs.toString()); } catch (e) {}
-                  return newHs;
-                });
-              }
-
-              // Top pipe
-              ctx.fillStyle = '#15803d';
-              ctx.fillRect(p.x, 0, 42, p.top);
-              ctx.fillStyle = '#22c55e';
-              ctx.fillRect(p.x + 3, 0, 6, p.top);
-              ctx.fillStyle = '#166534';
-              ctx.fillRect(p.x - 3, p.top - 16, 48, 16);
-
-              // Bottom pipe
-              const bottomY = p.top + gap;
-              const bottomH = groundY - bottomY;
-              ctx.fillStyle = '#15803d';
-              ctx.fillRect(p.x, bottomY, 42, bottomH);
-              ctx.fillStyle = '#22c55e';
-              ctx.fillRect(p.x + 3, bottomY, 6, bottomH);
-              ctx.fillStyle = '#166534';
-              ctx.fillRect(p.x - 3, bottomY, 48, 16);
-
-              // Collision
-              if (bird.x + bird.r > p.x && bird.x - bird.r < p.x + 42) {
-                if (bird.y - bird.r < p.top || bird.y + bird.r > bottomY) {
-                  state = 'over';
-                  setGameState('over');
-                }
-              }
-
-              if (p.x < -60) pipes.splice(i, 1);
+            // Ceiling clamp (Do NOT kill on ceiling)
+            if (bird.y - bird.r < 0) {
+              bird.y = bird.r;
+              bird.vy = 0;
             }
 
-            // Floor & ceiling hit
-            if (bird.y + bird.r >= groundY || bird.y - bird.r <= 0) {
+            // Ground collision
+            if (bird.y + bird.r >= groundY) {
+              bird.y = groundY - bird.r;
               state = 'over';
-              setGameState('over');
+              deathTime = Date.now();
             }
           } else if (state === 'idle') {
             bird.y = H / 2 + Math.sin(frame * 0.08) * 8;
             bird.rot = 0;
           }
 
-          // 4. Draw Bird
+          // Render & check pipes
+          for (let i = pipes.length - 1; i >= 0; i--) {
+            const p = pipes[i];
+            if (state === 'playing') {
+              p.x -= 2.0;
+            }
+
+            const bottomY = p.top + gap;
+            const bottomH = groundY - bottomY;
+
+            // Score pass check
+            if (state === 'playing' && !p.passed && p.x + 44 < bird.x) {
+              p.passed = true;
+              localScore++;
+              setScore(localScore);
+              const newHs = Math.max(highScoreRef.current, localScore);
+              setHighScore(newHs);
+              try { localStorage.setItem('flappy_hs', newHs.toString()); } catch (e) {}
+
+              // Golden star burst on score
+              for (let k = 0; k < 6; k++) {
+                particles.push({
+                  x: bird.x,
+                  y: bird.y,
+                  vx: (Math.random() - 0.5) * 4,
+                  vy: (Math.random() - 0.5) * 4,
+                  alpha: 1.0,
+                  color: '#facc15'
+                });
+              }
+            }
+
+            // Draw Pipes (Retro arcade green with highlight & rim)
+            // Top pipe
+            ctx.fillStyle = '#15803d';
+            ctx.fillRect(p.x, 0, 44, p.top);
+            ctx.fillStyle = '#4ade80';
+            ctx.fillRect(p.x + 3, 0, 5, p.top);
+            ctx.fillStyle = '#166534';
+            ctx.fillRect(p.x - 3, p.top - 18, 50, 18);
+            ctx.fillStyle = '#22c55e';
+            ctx.fillRect(p.x - 1, p.top - 16, 5, 14);
+
+            // Bottom pipe
+            ctx.fillStyle = '#15803d';
+            ctx.fillRect(p.x, bottomY, 44, bottomH);
+            ctx.fillStyle = '#4ade80';
+            ctx.fillRect(p.x + 3, bottomY, 5, bottomH);
+            ctx.fillStyle = '#166534';
+            ctx.fillRect(p.x - 3, bottomY, 50, 18);
+            ctx.fillStyle = '#22c55e';
+            ctx.fillRect(p.x - 1, bottomY + 2, 5, 14);
+
+            // Forgiving hitbox collision check
+            if (state === 'playing') {
+              const birdRight = bird.x + bird.r - hitboxMargin;
+              const birdLeft = bird.x - bird.r + hitboxMargin;
+              const pipeRight = p.x + 44;
+              const pipeLeft = p.x;
+
+              if (birdRight > pipeLeft && birdLeft < pipeRight) {
+                const birdTop = bird.y - bird.r + hitboxMargin;
+                const birdBottom = bird.y + bird.r - hitboxMargin;
+
+                if (birdTop < p.top || birdBottom > bottomY) {
+                  state = 'over';
+                  deathTime = Date.now();
+                }
+              }
+            }
+
+            if (p.x < -60) pipes.splice(i, 1);
+          }
+
+          // 3. Ground (Animated scrolling pattern)
+          ctx.fillStyle = '#064e3b';
+          ctx.fillRect(0, groundY, W, 36);
+          ctx.fillStyle = '#10b981';
+          ctx.fillRect(0, groundY, W, 4);
+
+          // Moving grass stripes
+          ctx.fillStyle = '#047857';
+          const grassOffset = state === 'playing' ? (frame * 2.0) % 18 : 0;
+          for (let gx = -grassOffset; gx < W + 18; gx += 18) {
+            ctx.fillRect(gx, groundY + 4, 9, 32);
+          }
+
+          // 4. Particles (Jump air & score bursts)
+          for (let pi = particles.length - 1; pi >= 0; pi--) {
+            const pt = particles[pi];
+            pt.x += pt.vx;
+            pt.y += pt.vy;
+            pt.alpha -= 0.035;
+            if (pt.alpha <= 0) {
+              particles.splice(pi, 1);
+              continue;
+            }
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, pt.alpha);
+            ctx.fillStyle = pt.color;
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          // 5. Draw Flappy Bird
           ctx.save();
           ctx.translate(bird.x, bird.y);
           ctx.rotate(bird.rot);
 
-          // Body
+          // Body (Vibrant Golden Yellow)
           ctx.fillStyle = '#f59e0b';
           ctx.beginPath();
           ctx.arc(0, 0, bird.r, 0, Math.PI * 2);
           ctx.fill();
           ctx.lineWidth = 2;
-          ctx.strokeStyle = '#000000';
+          ctx.strokeStyle = '#0f172a';
           ctx.stroke();
 
-          // Wing
+          // Wing (Flapping animation)
           ctx.fillStyle = '#fbbf24';
           ctx.beginPath();
-          const wingY = Math.sin(frame * 0.25) * 3;
-          ctx.ellipse(-4, wingY, 6, 4, 0, 0, Math.PI * 2);
+          const wingFlap = state === 'playing' && bird.vy < 0 ? -4 : Math.sin(frame * 0.28) * 3;
+          ctx.ellipse(-4, wingFlap, 6, 4, 0, 0, Math.PI * 2);
           ctx.fill();
           ctx.stroke();
 
-          // Eye
+          // Eye & Pupil
           ctx.fillStyle = '#ffffff';
           ctx.beginPath();
           ctx.arc(4, -4, 4, 0, Math.PI * 2);
           ctx.fill();
-          ctx.fillStyle = '#000000';
+          ctx.fillStyle = '#0f172a';
           ctx.beginPath();
           ctx.arc(5.5, -4, 2, 0, Math.PI * 2);
           ctx.fill();
@@ -257,8 +349,8 @@
           // Beak
           ctx.fillStyle = '#ea580c';
           ctx.beginPath();
-          ctx.moveTo(8, -1);
-          ctx.lineTo(16, 2);
+          ctx.moveTo(8, -2);
+          ctx.lineTo(16, 1.5);
           ctx.lineTo(8, 5);
           ctx.closePath();
           ctx.fill();
@@ -266,48 +358,51 @@
 
           ctx.restore();
 
-          // 5. HUD Text
+          // 6. HUD / Overlay State
           if (state === 'playing') {
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 28px monospace';
+            ctx.font = 'bold 32px monospace';
             ctx.textAlign = 'center';
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 4;
-            ctx.strokeText(localScore.toString(), W / 2, 45);
-            ctx.fillText(localScore.toString(), W / 2, 45);
+            ctx.strokeText(localScore.toString(), W / 2, 48);
+            ctx.fillText(localScore.toString(), W / 2, 48);
           } else if (state === 'idle') {
-            ctx.fillStyle = '#38bdf8';
-            ctx.font = 'bold 20px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('FLAPPY BIRD', W / 2, H / 2 - 50);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.fillRect(0, 0, W, H);
 
-            ctx.fillStyle = '#cbd5e1';
-            ctx.font = 'bold 12px sans-serif';
-            ctx.fillText('Press SPACE or Click to Jump', W / 2, H / 2 + 50);
+            ctx.fillStyle = '#38bdf8';
+            ctx.font = 'bold 22px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('FLAPPY BIRD', W / 2, H / 2 - 45);
+
+            ctx.fillStyle = '#f8fafc';
+            ctx.font = 'bold 13px sans-serif';
+            ctx.fillText('Tap Screen or Press SPACE to Start', W / 2, H / 2 + 35);
 
             ctx.fillStyle = '#94a3b8';
             ctx.font = '11px sans-serif';
-            ctx.fillText('Timepass while AI generates your video!', W / 2, H / 2 + 72);
+            ctx.fillText('Timepass while your video processes!', W / 2, H / 2 + 58);
           } else if (state === 'over') {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
             ctx.fillRect(0, 0, W, H);
 
             ctx.fillStyle = '#f43f5e';
-            ctx.font = 'bold 24px sans-serif';
+            ctx.font = 'bold 26px sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('GAME OVER', W / 2, H / 2 - 40);
+            ctx.fillText('GAME OVER', W / 2, H / 2 - 42);
 
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 16px sans-serif';
-            ctx.fillText(`Score: ${localScore}`, W / 2, H / 2 - 5);
+            ctx.fillText(`Score: ${localScore}`, W / 2, H / 2 - 8);
 
             ctx.fillStyle = '#fbbf24';
             ctx.font = 'bold 13px sans-serif';
-            ctx.fillText(`Best: ${Math.max(highScore, localScore)}`, W / 2, H / 2 + 20);
+            ctx.fillText(`Best: ${Math.max(highScoreRef.current, localScore)}`, W / 2, H / 2 + 16);
 
             ctx.fillStyle = '#38bdf8';
-            ctx.font = 'bold 12px sans-serif';
-            ctx.fillText('Click or Press SPACE to Play Again', W / 2, H / 2 + 60);
+            ctx.font = 'bold 13px sans-serif';
+            ctx.fillText('Tap or Press SPACE to Play Again', W / 2, H / 2 + 55);
           }
 
           animId = requestAnimationFrame(loop);
@@ -317,7 +412,7 @@
 
         const onKeyDown = (e) => {
           if (['INPUT', 'TEXTAREA'].includes(e.target?.tagName)) return;
-          if (e.code === 'Space') {
+          if (e.code === 'Space' || e.code === 'ArrowUp') {
             e.preventDefault();
             jumpBird();
           }
@@ -328,10 +423,10 @@
           cancelAnimationFrame(animId);
           window.removeEventListener('keydown', onKeyDown);
         };
-      }, [highScore]);
+      }, []);
 
       return (
-        <div class="flex flex-col items-center justify-center p-5 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl space-y-3">
+        <div class="flex flex-col items-center justify-center p-5 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl space-y-3 select-none">
           <div class="flex items-center justify-between w-full max-w-[340px] px-1">
             <div class="flex items-center space-x-2">
               <span class="text-base">🎮</span>
@@ -343,11 +438,11 @@
           </div>
 
           <div
-            onClick={() => {
-              const ev = new KeyboardEvent('keydown', { code: 'Space' });
-              window.dispatchEvent(ev);
+            onPointerDown={(e) => {
+              e.preventDefault();
+              jumpRef.current();
             }}
-            class="relative rounded-xl overflow-hidden border-2 border-indigo-900/60 shadow-2xl cursor-pointer hover:border-indigo-600 transition"
+            class="relative rounded-xl overflow-hidden border-2 border-indigo-900/60 shadow-2xl cursor-pointer hover:border-indigo-500 transition active:scale-[0.99]"
           >
             <canvas
               ref={canvasRef}
@@ -358,7 +453,7 @@
           </div>
 
           <p class="text-[11px] text-slate-400 text-center">
-            Tap on screen or press <kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300 font-mono text-[10px]">SPACE</kbd> to flap & dodge pipes!
+            Tap on screen or press <kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300 font-mono text-[10px]">SPACE</kbd> or <kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300 font-mono text-[10px]">↑</kbd> to flap & dodge pipes!
           </p>
         </div>
       );
