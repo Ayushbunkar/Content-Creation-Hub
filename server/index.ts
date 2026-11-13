@@ -1392,10 +1392,10 @@ app.delete('/api/clipper/projects/:id', async (req, res) => {
 // Start server
 async function main() {
   await initDatabase();
-  server.listen(PORT, '127.0.0.1', () => {
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`=======================================================`);
     console.log(` LOCAL AI VIDEO STUDIO — PRODUCTION SERVER RUNNING`);
-    console.log(` URL: http://127.0.0.1:${PORT}`);
+    console.log(` URL: http://127.0.0.1:${PORT} (and http://localhost:${PORT})`);
     console.log(` WebSocket: ws://127.0.0.1:${PORT}`);
     console.log(`=======================================================`);
   });

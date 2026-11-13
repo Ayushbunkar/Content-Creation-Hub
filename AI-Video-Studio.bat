@@ -8,57 +8,61 @@ echo                 AI VIDEO STUDIO - DESKTOP APP
 echo =================================================================
 echo.
 
-:: 1. Check if server is already running on port 3000
-netstat -ano | findstr :3000 | findstr LISTENING >nul 2>&1
+:: 1. Check if server is already responding on http://127.0.0.1:3000
+curl.exe -s -o nul http://127.0.0.1:3000 >nul 2>&1
 if %errorlevel% equ 0 (
-    echo [OK] Studio backend is already running on http://localhost:3000
+    echo [OK] Studio backend is active on http://127.0.0.1:3000
     goto LaunchApp
 )
 
-echo [STARTING] Starting background backend server...
-start "AI-Video-Studio-Server" /min cmd /c "npx tsx server/index.ts"
+echo [STARTING] Starting background studio server...
+if exist "node_modules\.bin\tsx.cmd" (
+    start "AI-Video-Studio-Server" /min cmd /c "node_modules\.bin\tsx.cmd server/index.ts"
+) else (
+    start "AI-Video-Studio-Server" /min cmd /c "npx tsx server/index.ts"
+)
 
-:: 2. Wait up to 10 seconds for server to respond on port 3000
+:: 2. Wait up to 15 seconds for HTTP server to become ready
 echo [WAITING] Waiting for server to initialize...
-for /l %%i in (1,1,10) do (
+for /l %%i in (1,1,15) do (
     timeout /t 1 /nobreak >nul
-    netstat -ano | findstr :3000 | findstr LISTENING >nul 2>&1
+    curl.exe -s -o nul http://127.0.0.1:3000 >nul 2>&1
     if !errorlevel! equ 0 (
-        echo [OK] Server is ready on port 3000!
+        echo [OK] Server is ready on http://127.0.0.1:3000!
         goto LaunchApp
     )
 )
 
 :LaunchApp
-echo [LAUNCHING] Opening AI Video Studio in Desktop App window...
+echo [LAUNCHING] Opening AI Video Studio Desktop window...
 
-:: Check Edge for standalone app mode
+:: Launch Edge in standalone app window mode with direct 127.0.0.1 IP
 if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" (
-    start "" "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" --app="http://localhost:3000" --window-size=1440,900
+    start "" "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" --app="http://127.0.0.1:3000" --window-size=1440,900
     goto Done
 )
 if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" (
-    start "" "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" --app="http://localhost:3000" --window-size=1440,900
+    start "" "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" --app="http://127.0.0.1:3000" --window-size=1440,900
     goto Done
 )
 :: Check Chrome
 if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" (
-    start "" "%ProgramFiles%\Google\Chrome\Application\chrome.exe" --app="http://localhost:3000" --window-size=1440,900
+    start "" "%ProgramFiles%\Google\Chrome\Application\chrome.exe" --app="http://127.0.0.1:3000" --window-size=1440,900
     goto Done
 )
 if exist "%LocalAppData%\Google\Chrome\Application\chrome.exe" (
-    start "" "%LocalAppData%\Google\Chrome\Application\chrome.exe" --app="http://localhost:3000" --window-size=1440,900
+    start "" "%LocalAppData%\Google\Chrome\Application\chrome.exe" --app="http://127.0.0.1:3000" --window-size=1440,900
     goto Done
 )
 
 :: Default browser fallback
-start http://localhost:3000
+start http://127.0.0.1:3000
 
 :Done
 echo.
 echo =================================================================
 echo   Studio Desktop is running!
-echo   Close the app window when finished.
+echo   Close this window when finished.
 echo =================================================================
-timeout /t 3 >nul
+timeout /t 2 >nul
 exit
