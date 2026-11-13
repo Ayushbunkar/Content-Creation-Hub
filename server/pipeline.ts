@@ -667,9 +667,10 @@ export class PipelineManager {
         `--height=${height}`,
         `--frames=0-${totalFrames - 1}`,
         '--pixel-format=yuv420p',
-        '--crf=20',
-        '--preset=fast',
-        '--audio-bitrate=192k',
+        '--crf=16',
+        '--preset=medium',
+        '--audio-bitrate=320k',
+        '--jpeg-quality=98',
         '--concurrency=4',
         '--overwrite'
       ];

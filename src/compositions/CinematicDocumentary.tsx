@@ -129,6 +129,17 @@ const FilmPostProcessing: FC<{ width: number; height: number; frame: number }> =
         <rect width="100%" height="100%" filter="url(#cinematicFilmGrain)" />
       </svg>
 
+      {/* 35mm Hollywood Cinema Color Grade & Contrast Tone */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'radial-gradient(ellipse at 50% 35%, rgba(251, 191, 36, 0.05) 0%, transparent 70%), linear-gradient(180deg, rgba(14, 165, 233, 0.04) 0%, rgba(2, 6, 23, 0.18) 100%)',
+          mixBlendMode: 'color-dodge',
+          pointerEvents: 'none',
+        }}
+      />
+
       {/* Atmospheric Cinematic Vignette */}
       <div
         style={{
@@ -428,6 +439,69 @@ const BroadcastLowerThird: FC<{
         )}
       </div>
     </div>
+  );
+};
+
+// ==========================================
+// 4.5. FAST SHIFT & DYNAMIC PUNCH TRANSITION WRAPPER
+// ==========================================
+const FastShiftSceneWrapper: FC<{
+  scene: CinematicSceneData;
+  sceneFrame: number;
+  durationFrames: number;
+  children: React.ReactNode;
+}> = ({ scene, sceneFrame, durationFrames, children }) => {
+  // 1. Snappy 14-frame Camera Punch on scene cut
+  const punchScale = interpolate(sceneFrame, [0, 6, 14], [1.075, 1.018, 1.0], {
+    extrapolateRight: 'clamp',
+    easing: Easing.bezier(0.16, 1, 0.3, 1),
+  });
+
+  // Fast directional whip drift on cut
+  const punchX = interpolate(sceneFrame, [0, 8], [32, 0], {
+    extrapolateRight: 'clamp',
+    easing: Easing.out(Easing.cubic),
+  });
+
+  // Optical cut flash beam (Netflix / Vox documentary cut feel)
+  const flashOpacity = interpolate(sceneFrame, [0, 2, 7], [0.32, 0.14, 0], {
+    extrapolateRight: 'clamp',
+  });
+
+  // Micro motion-blur on the initial shift
+  const motionBlur = interpolate(sceneFrame, [0, 3, 6], [2.2, 0.8, 0], {
+    extrapolateRight: 'clamp',
+  });
+
+  // 2. Continuous Organic Handheld Drift across shot (Zero dead frames)
+  const driftX = Math.sin(sceneFrame * 0.042) * 3.2;
+  const driftY = Math.cos(sceneFrame * 0.035) * 2.2;
+  const slowZoom = interpolate(sceneFrame, [0, durationFrames], [1.0, 1.04], {
+    easing: Easing.out(Easing.quad),
+  });
+
+  return (
+    <AbsoluteFill
+      style={{
+        transform: `scale(${punchScale * slowZoom}) translate(${punchX + driftX}px, ${driftY}px)`,
+        filter: motionBlur > 0.1 ? `blur(${motionBlur}px)` : undefined,
+        transformOrigin: 'center center',
+      }}
+    >
+      {children}
+
+      {/* Optical cut flash beam */}
+      {flashOpacity > 0.01 && (
+        <AbsoluteFill
+          style={{
+            background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.55) 50%, transparent 100%)',
+            opacity: flashOpacity,
+            mixBlendMode: 'screen',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+    </AbsoluteFill>
   );
 };
 
@@ -1253,11 +1327,11 @@ export const CinematicDocumentary: FC<CinematicDocumentaryProps> = ({
   );
 
   return (
-    <AbsoluteFill style={{ backgroundColor: '#020617' }}>
+    <AbsoluteFill style={{ backgroundColor: '#020617', filter: 'contrast(1.06) saturate(1.08)' }}>
       {/* 1. Master Audio System */}
       {audioGroup}
 
-      {/* 2. Dynamic Scene Layers */}
+      {/* 2. Dynamic Scene Layers with Fast Shift & Snappy Cuts */}
       {resolvedScenes.map((scene) => {
         const isCurrent = frame >= scene.startFrame && frame < scene.startFrame + scene.durationFrames;
         if (!isCurrent) return null;
@@ -1265,59 +1339,65 @@ export const CinematicDocumentary: FC<CinematicDocumentaryProps> = ({
         const currentSceneFrame = frame - scene.startFrame;
         const durFrames = scene.durationFrames;
 
+        let sceneContent: React.ReactNode = null;
         if (scene.type === 'video_footage' || scene.type === 'ai_video') {
-          return (
+          sceneContent = (
             <VideoFootageScene
-              key={scene.id}
               scene={scene}
               sceneFrame={currentSceneFrame}
               durationFrames={durFrames}
             />
           );
         } else if (scene.type === 'layered_parallax') {
-          return (
+          sceneContent = (
             <LayeredParallaxScene
-              key={scene.id}
               scene={scene}
               sceneFrame={currentSceneFrame}
               durationFrames={durFrames}
             />
           );
         } else if (scene.type === 'archival_document') {
-          return (
+          sceneContent = (
             <ArchivalDocumentScene
-              key={scene.id}
               scene={scene}
               sceneFrame={currentSceneFrame}
               durationFrames={durFrames}
             />
           );
         } else if (scene.type === 'data_metric') {
-          return (
+          sceneContent = (
             <DataMetricScene
-              key={scene.id}
               scene={scene}
               sceneFrame={currentSceneFrame}
             />
           );
         } else if (scene.type === 'cinematic_hook') {
-          return (
+          sceneContent = (
             <CinematicHookScene
-              key={scene.id}
               scene={scene}
               sceneFrame={currentSceneFrame}
               topic={topic}
             />
           );
         } else {
-          return (
+          sceneContent = (
             <TacticalMapScene
-              key={scene.id}
               scene={scene}
               sceneFrame={currentSceneFrame}
             />
           );
         }
+
+        return (
+          <FastShiftSceneWrapper
+            key={scene.id}
+            scene={scene}
+            sceneFrame={currentSceneFrame}
+            durationFrames={durFrames}
+          >
+            {sceneContent}
+          </FastShiftSceneWrapper>
+        );
       })}
 
       {/* 3. Broadcast Lower Third */}

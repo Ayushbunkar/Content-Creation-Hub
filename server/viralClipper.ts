@@ -771,16 +771,16 @@ export class ViralClipperService {
     const mode = clip.reframing_mode || 'blur_background';
 
     if (mode === 'center_crop') {
-      // Scale to height 1920 and crop middle 1080
-      filterGraph = `scale=-1:1920,crop=1080:1920:(iw-1080)/2:0,subtitles='${escapedAss}'`;
+      // Scale to height 1920 and crop middle 1080 with Lanczos & subtle unsharp
+      filterGraph = `scale=-1:1920:flags=lanczos,crop=1080:1920:(iw-1080)/2:0,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'`;
     } else if (mode === 'split_screen') {
-      // Split top and bottom
-      filterGraph = `split=2[top][bottom];[top]crop=iw/2:ih:0:0,scale=1080:960[t_sc];[bottom]crop=iw/2:ih:iw/2:0,scale=1080:960[b_sc];[t_sc][b_sc]vstack=inputs=2,subtitles='${escapedAss}'`;
+      // Split top and bottom with crisp Lanczos scaling
+      filterGraph = `split=2[top][bottom];[top]crop=iw/2:ih:0:0,scale=1080:960:flags=lanczos[t_sc];[bottom]crop=iw/2:ih:iw/2:0,scale=1080:960:flags=lanczos[b_sc];[t_sc][b_sc]vstack=inputs=2,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'`;
     } else {
-      // Gold standard Podcast blurred background framing
-      // Background: scale & crop to 1080x1920, blur, slight dim
-      // Foreground: scale crisp 1080 width, centered vertically with subtle drop-shadow
-      filterGraph = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=22:4,eq=brightness=-0.08[bg];[0:v]scale=1080:-1[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,subtitles='${escapedAss}'[outv]`;
+      // Gold standard Podcast blurred background framing (Premium Studio Grade)
+      // Background: Lanczos upscale, deep 2-pass gaussian blur, cinema contrast
+      // Foreground: Lanczos crisp scale with subtle edge unsharp mask
+      filterGraph = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,gblur=sigma=26:steps=2,eq=brightness=-0.10:contrast=1.06[bg];[0:v]scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${escapedAss}'[outv]`;
     }
 
     return new Promise((resolve, reject) => {
@@ -791,10 +791,15 @@ export class ViralClipperService {
         '-i', inputVideoPath,
         ...(mode === 'blur_background' ? ['-filter_complex', filterGraph, '-map', '[outv]', '-map', '0:a?'] : ['-vf', filterGraph]),
         '-c:v', 'libx264',
-        '-preset', 'fast',
-        '-crf', '21',
+        '-preset', 'medium',
+        '-crf', '17',
+        '-tune', 'film',
+        '-pix_fmt', 'yuv420p',
+        '-color_primaries', 'bt709',
+        '-color_trc', 'bt709',
+        '-colorspace', 'bt709',
         '-c:a', 'aac',
-        '-b:a', '192k',
+        '-b:a', '320k',
         '-movflags', '+faststart',
         outputPath
       ];

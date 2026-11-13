@@ -500,10 +500,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       }
     }
 
-    // Build FFmpeg video filters
+    // Build FFmpeg video filters with Lanczos scaling and subtle sharpening
     const filterParts: string[] = [
-      `scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=decrease`,
-      `pad=${targetWidth}:${targetHeight}:(ow-iw)/2:(oh-ih)/2:black`
+      `scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=decrease:flags=lanczos`,
+      `pad=${targetWidth}:${targetHeight}:(ow-iw)/2:(oh-ih)/2:black`,
+      `unsharp=5:5:0.4:5:5:0.0`
     ];
 
     if (burnCaptions && fs.existsSync(tempAssPath)) {
@@ -548,15 +549,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           args.push('-vf', vfString);
         }
 
-        // Video codec selection
+        // Video codec selection: High-bitrate studio quality
         if (useNvenc) {
-          args.push('-c:v', 'h264_nvenc', '-preset', 'p4', '-cq', '20', '-pix_fmt', 'yuv420p');
+          args.push('-c:v', 'h264_nvenc', '-preset', 'p6', '-cq', '16', '-b:v', '12M', '-pix_fmt', 'yuv420p');
         } else {
-          args.push('-c:v', 'libx264', '-preset', 'fast', '-crf', '20', '-pix_fmt', 'yuv420p');
+          args.push('-c:v', 'libx264', '-preset', 'medium', '-crf', '17', '-tune', 'film', '-pix_fmt', 'yuv420p');
         }
 
         // Audio codec & container optimization
-        args.push('-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', outputPath);
+        args.push('-c:a', 'aac', '-b:a', '320k', '-movflags', '+faststart', outputPath);
 
         const p = spawn('ffmpeg', args);
         let stderr = '';
