@@ -115,20 +115,24 @@ export class PipelineManager {
     // 6. VOICE GENERATION (Kokoro TTS)
     await this.updateStage(projectId, 'VOICE_GENERATION', 65);
     const narrationWav = path.join(process.cwd(), 'public', 'audio', `narration_${projectId}.wav`);
-    try {
-      await this.generateVoice(script, narrationWav, project.voice, project.language);
-    } catch (e: any) {
-      console.warn(`[Pipeline] Voice generation error for ${projectId}:`, e?.message);
+    if (!fs.existsSync(narrationWav) || fs.statSync(narrationWav).size < 10000) {
+      try {
+        await this.generateVoice(script, narrationWav, project.voice, project.language);
+      } catch (e: any) {
+        console.warn(`[Pipeline] Voice generation error for ${projectId}:`, e?.message);
+      }
     }
     await runQuery('UPDATE projects SET narration_file = ? WHERE id = ?', [`/audio/narration_${projectId}.wav`, projectId]);
 
     // 7. SUBTITLE GENERATION (Whisper base)
     await this.updateStage(projectId, 'SUBTITLE_GENERATION', 75);
     const srtPath = path.join(process.cwd(), 'public', `subtitles_${projectId}.srt`);
-    try {
-      await this.generateSubtitles(narrationWav, srtPath, project.language);
-    } catch (e: any) {
-      console.warn(`[Pipeline] Subtitle generation error for ${projectId}:`, e?.message);
+    if (!fs.existsSync(srtPath) || fs.statSync(srtPath).size < 100) {
+      try {
+        await this.generateSubtitles(narrationWav, srtPath, project.language);
+      } catch (e: any) {
+        console.warn(`[Pipeline] Subtitle generation error for ${projectId}:`, e?.message);
+      }
     }
     await runQuery('UPDATE projects SET subtitles_file = ? WHERE id = ?', [`/subtitles_${projectId}.srt`, projectId]);
 
