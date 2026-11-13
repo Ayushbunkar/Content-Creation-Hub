@@ -5,6 +5,7 @@ import { Title } from "./HelloWorld/Title";
 import AudioTest from "./compositions/AudioTest";
 import CinematicDocumentary from "./compositions/CinematicDocumentary";
 import { AIBubbleReel } from "./compositions/AIBubbleReel";
+import { NvidiaHoneytrapReel } from "./compositions/NvidiaHoneytrapReel";
 
 // Each <Composition> is an entry in the sidebar!
 
@@ -65,6 +66,18 @@ export const RemotionRoot: React.FC = () => {
           defaultProps={{
             narrationSrc: "/audio/ai_bubble_mastered.wav",
             musicSrc: "/audio/bgm/tech_cyber.wav",
+          }}
+        />
+        <Composition
+          id="NvidiaHoneytrapReel"
+          component={NvidiaHoneytrapReel}
+          durationInFrames={1500}
+          fps={30}
+          width={1080}
+          height={1920}
+          defaultProps={{
+            narrationSrc: "/audio/nvidia_honeytrap_narration.wav",
+            musicSrc: "/audio/bgm/mystery_investigation.wav",
           }}
         />
       </Folder>
