@@ -12,6 +12,7 @@ import { MediaSourceManager, QualityChecker } from './mediaSource';
 import { ViralClipperService } from './viralClipper';
 import { DocumentaryResearchService } from './documentaryResearch';
 import { DocumentaryNarrativeEngine } from './documentaryNarrative';
+import { VideoEnhancerService } from './videoEnhancer';
 
 const app = express();
 const server = http.createServer(app);
@@ -1384,6 +1385,114 @@ app.delete('/api/clipper/projects/:id', async (req, res) => {
     await runQuery('DELETE FROM clipper_clips WHERE project_id = ?', [projectId]);
     await runQuery('DELETE FROM clipper_projects WHERE id = ?', [projectId]);
     res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// VIDEO QUALITY & CINEMATIC ENHANCEMENT API
+// ==========================================
+
+// 1. Analyze Image Quality (Resolution, compression, blur detection)
+app.post('/api/enhancement/image-analyze', async (req, res) => {
+  try {
+    const { imagePath } = req.body;
+    if (!imagePath) return res.status(400).json({ error: 'imagePath is required' });
+    const fullPath = path.isAbsolute(imagePath) ? imagePath : path.join(process.cwd(), imagePath.replace(/^\//, ''));
+    if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'Image file not found' });
+    const metrics = await VideoEnhancerService.analyzeImageQuality(fullPath);
+    res.json({ success: true, metrics });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Enhance Image (2x / 4x Super Resolution + Restoration)
+app.post('/api/enhancement/image-enhance', async (req, res) => {
+  try {
+    const { imagePath, scale = 2, denoise = true, sharpen = true } = req.body;
+    if (!imagePath) return res.status(400).json({ error: 'imagePath is required' });
+    const fullPath = path.isAbsolute(imagePath) ? imagePath : path.join(process.cwd(), imagePath.replace(/^\//, ''));
+    if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'Image file not found' });
+    const result = await VideoEnhancerService.enhanceImage(fullPath, { scale, denoise, sharpen });
+    res.json({ success: true, result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Frame Interpolation (24 / 30 / 60 FPS motion-compensated)
+app.post('/api/enhancement/video-interpolate', async (req, res) => {
+  try {
+    const { videoPath, targetFps = 60 } = req.body;
+    if (!videoPath) return res.status(400).json({ error: 'videoPath is required' });
+    const fullPath = path.isAbsolute(videoPath) ? videoPath : path.join(process.cwd(), videoPath.replace(/^\//, ''));
+    if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'Video file not found' });
+    
+    const parsed = path.parse(fullPath);
+    const outputPath = path.join(parsed.dir, `${parsed.name}_${targetFps}fps${parsed.ext}`);
+    await VideoEnhancerService.interpolateVideo(fullPath, outputPath, targetFps);
+    const webPath = outputPath.replace(process.cwd(), '').replace(/\\/g, '/');
+    res.json({ success: true, outputPath: webPath, fps: targetFps });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Get Project QC Report
+app.get('/api/projects/:id/qc-report', async (req, res) => {
+  try {
+    const projectId = String(req.params.id);
+    const project = await getQuery<any>('SELECT qc_report, video_output, resolution, aspect_ratio FROM projects WHERE id = ?', [projectId]);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    
+    if (project.qc_report) {
+      return res.json({ success: true, report: JSON.parse(project.qc_report) });
+    }
+
+    // Generate fresh QC report if video exists
+    if (project.video_output && fs.existsSync(path.join(process.cwd(), project.video_output))) {
+      const w = project.aspect_ratio === '9:16' ? 1080 : 1920;
+      const h = project.aspect_ratio === '9:16' ? 1920 : 1080;
+      const qc = await VideoEnhancerService.runQualityControl(
+        path.join(process.cwd(), project.video_output),
+        120,
+        w,
+        h,
+        30
+      );
+      await runQuery('UPDATE projects SET qc_report = ? WHERE id = ?', [JSON.stringify(qc), projectId]);
+      return res.json({ success: true, report: qc });
+    }
+
+    res.json({ success: false, message: 'Video not rendered yet or QC not available' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5. Apply Enhancement Settings to Project
+app.post('/api/projects/:id/apply-enhancements', async (req, res) => {
+  try {
+    const projectId = String(req.params.id);
+    const { enhancementSettings, colorProfile, renderPreset } = req.body;
+    
+    await runQuery(
+      `UPDATE projects SET 
+        enhancement_settings = COALESCE(?, enhancement_settings),
+        color_profile = COALESCE(?, color_profile),
+        render_preset = COALESCE(?, render_preset)
+      WHERE id = ?`,
+      [
+        enhancementSettings ? JSON.stringify(enhancementSettings) : null,
+        colorProfile || null,
+        renderPreset || null,
+        projectId
+      ]
+    );
+
+    res.json({ success: true, message: 'Enhancement settings saved successfully' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

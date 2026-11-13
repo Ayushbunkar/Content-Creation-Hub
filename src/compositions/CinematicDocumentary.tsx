@@ -451,50 +451,66 @@ const FastShiftSceneWrapper: FC<{
   durationFrames: number;
   children: React.ReactNode;
 }> = ({ scene, sceneFrame, durationFrames, children }) => {
-  // 1. Snappy 14-frame Camera Punch on scene cut
-  const punchScale = interpolate(sceneFrame, [0, 6, 14], [1.075, 1.018, 1.0], {
+  // Deterministic transition style based on scene ID or type
+  const sceneNum = typeof scene.id === 'number' ? scene.id : (parseInt(String(scene.id).replace(/\D/g, '') || '0', 10));
+  const shiftMode = sceneNum % 4; // 0 = Zoom Punch, 1 = Whip Left, 2 = Whip Right, 3 = Cinematic Drop Tilt
+
+  // 1. Kinetic Camera Punch on cut (Vox / Lemmino snap transition)
+  const punchScale = interpolate(sceneFrame, [0, 5, 13], [shiftMode === 0 ? 1.09 : 1.06, 1.015, 1.0], {
     extrapolateRight: 'clamp',
     easing: Easing.bezier(0.16, 1, 0.3, 1),
   });
 
-  // Fast directional whip drift on cut
-  const punchX = interpolate(sceneFrame, [0, 8], [32, 0], {
+  // 2. Multi-axis whip vector
+  let whipX = 0;
+  let whipY = 0;
+  if (shiftMode === 1) {
+    whipX = interpolate(sceneFrame, [0, 8], [-44, 0], { extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) });
+  } else if (shiftMode === 2) {
+    whipX = interpolate(sceneFrame, [0, 8], [44, 0], { extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) });
+  } else if (shiftMode === 3) {
+    whipY = interpolate(sceneFrame, [0, 9], [-32, 0], { extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) });
+  }
+
+  // 3. Directional Motion Blur simulation on whip cut
+  const motionBlur = interpolate(sceneFrame, [0, 3, 7], [3.2, 1.0, 0], {
     extrapolateRight: 'clamp',
-    easing: Easing.out(Easing.cubic),
   });
 
-  // Optical cut flash beam (Netflix / Vox documentary cut feel)
-  const flashOpacity = interpolate(sceneFrame, [0, 2, 7], [0.32, 0.14, 0], {
+  // 4. Optical 35mm splice light flash & chromatic pulse
+  const flashOpacity = interpolate(sceneFrame, [0, 2, 6], [0.38, 0.15, 0], {
     extrapolateRight: 'clamp',
   });
 
-  // Micro motion-blur on the initial shift
-  const motionBlur = interpolate(sceneFrame, [0, 3, 6], [2.2, 0.8, 0], {
-    extrapolateRight: 'clamp',
-  });
-
-  // 2. Continuous Organic Handheld Drift across shot (Zero dead frames)
-  const driftX = Math.sin(sceneFrame * 0.042) * 3.2;
-  const driftY = Math.cos(sceneFrame * 0.035) * 2.2;
-  const slowZoom = interpolate(sceneFrame, [0, durationFrames], [1.0, 1.04], {
+  // 5. Continuous Organic Handheld Float across shot (Zero dead frames)
+  const driftX = Math.sin(sceneFrame * 0.038 + sceneNum) * 3.8;
+  const driftY = Math.cos(sceneFrame * 0.032 + sceneNum) * 2.6;
+  const slowZoom = interpolate(sceneFrame, [0, durationFrames], [1.0, 1.045], {
     easing: Easing.out(Easing.quad),
   });
+
+  // 6. Shutter angle / RGB chromatic aberration on cut
+  const chromaticShift = interpolate(sceneFrame, [0, 4], [2.2, 0], { extrapolateRight: 'clamp' });
 
   return (
     <AbsoluteFill
       style={{
-        transform: `scale(${punchScale * slowZoom}) translate(${punchX + driftX}px, ${driftY}px)`,
-        filter: motionBlur > 0.1 ? `blur(${motionBlur}px)` : undefined,
+        transform: `scale(${punchScale * slowZoom}) translate(${whipX + driftX}px, ${whipY + driftY}px)`,
+        filter: motionBlur > 0.1 
+          ? `blur(${motionBlur}px) ${chromaticShift > 0.3 ? `drop-shadow(${chromaticShift}px 0 rgba(239, 68, 68, 0.45)) drop-shadow(-${chromaticShift}px 0 rgba(56, 189, 248, 0.45))` : ''}` 
+          : undefined,
         transformOrigin: 'center center',
       }}
     >
       {children}
 
-      {/* Optical cut flash beam */}
+      {/* Optical cut flash beam - 35mm splice flare */}
       {flashOpacity > 0.01 && (
         <AbsoluteFill
           style={{
-            background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.55) 50%, transparent 100%)',
+            background: shiftMode === 1 || shiftMode === 2
+              ? 'linear-gradient(90deg, transparent 0%, rgba(255, 248, 220, 0.65) 50%, transparent 100%)'
+              : 'radial-gradient(circle at center, rgba(255, 250, 235, 0.5) 0%, rgba(245, 158, 11, 0.15) 50%, transparent 80%)',
             opacity: flashOpacity,
             mixBlendMode: 'screen',
             pointerEvents: 'none',

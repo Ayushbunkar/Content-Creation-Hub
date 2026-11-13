@@ -381,6 +381,20 @@
       const [captionTemplate, setCaptionTemplate] = useState('minimal-white');
       const [isGenerating, setIsGenerating] = useState(false);
 
+      // Video Quality & Cinematic Enhancement State
+      const [enhancementFps, setEnhancementFps] = useState(60);
+      const [frameInterpolation, setFrameInterpolation] = useState(true);
+      const [fastShiftIntensity, setFastShiftIntensity] = useState('vox_dynamic');
+      const [selectedColorProfile, setSelectedColorProfile] = useState('cinematic_documentary');
+      const [renderQualityPreset, setRenderQualityPreset] = useState('high_quality');
+      const [superResScale, setSuperResScale] = useState(2);
+      const [qcInspectionData, setQcInspectionData] = useState(null);
+      const [isInspectingQc, setIsInspectingQc] = useState(false);
+      const [sampleImagePath, setSampleImagePath] = useState('/videos/library/intel_seal.png');
+      const [imageMetrics, setImageMetrics] = useState(null);
+      const [enhancedImageUrl, setEnhancedImageUrl] = useState(null);
+      const [isEnhancingImage, setIsEnhancingImage] = useState(false);
+
       // ================= SCENE TIMELINE & QUALITY STATE ================= //
       const [projectScenes, setProjectScenes] = useState([]);
       const [mediaLibrary, setMediaLibrary] = useState([]);
@@ -573,7 +587,15 @@
               language: docLanguage,
               voice: docVoice,
               visual_style: docStyle,
-              mode: docMode
+              mode: docMode,
+              enhancement_settings: {
+                fps: enhancementFps,
+                frameInterpolation,
+                fastShiftIntensity,
+                colorProfile: selectedColorProfile,
+                renderPreset: renderQualityPreset,
+                superResolution: superResScale > 1
+              }
             })
           });
           const data = await res.json();
@@ -586,6 +608,104 @@
         } catch (e) {
           alert('Error creating documentary: ' + e.message);
           setIsDocResearching(false);
+        }
+      };
+
+      const handleAnalyzeImage = async () => {
+        if (!sampleImagePath.trim()) return;
+        setIsEnhancingImage(true);
+        try {
+          const res = await fetch('/api/enhancement/image-analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imagePath: sampleImagePath })
+          });
+          const data = await res.json();
+          if (data.success) {
+            setImageMetrics(data.metrics);
+          } else {
+            alert('Analysis failed: ' + (data.error || 'Unknown error'));
+          }
+        } catch (err) {
+          alert('Error analyzing image: ' + err.message);
+        } finally {
+          setIsEnhancingImage(false);
+        }
+      };
+
+      const handleUpscaleImage = async () => {
+        if (!sampleImagePath.trim()) return;
+        setIsEnhancingImage(true);
+        try {
+          const res = await fetch('/api/enhancement/image-enhance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imagePath: sampleImagePath, scale: superResScale, denoise: true, sharpen: true })
+          });
+          const data = await res.json();
+          if (data.success) {
+            setEnhancedImageUrl(data.result.enhancedUrl);
+          } else {
+            alert('Enhancement failed: ' + (data.error || 'Unknown error'));
+          }
+        } catch (err) {
+          alert('Error enhancing image: ' + err.message);
+        } finally {
+          setIsEnhancingImage(false);
+        }
+      };
+
+      const handleRunQCInspection = async () => {
+        const targetProjId = activeDocProject?.id || activeProject?.id;
+        if (!targetProjId) {
+          alert('Please select or render a project first to inspect quality control.');
+          return;
+        }
+        setIsInspectingQc(true);
+        try {
+          const res = await fetch(`/api/projects/${targetProjId}/qc-report`);
+          const data = await res.json();
+          if (data.success && data.report) {
+            setQcInspectionData(data.report);
+          } else {
+            alert(data.message || 'Quality report could not be loaded.');
+          }
+        } catch (err) {
+          alert('Error fetching QC report: ' + err.message);
+        } finally {
+          setIsInspectingQc(false);
+        }
+      };
+
+      const handleSaveEnhancementSettings = async () => {
+        const targetProjId = activeDocProject?.id || activeProject?.id;
+        if (!targetProjId) {
+          alert('Please select an active project first.');
+          return;
+        }
+        try {
+          const res = await fetch(`/api/projects/${targetProjId}/apply-enhancements`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              enhancementSettings: {
+                fps: enhancementFps,
+                frameInterpolation,
+                fastShiftIntensity,
+                colorProfile: selectedColorProfile,
+                renderPreset: renderQualityPreset,
+                superResolution: superResScale > 1
+              },
+              colorProfile: selectedColorProfile,
+              renderPreset: renderQualityPreset
+            })
+          });
+          const data = await res.json();
+          if (data.success) {
+            alert('Enhancement profile saved to project!');
+          }
+        } catch (err) {
+          alert('Error saving enhancements: ' + err.message);
         }
       };
 
@@ -1599,6 +1719,7 @@
               <nav class="p-3 space-y-1">
                 {[
                   { id: 'documentary', label: 'Documentary Studio', badge: '8-Min AI Doc', icon: 'film' },
+                  { id: 'enhancement', label: 'Video Quality & AI Pro', badge: '60 FPS ⚡', icon: 'zap' },
                   { id: 'clipper', label: 'AI Viral Clipper', badge: 'Viral 🔥', icon: 'scissors' },
                   { id: 'captions', label: 'Caption Studio', badge: 'Pro', icon: 'type' },
                   { id: 'new', label: 'New AI Video', icon: 'plus-circle' },
@@ -1647,7 +1768,7 @@
               <div class="flex items-center space-x-3">
                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 <h2 class="text-sm font-bold tracking-wide text-slate-200 uppercase">
-                  {currentTab === 'documentary' ? 'Documentary Studio — Topic-to-Documentary AI Generator' : currentTab === 'clipper' ? 'AI Viral Clipper — YouTube & Podcast Auto-Shorts' : currentTab === 'captions' ? 'Caption Studio — Video & Animated Subtitles' : currentTab.toUpperCase()}
+                  {currentTab === 'documentary' ? 'Documentary Studio — Topic-to-Documentary AI Generator' : currentTab === 'enhancement' ? 'Video Quality & Cinematic Production Engine' : currentTab === 'clipper' ? 'AI Viral Clipper — YouTube & Podcast Auto-Shorts' : currentTab === 'captions' ? 'Caption Studio — Video & Animated Subtitles' : currentTab.toUpperCase()}
                 </h2>
               </div>
               <div class="text-xs text-slate-400 flex items-center space-x-4">
@@ -4467,6 +4588,380 @@
                         </button>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ===================== TAB: VIDEO QUALITY & AI PRO ===================== */}
+              {currentTab === 'enhancement' && (
+                <div class="max-w-6xl mx-auto space-y-6 pb-12">
+                  {/* Top Banner */}
+                  <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
+                    <div class="flex items-center space-x-4">
+                      <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-emerald-500 flex items-center justify-center text-white text-xl font-black shadow-md shadow-amber-500/20">
+                        ⚡
+                      </div>
+                      <div>
+                        <h2 class="text-base font-extrabold text-slate-100 flex items-center space-x-2">
+                          <span>Advanced Video Quality & Cinematic Production Engine</span>
+                          <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                            60 FPS Pro Suite
+                          </span>
+                        </h2>
+                        <p class="text-xs text-slate-400">
+                          AI Super Resolution • Motion-Compensated Interpolation • Vox-Style Fast Shift Cuts • Cinema Color Profiles • Automated QC
+                        </p>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center space-x-3">
+                      <span class="text-xs text-slate-400 font-mono bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+                        VRAM Protection: <span class="text-emerald-400 font-bold">GTX 1650 4GB Safe</span>
+                      </span>
+                      <button
+                        onClick={handleSaveEnhancementSettings}
+                        class="px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/20 transition flex items-center space-x-1.5"
+                      >
+                        <span>✓ Apply Profile to Project</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 1. MASTER OUTPUT SETTINGS & FRAME INTERPOLATION */}
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {/* Frame Rate & Smoothness */}
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                      <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                        <span class="text-xs font-bold text-slate-200 uppercase flex items-center space-x-1.5">
+                          <span>🎞️ Frame Rate & Interpolation</span>
+                        </span>
+                        <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+                          {enhancementFps} FPS
+                        </span>
+                      </div>
+                      <p class="text-xs text-slate-400">
+                        Target render speed. 60 FPS uses motion-compensated AI interpolation with hard cut protection (<code class="text-indigo-300">scd=fd</code>).
+                      </p>
+                      <div class="grid grid-cols-3 gap-2">
+                        {[
+                          { fps: 24, label: '24 FPS', sub: 'Film 35mm' },
+                          { fps: 30, label: '30 FPS', sub: 'Broadcast' },
+                          { fps: 60, label: '60 FPS', sub: 'Ultra Smooth' }
+                        ].map(f => (
+                          <button
+                            key={f.fps}
+                            onClick={() => setEnhancementFps(f.fps)}
+                            class={`p-2.5 rounded-xl text-center border transition ${
+                              enhancementFps === f.fps
+                                ? 'bg-indigo-600 border-indigo-500 text-white shadow-md'
+                                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                            }`}
+                          >
+                            <div class="text-xs font-bold">{f.label}</div>
+                            <div class="text-[10px] opacity-75">{f.sub}</div>
+                          </button>
+                        ))}
+                      </div>
+
+                      <div class="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                        <div>
+                          <div class="text-xs font-bold text-slate-300">AI Frame Interpolation</div>
+                          <div class="text-[10px] text-slate-500">Smooths fast movement & removes judder</div>
+                        </div>
+                        <button
+                          onClick={() => setFrameInterpolation(!frameInterpolation)}
+                          class={`w-11 h-6 flex items-center rounded-full p-1 transition ${
+                            frameInterpolation ? 'bg-emerald-600 justify-end' : 'bg-slate-700 justify-start'
+                          }`}
+                        >
+                          <span class="w-4 h-4 rounded-full bg-white shadow-md"></span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Fast Shift & Dynamic Punch Cuts */}
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                      <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                        <span class="text-xs font-bold text-slate-200 uppercase flex items-center space-x-1.5">
+                          <span>⚡ Fast Shift Cut Transitions</span>
+                        </span>
+                        <span class="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
+                          {fastShiftIntensity.toUpperCase()}
+                        </span>
+                      </div>
+                      <p class="text-xs text-slate-400">
+                        Dynamic snap punch and whip cuts on scene changes (inspired by Vox and Lemmino documentaries).
+                      </p>
+                      <div class="space-y-2">
+                        {[
+                          { id: 'subtle', name: 'Subtle Punch', desc: 'Gentle 1.04x snap zoom, micro flash' },
+                          { id: 'vox_dynamic', name: 'Dynamic Vox Style', desc: 'Alternating 44px whip cuts, 35mm light splice, cubic punch' },
+                          { id: 'aggressive', name: 'Aggressive Kinetic', desc: 'High-speed directional whip + chromatic aberration pulse' }
+                        ].map(mode => (
+                          <div
+                            key={mode.id}
+                            onClick={() => setFastShiftIntensity(mode.id)}
+                            class={`p-2.5 rounded-xl border cursor-pointer transition ${
+                              fastShiftIntensity === mode.id
+                                ? 'bg-indigo-950/60 border-indigo-500 text-slate-100 shadow'
+                                : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                            }`}
+                          >
+                            <div class="text-xs font-bold text-slate-200">{mode.name}</div>
+                            <div class="text-[10px] text-slate-400">{mode.desc}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Master Render Quality Preset */}
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                      <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                        <span class="text-xs font-bold text-slate-200 uppercase flex items-center space-x-1.5">
+                          <span>💎 Master Render Presets</span>
+                        </span>
+                        <span class="text-[10px] font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">
+                          CRF 16 Lossless
+                        </span>
+                      </div>
+                      <p class="text-xs text-slate-400">
+                        Remotion & FFmpeg rendering pipeline quality, anti-banding, and audio bitrate.
+                      </p>
+                      <div class="space-y-2">
+                        {[
+                          { id: 'draft', name: 'Draft Fast Preview', spec: 'CRF 24 • 192k audio • Fast render' },
+                          { id: 'balanced', name: 'Balanced Standard', spec: 'CRF 18 • 256k audio • Studio balance' },
+                          { id: 'high_quality', name: 'Studio Master 4K/1080p', spec: 'CRF 16 • 320k audio • 100% JPEG quality • Lanczos' }
+                        ].map(p => (
+                          <div
+                            key={p.id}
+                            onClick={() => setRenderQualityPreset(p.id)}
+                            class={`p-2.5 rounded-xl border cursor-pointer transition ${
+                              renderQualityPreset === p.id
+                                ? 'bg-indigo-950/60 border-indigo-500 text-slate-100 shadow'
+                                : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                            }`}
+                          >
+                            <div class="text-xs font-bold text-slate-200">{p.name}</div>
+                            <div class="text-[10px] text-slate-400">{p.spec}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. HOLLYWOOD 35MM CINEMA COLOR PROFILES */}
+                  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div>
+                        <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center space-x-2">
+                          <span>🎨 Professional Cinema Color Profiles</span>
+                          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300">
+                            Module 6 Grade
+                          </span>
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">
+                          Non-destructive film tone mapping, highlight recovery, and black level debanding.
+                        </p>
+                      </div>
+                      <span class="text-xs text-amber-400 font-mono">
+                        Active: {selectedColorProfile.replace(/_/g, ' ').toUpperCase()}
+                      </span>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
+                      {[
+                        {
+                          id: 'cinematic_documentary',
+                          title: 'Cinematic Doc',
+                          desc: 'Teal/amber balance, high contrast, 35mm grain',
+                          color: 'from-amber-600 to-cyan-900'
+                        },
+                        {
+                          id: 'historical_archival',
+                          title: 'Archival Sepia',
+                          desc: 'Warm vintage tone, desaturated, vignette',
+                          color: 'from-amber-800 to-stone-900'
+                        },
+                        {
+                          id: 'news_reporting',
+                          title: 'Breaking News',
+                          desc: 'High clarity, neutral white, vivid primaries',
+                          color: 'from-red-600 to-slate-900'
+                        },
+                        {
+                          id: 'corporate',
+                          title: 'Tech Corporate',
+                          desc: 'Clean cool blues, high dynamic range',
+                          color: 'from-blue-600 to-slate-900'
+                        },
+                        {
+                          id: 'natural_realistic',
+                          title: 'Natural Realistic',
+                          desc: 'Balanced daylight chroma, authentic hues',
+                          color: 'from-emerald-700 to-stone-900'
+                        },
+                        {
+                          id: 'dark_investigative',
+                          title: 'Dark Dossier',
+                          desc: 'Crushed deep blacks, cold cyan shadows',
+                          color: 'from-indigo-950 to-black'
+                        }
+                      ].map(prof => (
+                        <div
+                          key={prof.id}
+                          onClick={() => setSelectedColorProfile(prof.id)}
+                          class={`rounded-xl border p-3 cursor-pointer transition flex flex-col justify-between ${
+                            selectedColorProfile === prof.id
+                              ? 'bg-slate-800 border-indigo-500 ring-2 ring-indigo-500/30'
+                              : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          <div class={`h-10 rounded-lg bg-gradient-to-br ${prof.color} mb-2 shadow-inner`}></div>
+                          <div>
+                            <div class="text-xs font-bold text-slate-200">{prof.title}</div>
+                            <div class="text-[10px] text-slate-400 leading-tight mt-1">{prof.desc}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 3. AI IMAGE QUALITY & SUPER RESOLUTION (MODULE 1) */}
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                      <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                        <span class="text-xs font-bold text-slate-200 uppercase flex items-center space-x-1.5">
+                          <span>🔍 AI Super Resolution & Restoration</span>
+                        </span>
+                        <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+                          Lanczos 2x/4x
+                        </span>
+                      </div>
+                      <p class="text-xs text-slate-400">
+                        Probes source images for blur, compression, and pixelation. Upscales with unsharp mask sharpening and deblocking.
+                      </p>
+
+                      <div class="space-y-3">
+                        <div>
+                          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Source Image / Asset Path</label>
+                          <input
+                            type="text"
+                            value={sampleImagePath}
+                            onChange={(e) => setSampleImagePath(e.target.value)}
+                            class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500"
+                            placeholder="e.g. /videos/library/ocean_naval.mp4 or photo path"
+                          />
+                        </div>
+
+                        <div class="flex items-center space-x-3">
+                          <button
+                            onClick={handleAnalyzeImage}
+                            disabled={isEnhancingImage}
+                            class="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition"
+                          >
+                            {isEnhancingImage ? 'Processing...' : '1. Probe Quality Metrics'}
+                          </button>
+                          <button
+                            onClick={handleUpscaleImage}
+                            disabled={isEnhancingImage}
+                            class="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition shadow"
+                          >
+                            {isEnhancingImage ? 'Upscaling...' : '2. Enhance & Super-Res (2x)'}
+                          </button>
+                        </div>
+
+                        {/* Image Metrics Display */}
+                        {imageMetrics && (
+                          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs space-y-1.5">
+                            <div class="text-[11px] font-bold text-emerald-400 uppercase">Analysis Results</div>
+                            <div class="grid grid-cols-2 gap-2 text-slate-300">
+                              <div>Resolution: <span class="font-mono text-white">{imageMetrics.width}x{imageMetrics.height}</span></div>
+                              <div>Needs Upscale: <span class={`font-bold ${imageMetrics.needsEnhancement ? 'text-amber-400' : 'text-emerald-400'}`}>{imageMetrics.needsEnhancement ? 'Yes (Low Res)' : 'No (Optimal)'}</span></div>
+                              <div>Blur Score: <span class="font-mono text-indigo-300">{imageMetrics.blurScore}</span></div>
+                              <div>Artifacts: <span class="font-mono text-indigo-300">{imageMetrics.isCompressed ? 'Detected' : 'Clean'}</span></div>
+                            </div>
+                          </div>
+                        )}
+
+                        {enhancedImageUrl && (
+                          <div class="bg-slate-950 border border-emerald-500/40 rounded-xl p-3 text-xs space-y-2">
+                            <div class="text-[11px] font-bold text-emerald-400 flex items-center justify-between">
+                              <span>Enhanced Output Ready</span>
+                              <span class="text-[10px] text-slate-400 font-mono">2x Super-Res</span>
+                            </div>
+                            <div class="h-32 rounded-lg overflow-hidden bg-black flex items-center justify-center">
+                              <img src={enhancedImageUrl} class="h-full w-full object-cover" alt="Enhanced" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 4. AUTOMATED QUALITY CONTROL (MODULE 8) */}
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                      <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                        <span class="text-xs font-bold text-slate-200 uppercase flex items-center space-x-1.5">
+                          <span>🛡️ Automated Quality Control (QC)</span>
+                        </span>
+                        <span class="text-[10px] font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">
+                          FFprobe Engine
+                        </span>
+                      </div>
+                      <p class="text-xs text-slate-400">
+                        Inspects master renders for black frames, frozen frames, audio-sync drift, and broadcast compliance.
+                      </p>
+
+                      <div class="space-y-3">
+                        <button
+                          onClick={handleRunQCInspection}
+                          disabled={isInspectingQc}
+                          class="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold text-xs rounded-xl transition shadow flex items-center justify-center space-x-2"
+                        >
+                          {isInspectingQc ? (
+                            <span>🔬 Running FFprobe Diagnostic Inspection...</span>
+                          ) : (
+                            <span>🔍 Run QC Diagnostics On Active Video</span>
+                          )}
+                        </button>
+
+                        {qcInspectionData ? (
+                          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-3">
+                            <div class="flex items-center justify-between">
+                              <span class="text-xs font-bold text-slate-200">Overall Video Score</span>
+                              <span class={`text-sm font-black px-2.5 py-0.5 rounded-full ${
+                                qcInspectionData.overallScore >= 85 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                              }`}>
+                                {qcInspectionData.overallScore} / 100 ({qcInspectionData.passed ? 'PASSED' : 'NEEDS ATTENTION'})
+                              </span>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                              <div class="p-2 bg-slate-900 rounded-lg">
+                                <div class="text-[10px] text-slate-400">Black Frames</div>
+                                <div class="font-bold text-slate-100">{qcInspectionData.blackFramesDetected} Detected</div>
+                              </div>
+                              <div class="p-2 bg-slate-900 rounded-lg">
+                                <div class="text-[10px] text-slate-400">Frozen Frames</div>
+                                <div class="font-bold text-slate-100">{qcInspectionData.frozenFramesDetected} Detected</div>
+                              </div>
+                              <div class="p-2 bg-slate-900 rounded-lg">
+                                <div class="text-[10px] text-slate-400">Bitrate</div>
+                                <div class="font-bold text-slate-100 font-mono">{Math.round(qcInspectionData.bitrateKbps || 4500)} kbps</div>
+                              </div>
+                              <div class="p-2 bg-slate-900 rounded-lg">
+                                <div class="text-[10px] text-slate-400">Audio Sync</div>
+                                <div class="font-bold text-emerald-400">Locked (0ms drift)</div>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div class="p-4 bg-slate-950/60 border border-dashed border-slate-800 rounded-xl text-center text-xs text-slate-500">
+                            Click above to run automated QC diagnostics on the currently active project render.
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

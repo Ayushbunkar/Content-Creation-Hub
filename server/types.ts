@@ -132,6 +132,41 @@ export interface SceneData {
   quality_status?: 'approved' | 'auto_enhanced';
 }
 
+export interface EnhancementSettings {
+  image_enhancement: 'off' | 'auto' | '2x' | '4x';
+  denoising: 'off' | 'low' | 'medium' | 'high';
+  sharpening: 'off' | 'low' | 'medium';
+  face_restoration: boolean;
+  target_fps: 24 | 30 | 60 | 'original';
+  frame_interpolation: 'off' | '2x' | '4x';
+  stabilization: boolean;
+  color_profile: 'cinematic_documentary' | 'historical_archival' | 'news_reporting' | 'corporate' | 'natural_realistic' | 'dark_investigative';
+  render_preset: 'draft' | 'balanced' | 'high_quality';
+  resolution: '720p' | '1080p' | '1440p' | '4K';
+  video_codec: 'h264' | 'h265';
+}
+
+export interface DetailedQualityControlReport {
+  passed: boolean;
+  original_resolution: string;
+  final_resolution: string;
+  original_fps: number;
+  final_fps: number;
+  video_bitrate_kbps: number;
+  audio_bitrate_kbps: number;
+  black_frames_detected: number;
+  freeze_frames_detected: number;
+  duplicate_footage_count: number;
+  enhanced_images_count: number;
+  interpolated_scenes_count: number;
+  stock_video_count: number;
+  static_scenes_count: number;
+  file_size_mb: number;
+  render_duration_sec: number;
+  overall_score: number; // 0 - 100
+  notes: string[];
+}
+
 export interface QualityReport {
   passed: boolean;
   total_shots: number;

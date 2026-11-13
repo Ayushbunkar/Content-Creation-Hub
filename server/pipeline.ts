@@ -3,6 +3,8 @@ import { runQuery, getQuery } from './db';
 import { MediaSourceManager, QualityChecker } from './mediaSource';
 import { DocumentaryResearchService, ResearchDossier } from './documentaryResearch';
 import { DocumentaryNarrativeEngine } from './documentaryNarrative';
+import { SceneIntelligenceEngine } from './sceneIntelligence';
+import { VideoEnhancerService } from './videoEnhancer';
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
@@ -147,9 +149,47 @@ export class PipelineManager {
     // 11. FINAL RENDER & VALIDATION
     await this.updateStage(projectId, 'FINAL_RENDER', 98);
     const videoOutput = path.join('output', `${projectId}.mp4`);
+    let finalOutputPath = videoOutput;
+
     try {
       await this.renderVideo(projectId, videoOutput);
       await runQuery('UPDATE projects SET video_output = ? WHERE id = ?', [videoOutput, projectId]);
+
+      // Check if project has custom enhancement settings
+      const projRow = await getQuery<any>('SELECT enhancement_settings, resolution, aspect_ratio FROM projects WHERE id = ?', [projectId]);
+      let enhancementSettings = projRow?.enhancement_settings ? JSON.parse(projRow.enhancement_settings) : null;
+
+      // Module 2: AI Frame Interpolation to 60 FPS if enabled
+      if (enhancementSettings?.frameInterpolation && enhancementSettings?.fps === 60) {
+        const smoothOutput = path.join('output', `${projectId}_60fps.mp4`);
+        try {
+          console.log(`[Pipeline] Running motion-compensated 60 FPS interpolation for ${projectId}...`);
+          await VideoEnhancerService.interpolateVideo(videoOutput, smoothOutput, 60);
+          finalOutputPath = smoothOutput;
+          await runQuery('UPDATE projects SET video_output = ? WHERE id = ?', [smoothOutput, projectId]);
+        } catch (interpErr: any) {
+          console.warn(`[Pipeline] Frame interpolation fallback:`, interpErr?.message);
+        }
+      }
+
+      // Module 8: Quality Control Inspection
+      try {
+        const audioPath = path.join(process.cwd(), 'public', 'audio', `narration_${projectId}.wav`);
+        const audioDur = await this.probeAudioDuration(audioPath);
+        const w = (projRow?.aspect_ratio === '9:16') ? 1080 : 1920;
+        const h = (projRow?.aspect_ratio === '9:16') ? 1920 : 1080;
+        const qc = await VideoEnhancerService.runQualityControl(
+          path.join(process.cwd(), finalOutputPath),
+          audioDur,
+          w,
+          h,
+          enhancementSettings?.fps || 30
+        );
+        await runQuery('UPDATE projects SET qc_report = ? WHERE id = ?', [JSON.stringify(qc), projectId]);
+        console.log(`[Pipeline] QC Report generated for ${projectId}: Score = ${qc.overallScore}/100, Passed = ${qc.passed}`);
+      } catch (qcErr: any) {
+        console.warn(`[Pipeline] QC Report note:`, qcErr?.message);
+      }
     } catch (e: any) {
       console.warn(`[Pipeline] Render video note for ${projectId}:`, e?.message);
     }
@@ -266,93 +306,54 @@ export class PipelineManager {
     ];
 
     const plannedScenes: SceneData[] = [];
+    const usedMediaUrls: string[] = [];
+    let lastMovement: CameraMovement | undefined = undefined;
 
     for (let idx = 0; idx < shotTexts.length; idx++) {
       const narration = shotTexts[idx];
-      const n = narration.toLowerCase();
       const wordCount = narration.trim().split(/\s+/).length;
       const durationSec = Math.max(2.5, Math.min(5.0, Number((wordCount / 2.3).toFixed(1))));
 
-      let visualType: VisualShotType = 'video_footage';
-      let mediaSource: MediaSource = 'real_video';
-      let badge = '[Real Video Footage]';
-      let title = `Strategic Phase ${idx + 1}`;
-      let mediaUrl = MediaSourceManager.searchLocalLibraryFootage(narration, project.category);
-      let location = 'STRATEGIC MONITOR';
-      let coords = "26°34'12\"N // 56°15'08\"E";
+      // Module 5: Contextual Scene Intelligence
+      const context = SceneIntelligenceEngine.analyzeNarration(
+        narration,
+        project.topic || 'Strategic Intelligence',
+        project.category || 'Geopolitics',
+        idx,
+        lastMovement
+      );
+      lastMovement = context.cameraMovement;
 
-      if (idx === 0) {
-        visualType = 'cinematic_hook';
-        mediaSource = 'motion_graphics';
-        badge = '[Motion Graphics]';
-        title = project.title || project.topic.toUpperCase();
-        location = 'GLOBAL DOSSIER';
-      } else if (n.includes('treaty') || n.includes('convention') || n.includes('law') || n.includes('unclos') || n.includes('doctrine') || n.includes('sovereignty') || n.includes('accord')) {
-        visualType = 'archival_document';
-        mediaSource = 'archival';
-        badge = '[Archival Document]';
-        title = 'UN Convention On The Law Of The Sea';
-        location = 'ARCHIVAL INTELLIGENCE';
-      } else if (n.includes('map') || n.includes('border') || n.includes('chokepoint') || n.includes('passage') || n.includes('nautical') || n.includes('peninsula') || n.includes('corridor')) {
-        visualType = 'tactical_map';
-        mediaSource = 'motion_graphics';
-        badge = '[Tactical Map]';
-        title = isHormuz ? 'Maritime Geography & Sovereign Borders' : 'Territorial Boundaries & Sovereign Stance';
-        location = isHormuz ? 'PERSIAN GULF // STRAIT' : 'THEATER MAP';
-      } else if (n.includes('percent') || n.includes('million') || n.includes('billion') || n.includes('barrel') || n.includes('daily') || n.includes('price') || n.includes('market') || n.includes('trade')) {
-        visualType = 'data_metric';
-        mediaSource = 'motion_graphics';
-        badge = '[Data Metric]';
-        title = isHormuz ? 'Petroleum Transit Volume' : 'Economic Impact & Scale';
-        location = 'GLOBAL ENERGY METRIC';
-      } else if (idx % 3 === 1) {
-        visualType = 'layered_parallax';
-        mediaSource = 'motion_graphics';
-        badge = '[Motion Graphics]';
-        title = 'Sovereign Balance of Power';
-        location = 'INTELLIGENCE RECORD';
-      } else {
-        visualType = 'video_footage';
-        mediaSource = 'real_video';
-        badge = '[Real Video Footage]';
-        title = 'Naval Operations & Critical Chokepoint';
-        location = 'OPERATIONAL THEATER';
-      }
+      // Module 4: Deduplicated Stock Selection
+      let mediaUrl = context.mediaSource === 'real_video' || context.visualType === 'video_footage'
+        ? SceneIntelligenceEngine.selectBestStockClip(context, usedMediaUrls)
+        : MediaSourceManager.searchLocalLibraryFootage(narration, project.category);
+      usedMediaUrls.push(mediaUrl);
 
       plannedScenes.push({
         id: `shot_${String(idx + 1).padStart(3, '0')}`,
         shot_number: idx + 1,
-        title,
+        title: context.title,
         narration,
         duration: durationSec,
-        visual_type: visualType,
-        media_source: mediaSource,
-        badge,
+        visual_type: context.visualType,
+        media_source: context.mediaSource,
+        badge: context.badge,
         media_url: mediaUrl,
-        camera_movement: cameraMovements[idx % cameraMovements.length],
-        transition: idx % 4 === 1 ? 'whip_pan' : 'crossfade',
-        visual_description: `Fast-cut shot #${idx + 1} with dynamic ${cameraMovements[idx % cameraMovements.length]} movement, timed to narration.`,
-        location,
-        coordinates: coords,
+        camera_movement: context.cameraMovement,
+        transition: context.transition || (idx % 3 === 1 ? 'whip_pan' : 'crossfade'),
+        visual_description: `Dynamic shot #${idx + 1} (${context.badge}) with ${context.cameraMovement} movement and fast shift.`,
+        location: context.location,
+        coordinates: context.coordinates,
         layers: {
           particles: idx % 2 === 0 ? 'dust_motes' : 'light_leaks'
         },
-        archival_data: visualType === 'archival_document' ? {
-          headline: 'INTERNATIONAL MARITIME TREATY & PASSAGE RIGHTS',
-          publication: 'THE GEOPOLITICAL HISTORICAL RECORD',
-          date: 'OCTOBER 1973 // STRATEGIC DISPATCH',
-          snippet: narration,
-          highlightPhrase: isHormuz ? 'Transit passage guaranteed under sovereign surveillance' : 'Sovereign security protocols'
-        } : undefined,
-        data_metric: visualType === 'data_metric' ? {
-          statNumber: '21,000,000',
-          statLabel: 'BARRELS TRANSITED DAILY',
-          statSubtext: 'Over 20% of international petroleum trade flows through this single passage.'
-        } : undefined,
-        map_config: {
-          region: isHormuz ? 'Middle East' : 'Global',
-          targetName: project.topic.toUpperCase(),
-          highlighted_countries: isHormuz ? ['IR', 'OM', 'AE', 'SA'] : ['US', 'CN', 'RU', 'IN']
+        archival_data: context.archivalData,
+        data_metric: context.dataMetric,
+        map_config: context.mapConfig || {
+          region: 'Global',
+          targetName: (project.topic || 'THEATER').toUpperCase(),
+          highlighted_countries: ['US', 'CN', 'RU', 'IN']
         },
         audio: {
           music_volume: 0.14,

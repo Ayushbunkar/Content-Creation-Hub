@@ -53,7 +53,11 @@ export function initDatabase(): Promise<void> {
           `ALTER TABLE projects ADD COLUMN asset_manifest TEXT`,
           `ALTER TABLE projects ADD COLUMN mode TEXT DEFAULT 'one_click'`,
           `ALTER TABLE projects ADD COLUMN review_approved INTEGER DEFAULT 0`,
-          `ALTER TABLE projects ADD COLUMN documentary_chapters TEXT`
+          `ALTER TABLE projects ADD COLUMN documentary_chapters TEXT`,
+          `ALTER TABLE projects ADD COLUMN enhancement_settings TEXT`,
+          `ALTER TABLE projects ADD COLUMN qc_report TEXT`,
+          `ALTER TABLE projects ADD COLUMN color_profile TEXT DEFAULT 'cinematic_documentary'`,
+          `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`
         ];
         docColumns.forEach(sql => db.run(sql, () => {}));
       });
@@ -82,7 +86,11 @@ export function initDatabase(): Promise<void> {
           `ALTER TABLE projects ADD COLUMN asset_manifest TEXT`,
           `ALTER TABLE projects ADD COLUMN mode TEXT DEFAULT 'one_click'`,
           `ALTER TABLE projects ADD COLUMN review_approved INTEGER DEFAULT 0`,
-          `ALTER TABLE projects ADD COLUMN documentary_chapters TEXT`
+          `ALTER TABLE projects ADD COLUMN documentary_chapters TEXT`,
+          `ALTER TABLE projects ADD COLUMN enhancement_settings TEXT`,
+          `ALTER TABLE projects ADD COLUMN qc_report TEXT`,
+          `ALTER TABLE projects ADD COLUMN color_profile TEXT DEFAULT 'cinematic_documentary'`,
+          `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`
         ];
         docColumns.forEach(sql => db.run(sql, () => {}));
       });
@@ -119,7 +127,11 @@ export function initDatabase(): Promise<void> {
           `ALTER TABLE projects ADD COLUMN asset_manifest TEXT`,
           `ALTER TABLE projects ADD COLUMN mode TEXT DEFAULT 'one_click'`,
           `ALTER TABLE projects ADD COLUMN review_approved INTEGER DEFAULT 0`,
-          `ALTER TABLE projects ADD COLUMN documentary_chapters TEXT`
+          `ALTER TABLE projects ADD COLUMN documentary_chapters TEXT`,
+          `ALTER TABLE projects ADD COLUMN enhancement_settings TEXT`,
+          `ALTER TABLE projects ADD COLUMN qc_report TEXT`,
+          `ALTER TABLE projects ADD COLUMN color_profile TEXT DEFAULT 'cinematic_documentary'`,
+          `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`
         ];
         docColumns.forEach(sql => db.run(sql, () => {}));
       });
@@ -158,7 +170,11 @@ export function initDatabase(): Promise<void> {
           `ALTER TABLE projects ADD COLUMN asset_manifest TEXT`,
           `ALTER TABLE projects ADD COLUMN mode TEXT DEFAULT 'one_click'`,
           `ALTER TABLE projects ADD COLUMN review_approved INTEGER DEFAULT 0`,
-          `ALTER TABLE projects ADD COLUMN documentary_chapters TEXT`
+          `ALTER TABLE projects ADD COLUMN documentary_chapters TEXT`,
+          `ALTER TABLE projects ADD COLUMN enhancement_settings TEXT`,
+          `ALTER TABLE projects ADD COLUMN qc_report TEXT`,
+          `ALTER TABLE projects ADD COLUMN color_profile TEXT DEFAULT 'cinematic_documentary'`,
+          `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`
         ];
         docColumns.forEach(sql => db.run(sql, () => {}));
       });
