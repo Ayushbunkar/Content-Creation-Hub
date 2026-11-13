@@ -182,15 +182,20 @@ export class MediaSourceManager {
   ): Promise<string> {
     await this.initMediaLibrary();
 
-    const enhancedOutput = path.join(this.cacheDir, `enhanced_${shotId}.mp4`);
-    const enhancedUrl = `/videos/cache/enhanced_${shotId}.mp4`;
+    const imageOutput = path.join(this.cacheDir, `asset_${shotId}.jpg`);
+    const imageUrl = `/videos/cache/asset_${shotId}.jpg`;
+    const videoOutput = path.join(this.cacheDir, `enhanced_${shotId}.mp4`);
+    const videoUrl = `/videos/cache/enhanced_${shotId}.mp4`;
 
     // Return if already cached and valid
-    if (fs.existsSync(enhancedOutput) && fs.statSync(enhancedOutput).size > 15000) {
-      return enhancedUrl;
+    if (fs.existsSync(imageOutput) && fs.statSync(imageOutput).size > 10000) {
+      return imageUrl;
+    }
+    if (fs.existsSync(videoOutput) && fs.statSync(videoOutput).size > 15000) {
+      return videoUrl;
     }
 
-    const clean = this.cleanKeywords(query) || this.cleanKeywords(category) || 'geopolitics naval';
+    const clean = this.cleanKeywords(query) || this.cleanKeywords(category) || 'cinematic documentary';
 
     // 1. Run Python fetch & watermark-clean enhance pipeline
     try {
@@ -199,11 +204,11 @@ export class MediaSourceManager {
         : 'python';
       const fetchScript = path.join(process.cwd(), 'scripts', 'fetch_asset.py');
 
-      await new Promise<void>((resolve, reject) => {
+      await new Promise<void>((resolve) => {
         const p = spawn(pythonExe, [
           fetchScript,
           clean,
-          enhancedOutput,
+          imageOutput,
           '--duration', String(durationSec),
           '--aspect-ratio', aspectRatio
         ]);
@@ -211,15 +216,11 @@ export class MediaSourceManager {
         const killTimer = setTimeout(() => {
           try { p.kill(); } catch (e) { }
           resolve(); // gracefully proceed to fallback
-        }, 6000);
+        }, 18000);
 
         p.on('close', (code) => {
           clearTimeout(killTimer);
-          if (code === 0 && fs.existsSync(enhancedOutput) && fs.statSync(enhancedOutput).size > 15000) {
-            resolve();
-          } else {
-            resolve(); // fallback to local library
-          }
+          resolve();
         });
         p.on('error', () => {
           clearTimeout(killTimer);
@@ -227,7 +228,9 @@ export class MediaSourceManager {
         });
       });
 
-      return enhancedUrl;
+      if (fs.existsSync(imageOutput) && fs.statSync(imageOutput).size > 10000) {
+        return imageUrl;
+      }
     } catch (e) {
       console.warn(`[MediaSourceManager] Could not download live asset for "${clean}". Falling back to curated library.`);
     }

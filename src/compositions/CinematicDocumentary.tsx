@@ -5,6 +5,7 @@ import {
   Easing,
   AbsoluteFill,
   OffthreadVideo,
+  Img,
   staticFile,
 } from "remotion";
 import { AudioTrackGroup } from "../audio/AudioTrack";
@@ -559,6 +560,7 @@ const VideoFootageScene: FC<{
   const videoSrc = (rawSrc.startsWith('http://') || rawSrc.startsWith('https://') || rawSrc.startsWith('data:'))
     ? rawSrc
     : staticFile(rawSrc.replace(/^\//, ''));
+  const isImage = /\.(jpg|jpeg|png|webp|avif|gif)(\?.*)?$/i.test(rawSrc);
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#020617', overflow: 'hidden' }}>
@@ -570,16 +572,28 @@ const VideoFootageScene: FC<{
           transformOrigin: 'center center',
         }}
       >
-        <OffthreadVideo
-          src={videoSrc}
-          onError={() => {}}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            filter: 'contrast(1.12) brightness(0.95) saturate(1.1)',
-          }}
-        />
+        {isImage ? (
+          <Img
+            src={videoSrc}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              filter: 'contrast(1.12) brightness(0.95) saturate(1.1)',
+            }}
+          />
+        ) : (
+          <OffthreadVideo
+            src={videoSrc}
+            onError={() => {}}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              filter: 'contrast(1.12) brightness(0.95) saturate(1.1)',
+            }}
+          />
+        )}
       </div>
 
       {/* Cinematic Depth Particle Field */}
@@ -597,32 +611,53 @@ const LayeredParallaxScene: FC<{
   durationFrames: number;
 }> = ({ scene, sceneFrame, durationFrames }) => {
   // 3-Plane Parallax Depth Speeds
-  const bgZoom = interpolate(sceneFrame, [0, durationFrames], [1.0, 1.06]);
-  const bgPan = interpolate(sceneFrame, [0, durationFrames], [0, -35]);
+  const bgZoom = interpolate(sceneFrame, [0, durationFrames], [1.02, 1.12]);
+  const bgPan = interpolate(sceneFrame, [0, durationFrames], [0, -40]);
 
   const midDriftX = interpolate(sceneFrame, [0, durationFrames], [30, -15]);
   const midScale = interpolate(sceneFrame, [0, durationFrames], [1.02, 1.08]);
 
   const fgPanX = interpolate(sceneFrame, [0, durationFrames], [-60, 60]);
 
+  const rawSrc = scene.mediaUrl || '/videos/library/ocean_naval.mp4';
+  const mediaSrc = (rawSrc.startsWith('http://') || rawSrc.startsWith('https://') || rawSrc.startsWith('data:'))
+    ? rawSrc
+    : staticFile(rawSrc.replace(/^\//, ''));
+  const isImage = /\.(jpg|jpeg|png|webp|avif|gif)(\?.*)?$/i.test(rawSrc);
+
   return (
     <AbsoluteFill style={{ backgroundColor: '#060a12', overflow: 'hidden' }}>
-      {/* Background Plane (Speed: 0.4x) */}
+      {/* Background Plane (Speed: 0.4x with cinematic blur & grade) */}
       <div
         style={{
           position: 'absolute',
-          inset: '-5%',
+          inset: '-8%',
           transform: `scale(${bgZoom}) translateX(${bgPan}px)`,
+          filter: 'brightness(0.32) contrast(1.2) blur(2px) saturate(1.15)',
+        }}
+      >
+        {isImage ? (
+          <Img src={mediaSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <OffthreadVideo src={mediaSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        )}
+      </div>
+
+      {/* Atmospheric Vignette & Tactical Grid Overlay */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
           backgroundImage: `
-            radial-gradient(circle at center, rgba(30, 58, 138, 0.4) 0%, rgba(3, 7, 18, 0.95) 80%),
-            linear-gradient(rgba(56, 189, 248, 0.06) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(56, 189, 248, 0.06) 1px, transparent 1px)
+            radial-gradient(circle at center, transparent 35%, rgba(2, 6, 23, 0.88) 85%),
+            linear-gradient(rgba(56, 189, 248, 0.04) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(56, 189, 248, 0.04) 1px, transparent 1px)
           `,
-          backgroundSize: '100% 100%, 70px 70px, 70px 70px',
+          backgroundSize: '100% 100%, 64px 64px, 64px 64px',
         }}
       />
 
-      {/* Middleground Plane (Speed: 1.0x with Depth Shadow) */}
+      {/* Middleground Plane (Speed: 1.0x with Depth Shadow & Framed Card) */}
       <div
         style={{
           position: 'absolute',
@@ -631,52 +666,74 @@ const LayeredParallaxScene: FC<{
           alignItems: 'center',
           justifyContent: 'center',
           transform: `scale(${midScale}) translateX(${midDriftX}px)`,
+          zIndex: 10,
         }}
       >
         <div
           style={{
-            maxWidth: '850px',
-            backgroundColor: 'rgba(15, 23, 42, 0.85)',
-            border: '1px solid rgba(56, 189, 248, 0.3)',
-            borderRadius: '12px',
+            maxWidth: '920px',
+            backgroundColor: 'rgba(10, 17, 34, 0.92)',
+            border: '1px solid rgba(56, 189, 248, 0.35)',
+            borderLeft: '5px solid #f59e0b',
+            borderRadius: '14px',
             padding: '36px 48px',
-            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(16px)',
-            textAlign: 'center',
+            boxShadow: '0 30px 80px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
+            backdropFilter: 'blur(20px)',
+            textAlign: 'left',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
           }}
         >
-          <div
-            style={{
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: '12px',
-              fontWeight: 800,
-              color: '#38bdf8',
-              letterSpacing: '2px',
-              textTransform: 'uppercase',
-              marginBottom: '12px',
-            }}
-          >
-            PARALLAX INTELLIGENCE DOSSIER
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span
+              style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: '12px',
+                fontWeight: 800,
+                color: '#38bdf8',
+                letterSpacing: '2px',
+                textTransform: 'uppercase',
+              }}
+            >
+              PARALLAX INTELLIGENCE DOSSIER // {scene.location || 'CONFIDENTIAL'}
+            </span>
+            <span
+              style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: '11px',
+                color: '#f59e0b',
+                backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                padding: '3px 10px',
+                borderRadius: '4px',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+              }}
+            >
+              ARCHIVAL SUBJECT
+            </span>
           </div>
+
           <h1
             style={{
-              fontFamily: "'Playfair Display', serif",
-              fontSize: '44px',
+              fontFamily: "'Inter', sans-serif",
+              fontSize: '42px',
               fontWeight: 900,
               color: '#ffffff',
-              margin: '0 0 16px 0',
-              lineHeight: 1.2,
+              margin: '0',
+              lineHeight: 1.15,
+              letterSpacing: '-0.5px',
             }}
           >
             {scene.title}
           </h1>
+
           <p
             style={{
               fontFamily: "'Inter', sans-serif",
               fontSize: '18px',
               color: '#cbd5e1',
               margin: 0,
-              lineHeight: 1.5,
+              lineHeight: 1.55,
             }}
           >
             {scene.narration}
@@ -685,7 +742,7 @@ const LayeredParallaxScene: FC<{
       </div>
 
       {/* Foreground Plane (Speed: 1.8x Floating Particles & Flares) */}
-      <div style={{ position: 'absolute', inset: 0, transform: `translateX(${fgPanX}px)` }}>
+      <div style={{ position: 'absolute', inset: 0, transform: `translateX(${fgPanX}px)`, zIndex: 15 }}>
         <FloatingParticleField frame={sceneFrame} type="light_leaks" />
       </div>
     </AbsoluteFill>
@@ -737,8 +794,19 @@ const ArchivalDocumentScene: FC<{
         overflow: 'hidden',
       }}
     >
-      {/* Background Shadow */}
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle, rgba(15, 23, 42, 0.4) 0%, #030712 90%)' }} />
+      {/* Background Mahogany Investigator Desk Texture */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: '-5%',
+          backgroundImage: `
+            radial-gradient(circle at center, rgba(245, 158, 11, 0.15) 0%, rgba(3, 7, 18, 0.95) 80%),
+            linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px)
+          `,
+          backgroundSize: '100% 100%, 80px 80px, 80px 80px',
+        }}
+      />
 
       {/* Aged Document Container */}
       <div
@@ -871,7 +939,23 @@ const TacticalMapScene: FC<{ scene: CinematicSceneData; sceneFrame: number }> = 
           transformOrigin: '55% 50%',
         }}
       >
-        <svg viewBox="0 0 1920 1080" style={{ width: '100%', height: '100%' }}>
+        {/* Real Satellite Topography Background */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            opacity: 0.35,
+            mixBlendMode: 'screen',
+            filter: 'contrast(1.25) brightness(0.7)',
+          }}
+        >
+          <OffthreadVideo
+            src={staticFile('videos/library/satellite_globe.mp4')}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        </div>
+
+        <svg viewBox="0 0 1920 1080" style={{ width: '100%', height: '100%', position: 'relative', zIndex: 2 }}>
           <defs>
             <linearGradient id="oceanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#08101e" />
@@ -954,6 +1038,13 @@ const DataMetricScene: FC<{ scene: CinematicSceneData; sceneFrame: number }> = (
     extrapolateRight: 'clamp',
   });
 
+  const rawBg = scene.mediaUrl || '/videos/library/ocean_naval.mp4';
+  const bgSrc = (rawBg.startsWith('http://') || rawBg.startsWith('https://') || rawBg.startsWith('data:'))
+    ? rawBg
+    : staticFile(rawBg.replace(/^\//, ''));
+  const isImage = /\.(jpg|jpeg|png|webp|avif|gif)(\?.*)?$/i.test(rawBg);
+  const zoom = interpolate(sceneFrame, [0, 240], [1.02, 1.12], { easing: Easing.out(Easing.quad) });
+
   return (
     <AbsoluteFill
       style={{
@@ -964,15 +1055,38 @@ const DataMetricScene: FC<{ scene: CinematicSceneData; sceneFrame: number }> = (
         overflow: 'hidden',
       }}
     >
+      {/* Cinematic Photorealistic Background under numbers */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
-          background: 'radial-gradient(circle at center, rgba(14, 165, 233, 0.15) 0%, rgba(3, 7, 18, 0.95) 75%)',
+          transform: `scale(${zoom})`,
+          transformOrigin: 'center center',
+          filter: 'brightness(0.22) contrast(1.25) blur(2.5px) saturate(1.2)',
+        }}
+      >
+        {isImage ? (
+          <Img src={bgSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <OffthreadVideo src={bgSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        )}
+      </div>
+
+      {/* Dark Tactical Grid & Vignette Overlay */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: `
+            radial-gradient(circle at center, transparent 30%, rgba(3, 7, 18, 0.92) 85%),
+            linear-gradient(rgba(56, 189, 248, 0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(56, 189, 248, 0.05) 1px, transparent 1px)
+          `,
+          backgroundSize: '100% 100%, 72px 72px, 72px 72px',
         }}
       />
 
-      <div style={{ maxWidth: '1000px', textAlign: 'center', padding: '0 40px', zIndex: 10 }}>
+      <div style={{ maxWidth: '1050px', textAlign: 'center', padding: '0 40px', zIndex: 10 }}>
         <span
           style={{
             fontFamily: "'JetBrains Mono', monospace",
@@ -985,21 +1099,21 @@ const DataMetricScene: FC<{ scene: CinematicSceneData; sceneFrame: number }> = (
             marginBottom: '16px',
           }}
         >
-          GLOBAL ECONOMIC IMPACT METRIC
+          GLOBAL STRATEGIC IMPACT METRIC
         </span>
 
         <div
           style={{
             fontFamily: "'Inter', sans-serif",
-            fontSize: '88px',
+            fontSize: '92px',
             fontWeight: 900,
             letterSpacing: '-2px',
             background: 'linear-gradient(135deg, #ffffff 40%, #f59e0b 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
-            lineHeight: 1.1,
+            lineHeight: 1.05,
             marginBottom: '14px',
-            filter: 'drop-shadow(0 8px 30px rgba(245, 158, 11, 0.3))',
+            filter: 'drop-shadow(0 10px 35px rgba(245, 158, 11, 0.45))',
           }}
         >
           {statVal}
@@ -1023,7 +1137,7 @@ const DataMetricScene: FC<{ scene: CinematicSceneData; sceneFrame: number }> = (
           style={{
             width: '600px',
             height: '8px',
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            backgroundColor: 'rgba(255, 255, 255, 0.12)',
             borderRadius: '4px',
             margin: '0 auto 28px auto',
             overflow: 'hidden',
@@ -1035,7 +1149,7 @@ const DataMetricScene: FC<{ scene: CinematicSceneData; sceneFrame: number }> = (
               height: '100%',
               background: 'linear-gradient(90deg, #38bdf8, #f59e0b)',
               borderRadius: '4px',
-              boxShadow: '0 0 12px rgba(245, 158, 11, 0.7)',
+              boxShadow: '0 0 16px rgba(245, 158, 11, 0.8)',
             }}
           />
         </div>
@@ -1045,8 +1159,8 @@ const DataMetricScene: FC<{ scene: CinematicSceneData; sceneFrame: number }> = (
             fontFamily: "'Inter', sans-serif",
             fontSize: '18px',
             fontWeight: 400,
-            color: '#94a3b8',
-            maxWidth: '750px',
+            color: '#cbd5e1',
+            maxWidth: '800px',
             margin: '0 auto',
             lineHeight: 1.6,
           }}

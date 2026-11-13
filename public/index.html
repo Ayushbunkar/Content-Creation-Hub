@@ -631,7 +631,7 @@
       const [docProjects, setDocProjects] = useState([]);
       const [activeDocProject, setActiveDocProject] = useState(null);
       const [docTopic, setDocTopic] = useState('');
-      const [docDuration, setDocDuration] = useState(480); // 8 minutes default
+      const [docDuration, setDocDuration] = useState(120); // 2 minutes default for fast premium rendering
       const [docLanguage, setDocLanguage] = useState('English');
       const [docVoice, setDocVoice] = useState('am_adam');
       const [docStyle, setDocStyle] = useState('investigative');
@@ -1963,10 +1963,10 @@
                           <label class="block text-[11px] font-bold text-slate-400 uppercase">Target Duration</label>
                           <div class="grid grid-cols-2 gap-1.5">
                             {[
-                              { label: '3 Min (Short)', sec: 180 },
-                              { label: '5 Min (Story)', sec: 300 },
-                              { label: '8 Min (Standard)', sec: 480 },
-                              { label: '12 Min (Deep)', sec: 720 }
+                              { label: '1 Min (Fast Reel)', sec: 60 },
+                              { label: '2 Min (Fast Story)', sec: 120 },
+                              { label: '5 Min (Feature)', sec: 300 },
+                              { label: '8 Min (Deep Dive)', sec: 480 }
                             ].map(d => (
                               <button
                                 key={d.sec}

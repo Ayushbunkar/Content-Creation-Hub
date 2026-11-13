@@ -97,7 +97,7 @@ export class PipelineManager {
     const totalShots = initialSceneData.length;
     for (let i = 0; i < totalShots; i++) {
       const shot = initialSceneData[i];
-      if (shot.visual_type === 'video_footage' || shot.visual_type === 'ai_video') {
+      if (!shot.media_url || shot.visual_type === 'video_footage' || shot.visual_type === 'ai_video' || shot.visual_type === 'layered_parallax' || shot.visual_type === 'data_metric') {
         const shotId = `${projectId}_${shot.id}`;
         shot.media_url = await MediaSourceManager.fetchCopyrightFreeAsset(
           shot.narration || shot.title,
@@ -164,7 +164,7 @@ export class PipelineManager {
         const smoothOutput = path.join('output', `${projectId}_60fps.mp4`);
         try {
           console.log(`[Pipeline] Running motion-compensated 60 FPS interpolation for ${projectId}...`);
-          await VideoEnhancerService.interpolateVideo(videoOutput, smoothOutput, 60);
+          await VideoEnhancerService.interpolateVideo(videoOutput, smoothOutput, { targetFps: 60 });
           finalOutputPath = smoothOutput;
           await runQuery('UPDATE projects SET video_output = ? WHERE id = ?', [smoothOutput, projectId]);
         } catch (interpErr: any) {
@@ -180,13 +180,14 @@ export class PipelineManager {
         const h = (projRow?.aspect_ratio === '9:16') ? 1920 : 1080;
         const qc = await VideoEnhancerService.runQualityControl(
           path.join(process.cwd(), finalOutputPath),
-          audioDur,
-          w,
-          h,
-          enhancementSettings?.fps || 30
+          {
+            targetResolution: `${w}x${h}`,
+            targetFps: enhancementSettings?.fps || 30,
+            renderDurationSec: audioDur,
+          }
         );
         await runQuery('UPDATE projects SET qc_report = ? WHERE id = ?', [JSON.stringify(qc), projectId]);
-        console.log(`[Pipeline] QC Report generated for ${projectId}: Score = ${qc.overallScore}/100, Passed = ${qc.passed}`);
+        console.log(`[Pipeline] QC Report generated for ${projectId}: Score = ${qc.overall_score}/100, Passed = ${qc.passed}`);
       } catch (qcErr: any) {
         console.warn(`[Pipeline] QC Report note:`, qcErr?.message);
       }
@@ -306,7 +307,7 @@ export class PipelineManager {
     ];
 
     const plannedScenes: SceneData[] = [];
-    const usedMediaUrls: string[] = [];
+    const usedMediaUrls = new Set<string>();
     let lastMovement: CameraMovement | undefined = undefined;
 
     for (let idx = 0; idx < shotTexts.length; idx++) {
@@ -326,9 +327,9 @@ export class PipelineManager {
 
       // Module 4: Deduplicated Stock Selection
       let mediaUrl = context.mediaSource === 'real_video' || context.visualType === 'video_footage'
-        ? SceneIntelligenceEngine.selectBestStockClip(context, usedMediaUrls)
+        ? SceneIntelligenceEngine.selectBestStockClip(context.keywords, project.category || 'Geopolitics', usedMediaUrls).url
         : MediaSourceManager.searchLocalLibraryFootage(narration, project.category);
-      usedMediaUrls.push(mediaUrl);
+      usedMediaUrls.add(mediaUrl);
 
       plannedScenes.push({
         id: `shot_${String(idx + 1).padStart(3, '0')}`,
@@ -350,7 +351,7 @@ export class PipelineManager {
         },
         archival_data: context.archivalData,
         data_metric: context.dataMetric,
-        map_config: context.mapConfig || {
+        map_config: {
           region: 'Global',
           targetName: (project.topic || 'THEATER').toUpperCase(),
           highlighted_countries: ['US', 'CN', 'RU', 'IN']

@@ -1457,10 +1457,11 @@ app.get('/api/projects/:id/qc-report', async (req, res) => {
       const h = project.aspect_ratio === '9:16' ? 1920 : 1080;
       const qc = await VideoEnhancerService.runQualityControl(
         path.join(process.cwd(), project.video_output),
-        120,
-        w,
-        h,
-        30
+        {
+          targetResolution: `${w}x${h}`,
+          targetFps: 30,
+          renderDurationSec: 120
+        }
       );
       await runQuery('UPDATE projects SET qc_report = ? WHERE id = ?', [JSON.stringify(qc), projectId]);
       return res.json({ success: true, report: qc });
