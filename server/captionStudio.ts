@@ -320,7 +320,18 @@ Style: Accent,${s.fontFamily},${s.fontSize},${assSecondary},${assPrimary},${assO
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
 
+    // Deduplicate segments that have identical text or overlap within same time
+    const cleanSegments: TranscriptSegment[] = [];
     for (const seg of segments) {
+      const prev = cleanSegments[cleanSegments.length - 1];
+      if (prev) {
+        if (prev.text.trim() === seg.text.trim()) continue;
+        if (prev.text.includes(seg.text.trim()) && Math.abs(prev.start - seg.start) < 1.2) continue;
+      }
+      cleanSegments.push(seg);
+    }
+
+    for (const seg of cleanSegments) {
       const formatTime = (sec: number) => {
         const h = Math.floor(sec / 3600);
         const m = Math.floor((sec % 3600) / 60);

@@ -451,7 +451,18 @@ export class ViralClipperService {
                 i++;
               }
               const cleanText = textLines.join(' ').trim();
-              if (cleanText) {
+              const isTitleCard = line.includes('line:0%') || line.includes('line:10%') || line.includes('position:0%');
+              if (cleanText && !isTitleCard) {
+                // Deduplicate identical or near-identical cues from YouTube VTT
+                const lastSeg = segments[segments.length - 1];
+                if (lastSeg && (
+                  (lastSeg.text.trim() === cleanText.trim()) ||
+                  (lastSeg.text.includes(cleanText) && Math.abs(lastSeg.start - startTs) < 1.0)
+                )) {
+                  // Duplicate or redundant nested cue, skip
+                  continue;
+                }
+
                 const words = cleanText.split(/\s+/);
                 const wordDur = (endTs - startTs) / Math.max(1, words.length);
                 const wordsArr = words.map((w, wIdx) => ({
@@ -898,9 +909,25 @@ export class ViralClipperService {
     const segments: TranscriptSegment[] = clip.transcript_segments ? JSON.parse(clip.transcript_segments) : [];
     const customStyle = clip.custom_style ? JSON.parse(clip.custom_style) : {};
 
+    // Deduplicate any overlapping or identical subtitle cues (cleaning legacy duplicate cues)
+    const deduplicatedSegments: TranscriptSegment[] = [];
+    for (const s of segments) {
+      const prev = deduplicatedSegments[deduplicatedSegments.length - 1];
+      if (prev) {
+        if (prev.text.trim() === s.text.trim()) continue;
+        if (prev.text.includes(s.text.trim()) && Math.abs(prev.start - s.start) < 1.2) continue;
+        if (s.text.includes(prev.text.trim()) && Math.abs(prev.start - s.start) < 0.5) {
+          // Replace previous shorter cue with full cue
+          deduplicatedSegments[deduplicatedSegments.length - 1] = s;
+          continue;
+        }
+      }
+      deduplicatedSegments.push(s);
+    }
+
     // Generate ASS Subtitles file adjusted to relative clip start time
     const clipStartTime = clip.start_time;
-    const relativeSegments = segments.map((s, idx) => {
+    const relativeSegments = deduplicatedSegments.map((s, idx) => {
       const relStart = Math.max(0, s.start - clipStartTime);
       const relEnd = Math.max(relStart + 0.1, s.end - clipStartTime);
       return {
