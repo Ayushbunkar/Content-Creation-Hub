@@ -2507,21 +2507,21 @@
       return (
         <div class="flex h-screen bg-slate-950">
           {/* LEFT NAVIGATION SIDEBAR */}
-          <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between">
-            <div>
-              <div class="p-5 border-b border-slate-800 flex items-center space-x-3">
-                <div class="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/30">
-                  AI
-                </div>
-                <div>
-                  <h1 class="text-sm font-bold tracking-wide uppercase text-slate-100">Local Studio</h1>
-                  <p class="text-xs text-indigo-400 font-medium">Production Platform</p>
-                </div>
+          <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-screen flex-shrink-0">
+            <div class="p-5 border-b border-slate-800 flex items-center space-x-3 flex-shrink-0">
+              <div class="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/30">
+                AI
               </div>
+              <div>
+                <h1 class="text-sm font-bold tracking-wide uppercase text-slate-100">Local Studio</h1>
+                <p class="text-xs text-indigo-400 font-medium">Production Platform</p>
+              </div>
+            </div>
 
-              <nav class="p-3 space-y-1">
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-3">
+              <nav class="space-y-1">
                 {[
-                  { id: 'paper', label: 'Paper Animation Studio', badge: 'Airyzen 📜', icon: 'file-text' },
+                  { id: 'paper', label: 'Paper Animation Studio', badge: 'Paper 📜', icon: 'file-text' },
                   { id: 'documentary', label: 'Documentary Studio', badge: '8-Min AI Doc', icon: 'film' },
                   { id: 'enhancement', label: 'Video Quality & AI Pro', badge: '60 FPS ⚡', icon: 'zap' },
                   { id: 'audio_police', label: 'Audio Copyright Police', badge: 'Police 🚨', icon: 'shield' },
@@ -2573,7 +2573,7 @@
               <div class="flex items-center space-x-3">
                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 <h2 class="text-sm font-bold tracking-wide text-slate-200 uppercase">
-                  {currentTab === 'paper' ? 'Paper Animation Studio — Airyzen Master Explainer Engine' : currentTab === 'documentary' ? 'Documentary Studio — Topic-to-Documentary AI Generator' : currentTab === 'enhancement' ? 'Video Quality & Cinematic Production Engine' : currentTab === 'audio_police' ? 'Audio Copyright Police — Pre-Export Gate & Asset Registry' : currentTab === 'clipper' ? 'AI Viral Clipper — YouTube & Podcast Auto-Shorts' : currentTab === 'captions' ? 'Caption Studio — Video & Animated Subtitles' : currentTab.toUpperCase()}
+                  {currentTab === 'paper' ? 'Paper Animation Studio — Master Explainer Engine' : currentTab === 'documentary' ? 'Documentary Studio — Topic-to-Documentary AI Generator' : currentTab === 'enhancement' ? 'Video Quality & Cinematic Production Engine' : currentTab === 'audio_police' ? 'Audio Copyright Police — Pre-Export Gate & Asset Registry' : currentTab === 'clipper' ? 'AI Viral Clipper — YouTube & Podcast Auto-Shorts' : currentTab === 'captions' ? 'Caption Studio — Video & Animated Subtitles' : currentTab.toUpperCase()}
                 </h2>
               </div>
               <div class="text-xs text-slate-400 flex items-center space-x-4">
@@ -2599,7 +2599,7 @@
                         <h2 class="text-lg font-black text-slate-100 flex items-center space-x-2">
                           <span>Paper Style Animation Studio</span>
                           <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                            Airyzen Master Explainer Engine
+                            Master Explainer Engine
                           </span>
                         </h2>
                         <p class="text-xs text-slate-400 mt-0.5">
@@ -2813,7 +2813,7 @@
                       <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
                         <div>
                           <div class="text-[10px] font-mono text-amber-400 uppercase tracking-widest font-black">
-                            MASTER PRODUCTION PLAN • AIRYZEN PAPER ANIMATION PIPELINE
+                            MASTER PRODUCTION PLAN • PAPER ANIMATION PIPELINE
                           </div>
                           <h3 class="text-base font-black text-slate-100 mt-1">
                             {paperPlan.title}
