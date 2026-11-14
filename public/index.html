@@ -972,6 +972,54 @@
       const [clipInspectorTab, setClipInspectorTab] = useState('trim'); // 'trim', 'virality', 'platform', 'thumbnails', 'retention'
       const [selectedPlatformTab, setSelectedPlatformTab] = useState('youtube'); // 'youtube', 'reels', 'tiktok', 'linkedin'
 
+      // Central Theme-Matching Studio Modal System (Replaces browser default alerts)
+      const [appModal, setAppModal] = useState({
+        isOpen: false,
+        type: 'info', // 'error', 'warning', 'success', 'info'
+        title: '',
+        message: '',
+        hint: '',
+        actionText: 'OK',
+        onAction: null,
+        secondaryText: '',
+        onSecondary: null
+      });
+
+      const showAppModal = (opts) => {
+        if (typeof opts === 'string') {
+          const isErr = opts.toLowerCase().includes('error') || opts.toLowerCase().includes('fail');
+          const isProtected = opts.includes('Protected Streaming Platform') || opts.includes('DRM') || opts.includes('authentication') || opts.includes('netflix');
+          setAppModal({
+            isOpen: true,
+            type: isErr ? 'error' : 'info',
+            title: isProtected ? '🛡️ Protected Streaming Platform' : (isErr ? '⚠️ Studio Alert' : '✨ Studio Notice'),
+            message: opts,
+            hint: isProtected ? 'Netflix & subscription platforms encrypt their streams. Use the "📁 Local Video Upload" tab to upload any recorded screen clip, podcast, or downloaded video without restrictions!' : '',
+            actionText: isProtected ? '📁 Switch to Local Upload' : 'OK',
+            onAction: isProtected ? () => setClipperSourceType('upload') : null
+          });
+        } else {
+          setAppModal({
+            isOpen: true,
+            type: opts.type || 'info',
+            title: opts.title || (opts.type === 'error' ? '⚠️ Studio Alert' : '✨ Studio Notice'),
+            message: opts.message || '',
+            hint: opts.hint || '',
+            actionText: opts.actionText || 'OK',
+            onAction: opts.onAction || null,
+            secondaryText: opts.secondaryText || '',
+            onSecondary: opts.onSecondary || null
+          });
+        }
+      };
+
+      // Safely intercept window.alert so all app alerts render as centered theme-matching modals
+      useEffect(() => {
+        window.alert = (msg) => {
+          showAppModal(msg);
+        };
+      }, []);
+
       // Fetch all Clipper projects
       const fetchClipperProjects = async () => {
         try {
@@ -1485,7 +1533,15 @@
           if (data.error) {
             setIsClipperBusy(false);
             setClipperError(data.error);
-            alert('Clipper error: ' + data.error);
+            const isProtected = data.error.includes('Protected Streaming Platform') || data.error.includes('DRM') || data.error.includes('authentication') || data.error.includes('netflix');
+            showAppModal({
+              type: 'error',
+              title: isProtected ? '🛡️ Protected Video Stream' : '⚠️ Clipping Pipeline Notice',
+              message: data.error,
+              hint: isProtected ? 'Netflix & subscription streaming platforms encrypt video streams. Click below to switch to "Local Video Upload" and process your recorded clip with 100% full quality!' : undefined,
+              actionText: isProtected ? '📁 Switch to Local Upload' : 'Got it',
+              onAction: isProtected ? () => setClipperSourceType('upload') : null
+            });
             return;
           }
 
@@ -1496,7 +1552,11 @@
         } catch (err) {
           setIsClipperBusy(false);
           setClipperError(err.message);
-          alert('Failed to start clipper: ' + err.message);
+          showAppModal({
+            type: 'error',
+            title: '⚠️ Ingestion Error',
+            message: 'Failed to start clipper: ' + err.message
+          });
         }
       };
 
@@ -7565,6 +7625,88 @@
                       >
                         Close
                       </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Centered Theme-Matching Studio Modal System */}
+              {appModal.isOpen && (
+                <div class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
+                  <div class="relative w-full max-w-lg bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl shadow-indigo-500/15 overflow-hidden transform transition-all">
+                    {/* Top Accent Line */}
+                    <div class={`h-1.5 w-full ${
+                      appModal.type === 'error' ? 'bg-gradient-to-r from-rose-500 via-red-500 to-amber-500' :
+                      appModal.type === 'warning' ? 'bg-gradient-to-r from-amber-500 to-yellow-400' :
+                      appModal.type === 'success' ? 'bg-gradient-to-r from-emerald-500 to-teal-400' :
+                      'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500'
+                    }`}></div>
+
+                    <div class="p-6 space-y-4">
+                      {/* Header with Themed Icon */}
+                      <div class="flex items-start space-x-3.5">
+                        <div class={`w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0 shadow-lg ${
+                          appModal.type === 'error' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30 shadow-rose-500/20' :
+                          appModal.type === 'warning' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-amber-500/20' :
+                          appModal.type === 'success' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-emerald-500/20' :
+                          'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 shadow-indigo-500/20'
+                        }`}>
+                          {appModal.type === 'error' ? '⚠️' : appModal.type === 'warning' ? '⚡' : appModal.type === 'success' ? '✅' : 'ℹ️'}
+                        </div>
+                        <div class="flex-1 min-w-0 pt-0.5">
+                          <div class="flex items-center justify-between">
+                            <h3 class="text-base font-bold text-slate-100 truncate pr-2">
+                              {appModal.title || 'Studio Notice'}
+                            </h3>
+                            <button
+                              onClick={() => setAppModal({ isOpen: false, message: '' })}
+                              class="text-slate-400 hover:text-slate-100 transition-colors text-lg leading-none p-1 -mr-1"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          <p class="text-[11px] text-slate-400 mt-0.5">
+                            {appModal.type === 'error' ? 'Action required or platform restriction' : 'AI Content Creation Platform'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Main Message Body */}
+                      <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 text-xs font-medium text-slate-200 leading-relaxed max-h-60 overflow-y-auto whitespace-pre-line">
+                        {appModal.message}
+                      </div>
+
+                      {/* Optional Hint Banner */}
+                      {appModal.hint && (
+                        <div class="flex items-start space-x-2.5 bg-indigo-950/50 border border-indigo-500/30 rounded-xl p-3.5 text-xs text-indigo-200">
+                          <span class="text-base">💡</span>
+                          <span class="flex-1 leading-snug">{appModal.hint}</span>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div class="flex items-center justify-end space-x-2.5 pt-2 border-t border-slate-800/80">
+                        {appModal.secondaryText && (
+                          <button
+                            onClick={() => {
+                              if (appModal.onSecondary) appModal.onSecondary();
+                              setAppModal({ isOpen: false, message: '' });
+                            }}
+                            class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition"
+                          >
+                            {appModal.secondaryText}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            if (appModal.onAction) appModal.onAction();
+                            setAppModal({ isOpen: false, message: '' });
+                          }}
+                          class="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 transition flex items-center space-x-1.5"
+                        >
+                          <span>{appModal.actionText || 'OK'}</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

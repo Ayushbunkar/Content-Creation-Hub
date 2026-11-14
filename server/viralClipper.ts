@@ -83,12 +83,22 @@ export class ViralClipperService {
   }
 
   /**
-   * Fetch video metadata from YouTube or podcast URL using yt-dlp
+   * Fetch video metadata from YouTube, podcast, or online URL using yt-dlp
    */
   static async fetchUrlMetadata(url: string): Promise<{ title: string; duration: number; thumbnail: string; id: string }> {
+    // 1. Proactive detection for DRM-protected streaming services (Netflix, Prime, Hotstar, Disney+)
+    const lowerUrl = url.toLowerCase();
+    if (lowerUrl.includes('netflix.com') || lowerUrl.includes('primevideo.com') || lowerUrl.includes('hotstar.com') || lowerUrl.includes('disneyplus.com') || lowerUrl.includes('hbomax.com')) {
+      throw new Error(
+        'Protected Streaming Platform Detected: Netflix, Prime Video, and subscription services use Widevine DRM encryption and session authentication. Direct URL scraping is blocked by the platform. Please record or download the video clip and use the "📁 Local Video Upload" tab above to process it with 100% full quality!'
+      );
+    }
+
     return new Promise((resolve, reject) => {
+      const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
+      const pythonExe = fs.existsSync(venvPy) ? venvPy : 'python';
       const args = ['-m', 'yt_dlp', '--dump-json', '--no-playlist', url];
-      const p = spawn('python', args);
+      const p = spawn(pythonExe, args);
       let stdout = '';
       let stderr = '';
 
@@ -98,7 +108,25 @@ export class ViralClipperService {
       p.on('close', (code) => {
         if (code === 0 && stdout.trim()) {
           try {
-            const data = JSON.parse(stdout);
+            // Robust parsing: extract valid JSON line even if yt-dlp outputs multiple lines or trailing data
+            let data: any = null;
+            const lines = stdout.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+            for (const line of lines) {
+              if (line.startsWith('{')) {
+                try {
+                  const candidate = JSON.parse(line);
+                  if (candidate && (candidate.title || candidate.id)) {
+                    data = candidate;
+                    break;
+                  }
+                } catch {}
+              }
+            }
+
+            if (!data) {
+              data = JSON.parse(stdout.trim());
+            }
+
             resolve({
               title: data.title || 'Online Video',
               duration: parseFloat(data.duration || '0'),
@@ -110,8 +138,8 @@ export class ViralClipperService {
           }
         } else {
           const errMsg = stderr || stdout || 'Unknown error fetching URL';
-          if (errMsg.includes('Sign in to confirm you’re not a bot') || errMsg.includes('Private video') || errMsg.includes('DRM')) {
-            reject(new Error('This video requires authentication or platform access permissions. Please download or record the clip and use Local Video Upload instead.'));
+          if (errMsg.includes('Sign in to confirm you’re not a bot') || errMsg.includes('Private video') || errMsg.includes('DRM') || errMsg.includes('login') || errMsg.includes('netflix')) {
+            reject(new Error('This video requires authentication or platform access permissions. Please download or record the clip and use the "📁 Local Video Upload" tab instead.'));
           } else {
             reject(new Error(`Could not fetch video from URL: ${errMsg.slice(0, 300)}`));
           }
