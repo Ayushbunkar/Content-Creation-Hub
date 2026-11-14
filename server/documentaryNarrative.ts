@@ -229,8 +229,8 @@ export class DocumentaryNarrativeEngine {
           headline: dossier.claims[(shotCounter % dossier.claims.length)]?.claim_text.slice(0, 65) || 'Official Regulatory Investigation Record',
           publication: 'International Intelligence & Regulatory Press',
           date: '2026-11',
-          snippet: sentence,
-          highlightPhrase: sentence.split(' ').slice(0, 4).join(' ')
+          snippet: phrase,
+          highlightPhrase: phrase.split(' ').slice(0, 4).join(' ')
         } : undefined;
 
         // Map data metric if data_metric shot
@@ -258,7 +258,7 @@ export class DocumentaryNarrativeEngine {
           id: `shot_${String(shotCounter).padStart(3, '0')}`,
           shot_number: shotCounter,
           title: `${chap.title}: Shot ${sIndex + 1}`,
-          narration: sentence,
+          narration: phrase,
           duration: durationSec,
           startSec: accumulatedSec,
           endSec: +(accumulatedSec + durationSec).toFixed(1),
@@ -270,7 +270,7 @@ export class DocumentaryNarrativeEngine {
           media_url: asset?.local_path || '/videos/library/datacenter_tech.mp4',
           camera_movement: camMove,
           transition: (shotCounter % 4 === 0) ? 'whip_pan' : 'crossfade',
-          visual_description: `Cinematic 4K shot with ${camMove} motion representing ${sentence.slice(0, 60)}...`,
+          visual_description: `Cinematic 4K shot with ${camMove} motion representing ${phrase.slice(0, 60)}...`,
           archival_data: archivalData,
           data_metric: dataMetric,
           map_config: mapConfig,

@@ -269,45 +269,111 @@ export class CaptionStudioService {
     const scaleFactor = Math.max(0.5, targetWidth / baseWidth);
 
     const baseFontSize = customStyle?.fontSize && customStyle.fontSize !== 54 ? customStyle.fontSize : (targetWidth < targetHeight ? 68 : 44);
-    const baseOutlineWidth = customStyle?.outlineWidth !== undefined ? customStyle.outlineWidth : (template === 'outline-caption' ? 5 : (targetWidth < targetHeight ? 5 : 3));
+    const baseOutlineWidth = customStyle?.outlineWidth !== undefined ? customStyle.outlineWidth : (
+      ['outline-caption', 'gaming-captions', 'mrbeast-bold', 'hormozi-bold'].includes(template) ? 6 : (targetWidth < targetHeight ? 5 : 3)
+    );
     const baseShadowWidth = customStyle?.shadow !== undefined ? customStyle.shadow : (targetWidth < targetHeight ? 3 : 2);
-    // For vertical 9:16 reels, verticalMargin 480 positions caption beautifully in lower-middle (center-horizontal, slightly below center)
-    const baseVerticalMargin = (customStyle?.verticalOffset !== undefined && customStyle.verticalOffset !== 240 && customStyle.verticalOffset !== 750)
-      ? customStyle.verticalOffset
-      : (targetWidth < targetHeight ? 480 : 80);
+
+    // Vertical positioning / safe zones:
+    // 'bottom': 480px from bottom (9:16 portrait standard)
+    // 'center': targetHeight / 2 (or 960px)
+    // 'top': targetHeight - 240px (or 1600px)
+    // 'lower-third': 320px
+    let baseVerticalMargin = 480;
+    if (customStyle?.position === 'top') {
+      baseVerticalMargin = targetWidth < targetHeight ? 1620 : 920;
+    } else if (customStyle?.position === 'center') {
+      baseVerticalMargin = targetWidth < targetHeight ? 960 : 500;
+    } else if (customStyle?.position === 'lower-third') {
+      baseVerticalMargin = targetWidth < targetHeight ? 320 : 160;
+    } else if (customStyle?.verticalOffset !== undefined && customStyle.verticalOffset !== 240 && customStyle.verticalOffset !== 750) {
+      baseVerticalMargin = customStyle.verticalOffset;
+    } else if (targetWidth >= targetHeight) {
+      baseVerticalMargin = 80;
+    }
+
+    // Default typography mappings per preset
+    const defaultFonts: Record<string, string> = {
+      'minimal-montserrat': 'Montserrat',
+      'yellow-karaoke': 'Montserrat',
+      'mrbeast-bold': 'Montserrat',
+      'hormozi-bold': 'Montserrat',
+      'podcast-pro': 'Poppins',
+      'netflix-doc': 'Inter',
+      'viral-word-pop': 'Inter',
+      'typewriter': 'Courier New',
+      'modern-kinetic': 'Montserrat',
+      'clean-subtitle': 'Inter',
+      'yellow-box-highlight': 'Montserrat',
+      'premium-editorial': 'Playfair Display',
+      'gaming-captions': 'Oswald',
+      'neon-captions': 'Inter',
+      'cinematic-two-line': 'Inter',
+      'minimal-light': 'Montserrat',
+      'dynamic-bounce': 'Montserrat',
+      'news-broadcast': 'Inter',
+      'documentary-highlight': 'Playfair Display',
+      'gradient-accent': 'Poppins',
+      'centered-impact': 'Montserrat',
+      'split-captions': 'Inter',
+      'social-minimal': 'Inter',
+      'editorial-bold': 'Montserrat',
+      'documentary-serif': 'Playfair Display',
+      'magazine-paper': 'Georgia',
+      'hinglish-caption': 'Noto Sans Devanagari'
+    };
+
+    const defaultColors: Record<string, { primary: string; accent: string }> = {
+      'minimal-montserrat': { primary: '#FFFFFF', accent: '#FFD700' },
+      'yellow-karaoke': { primary: '#FFFFFF', accent: '#FFD700' },
+      'mrbeast-bold': { primary: '#FFFFFF', accent: '#FFDE00' },
+      'hormozi-bold': { primary: '#FFFFFF', accent: '#FFE600' },
+      'podcast-pro': { primary: '#FFFFFF', accent: '#FFD700' },
+      'netflix-doc': { primary: '#F0F0F0', accent: '#E50914' },
+      'viral-word-pop': { primary: '#FFFFFF', accent: '#FFD700' },
+      'typewriter': { primary: '#00FF66', accent: '#FFFFFF' },
+      'modern-kinetic': { primary: '#FFFFFF', accent: '#FF3B30' },
+      'clean-subtitle': { primary: '#FFFFFF', accent: '#CCCCCC' },
+      'yellow-box-highlight': { primary: '#FFFFFF', accent: '#FFD700' },
+      'premium-editorial': { primary: '#F5E6C8', accent: '#D4AF37' },
+      'gaming-captions': { primary: '#00F5FF', accent: '#FF0077' },
+      'neon-captions': { primary: '#00F5FF', accent: '#FF00AA' },
+      'cinematic-two-line': { primary: '#FFFFFF', accent: '#FFD700' },
+      'minimal-light': { primary: '#FFFFFF', accent: '#FFD700' },
+      'dynamic-bounce': { primary: '#FFFFFF', accent: '#FFD700' },
+      'news-broadcast': { primary: '#FFFFFF', accent: '#FF0000' },
+      'documentary-highlight': { primary: '#FFFFFF', accent: '#FFD700' },
+      'gradient-accent': { primary: '#FFFFFF', accent: '#00F5FF' },
+      'centered-impact': { primary: '#FFFFFF', accent: '#FFDE00' },
+      'split-captions': { primary: '#FFFFFF', accent: '#FFD700' },
+      'social-minimal': { primary: '#FFFFFF', accent: '#FFD700' },
+      'editorial-bold': { primary: '#FFFFFF', accent: '#FFD700' },
+      'karaoke-highlight': { primary: '#FFD700', accent: '#FF6B35' },
+      'neon-glow': { primary: '#00F5FF', accent: '#FF00AA' },
+      'fire-word': { primary: '#FF6B00', accent: '#FF0000' },
+      'magazine-paper': { primary: '#1A1A1A', accent: '#CC0000' }
+    };
+
+    const chosenFont = customStyle?.fontFamily || defaultFonts[template] || 'Inter';
+    const chosenColors = defaultColors[template] || { primary: '#FFFFFF', accent: '#FFD700' };
 
     const s = {
-      fontFamily: customStyle?.fontFamily || (
-        template === 'documentary-serif' ? 'Playfair Display' :
-        template === 'typewriter' ? 'Courier New' :
-        template === 'magazine-paper' ? 'Georgia' :
-        template === 'hinglish-caption' ? 'Noto Sans Devanagari' :
-        'Inter'
-      ),
+      fontFamily: chosenFont,
       fontSize: Math.round(baseFontSize * scaleFactor),
-      fontWeight: customStyle?.fontWeight || (['bold-keyword','outline-caption','neon-glow','fire-word','word-pop','chapter-caption'].includes(template) ? '900' : '700'),
-      primaryColor: customStyle?.color || (
-        template === 'karaoke-highlight' ? '#FFD700' :
-        template === 'neon-glow' ? '#00F5FF' :
-        template === 'fire-word' ? '#FF6B00' :
-        template === 'magazine-paper' ? '#1a1a1a' :
-        template === 'typewriter' ? '#00FF41' :
-        '#FFFFFF'
+      fontWeight: customStyle?.fontWeight || (
+        ['minimal-light'].includes(template) ? '400' :
+        ['bold-keyword','outline-caption','neon-glow','fire-word','word-pop','mrbeast-bold','hormozi-bold','gaming-captions','editorial-bold','centered-impact'].includes(template) ? '900' : '700'
       ),
-      accentColor: customStyle?.highlightColor || (
-        template === 'neon-glow' ? '#FF00AA' :
-        template === 'fire-word' ? '#FF0000' :
-        template === 'magazine-paper' ? '#CC0000' :
-        '#FF3B30'
-      ),
-      outlineColor: customStyle?.outlineColor || (
-        template === 'magazine-paper' ? '#F5F0E8' : '#000000'
-      ),
+      primaryColor: customStyle?.color || chosenColors.primary,
+      accentColor: customStyle?.highlightColor || chosenColors.accent,
+      outlineColor: customStyle?.outlineColor || (template === 'magazine-paper' ? '#F5F0E8' : '#000000'),
       outlineWidth: Math.max(1, Math.round(baseOutlineWidth * scaleFactor)),
       shadowWidth: Math.max(0, Math.round(baseShadowWidth * scaleFactor)),
-      alignment: customStyle?.alignment === 'center' ? 2 : customStyle?.alignment === 'left' ? 1 : 3,
+      alignment: customStyle?.alignment === 'left' ? 1 : customStyle?.alignment === 'right' ? 3 : 2,
       verticalMargin: Math.round(baseVerticalMargin * scaleFactor),
-      borderRadius: Math.round((customStyle?.borderRadius || 8) * scaleFactor)
+      letterSpacing: customStyle?.letterSpacing !== undefined ? customStyle.letterSpacing : (
+        ['cinematic-editorial', 'netflix-doc'].includes(template) ? 3 : 0
+      )
     };
 
     // Helper to convert hex #RRGGBB to ASS &H00BBGGRR
@@ -322,15 +388,21 @@ export class CaptionStudioService {
     const assPrimary = hexToAssColor(s.primaryColor, '00');
     const assSecondary = hexToAssColor(s.accentColor, '00');
     const assOutline = hexToAssColor(s.outlineColor, '00');
-    // BackColour (box background): opaque for boxed/news/cinematic, transparent for neon/outline
-    const assBack = (template === 'boxed-caption' || template === 'news-lower-third') ? '&H70000000&'
-      : template === 'cinematic-subtitle' ? '&HCC000000&'
-      : template === 'magazine-paper' ? '&HF0E8F5F0&'
-      : (template === 'neon-glow' || template === 'outline-caption' || template === 'fire-word') ? '&H00000000&'
-      : '&H80000000&';
+
+    // Box background formatting for boxed/news/netflix/yellow-box styles
+    const isBoxedStyle = [
+      'boxed-caption', 'news-lower-third', 'news-broadcast', 'cinematic-subtitle',
+      'netflix-doc', 'magazine-paper', 'yellow-box-highlight'
+    ].includes(template);
+
+    const assBack = isBoxedStyle
+      ? (template === 'magazine-paper' ? '&HF0E8F5F0&' : template === 'yellow-box-highlight' ? '&H0000D7FF&' : '&HCC000000&')
+      : (['neon-glow', 'neon-captions', 'outline-caption', 'fire-word'].includes(template) ? '&H00000000&' : '&H80000000&');
+
+    const borderStyleNum = isBoxedStyle ? 4 : 1;
 
     let assContent = `[Script Info]
-Title: Caption Studio Output
+Title: AI Viral Clipper Advanced Subtitles
 ScriptType: v4.00+
 PlayResX: ${targetWidth}
 PlayResY: ${targetHeight}
@@ -338,8 +410,8 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${s.fontFamily},${s.fontSize},${assPrimary},${assSecondary},${assOutline},${assBack},1,0,0,0,100,100,${template === 'cinematic-editorial' ? '3' : '0'},0,${(template === 'boxed-caption' || template === 'cinematic-subtitle' || template === 'magazine-paper' || template === 'news-lower-third') ? '4' : '1'},${s.outlineWidth},${s.shadowWidth},${s.alignment},40,40,${s.verticalMargin},1
-Style: Accent,${s.fontFamily},${s.fontSize},${assSecondary},${assPrimary},${assOutline},${assBack},1,0,0,0,100,100,0,0,1,${s.outlineWidth},${s.shadowWidth},${s.alignment},40,40,${s.verticalMargin},1
+Style: Default,${s.fontFamily},${s.fontSize},${assPrimary},${assSecondary},${assOutline},${assBack},1,0,0,0,100,100,${s.letterSpacing},0,${borderStyleNum},${s.outlineWidth},${s.shadowWidth},${s.alignment},40,40,${s.verticalMargin},1
+Style: Accent,${s.fontFamily},${s.fontSize},${assSecondary},${assPrimary},${assOutline},${assBack},1,0,0,0,100,100,${s.letterSpacing},0,${borderStyleNum},${s.outlineWidth},${s.shadowWidth},${s.alignment},40,40,${s.verticalMargin},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -356,6 +428,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       cleanSegments.push(seg);
     }
 
+    const highlightMode = customStyle?.highlightMode || (
+      ['yellow-karaoke', 'karaoke-highlight', 'word-pop', 'viral-word-pop', 'fire-word', 'dynamic-bounce'].includes(template)
+        ? 'word-by-word'
+        : ['clean-subtitle', 'netflix-doc'].includes(template)
+        ? 'no-highlighting'
+        : 'keyword-emphasis'
+    );
+
     for (const seg of cleanSegments) {
       const formatTime = (sec: number) => {
         const h = Math.floor(sec / 3600);
@@ -368,74 +448,75 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       const startStr = formatTime(seg.start);
       const endStr = formatTime(seg.end);
 
-      let textFormatted = seg.text;
+      let textFormatted = seg.text.trim();
 
-      // Template-specific ASS formatting
-      if (template === 'news-lower-third') {
-        textFormatted = `{\\an2\\b1}[REPORT] {\\b0}${textFormatted}`;
-      } else if (template === 'bold-keyword') {
-        const words = textFormatted.split(' ');
-        if (words.length > 2) {
-          words[1] = `{\\c${assSecondary}\\b1}${words[1]}{\\c${assPrimary}\\b0}`;
-          textFormatted = words.join(' ');
-        }
-      } else if (template === 'karaoke-highlight' && seg.words && seg.words.length > 0) {
+      // Apply Highlighting Modes
+      if (highlightMode === 'no-highlighting') {
+        // Plain clean text
+        textFormatted = `{\\b1}${textFormatted}`;
+      } else if (highlightMode === 'word-by-word' && seg.words && seg.words.length > 0) {
+        // Karaoke word-by-word progressive reveal
         let kText = '';
         for (const w of seg.words) {
           const durCs = Math.max(1, Math.round((w.end - w.start) * 100));
-          kText += `{\\kf${durCs}}${w.word} `;
-        }
-        textFormatted = kText.trim();
-      } else if (template === 'hinglish-caption') {
-        // Force Devanagari-compatible font and larger size for Hindi text
-        textFormatted = `{\\fnNoto Sans Devanagari\\fs${Math.round(s.fontSize * 1.1)}}${textFormatted}`;
-      } else if (template === 'chapter-caption') {
-        textFormatted = `{\\fs${Math.round(s.fontSize * 1.3)}\\b1}OVERVIEW\\N{\\fs${s.fontSize}\\b0}${textFormatted}`;
-      } else if (template === 'neon-glow') {
-        // Neon glow: use primary cyan color + blur tag for glow effect
-        // ASS \blur simulates glow — apply it to the whole line
-        textFormatted = `{\\blur6\\b1\\c${assPrimary}}${textFormatted}{\\blur0}`;
-      } else if (template === 'cinematic-subtitle') {
-        // Netflix/Prime style: clean white, centered, opaque dark bar (handled via BackColour in style)
-        // Keep text clean, 2-line max enforced in wrap
-        textFormatted = `{\\an2\\b0}${textFormatted}`;
-      } else if (template === 'magazine-paper') {
-        // Magazine cut-out: mixed weights, serif font forced
-        const words = textFormatted.split(' ');
-        const formatted = words.map((w, i) =>
-          i % 3 === 0 ? `{\\b1\\fs${Math.round(s.fontSize * 1.1)}}${w}{\\b0\\fs${s.fontSize}}` : w
-        ).join(' ');
-        textFormatted = `{\\fnGeorgia}${formatted}`;
-      } else if (template === 'fire-word') {
-        // Fire words: each word flickers orange→red using karaoke timing or static
-        if (seg.words && seg.words.length > 0) {
-          let fireText = '';
-          for (const w of seg.words) {
-            const durCs = Math.max(1, Math.round((w.end - w.start) * 100));
-            // Alternate between orange and red for drama
-            fireText += `{\\kf${durCs}\\c${assSecondary}}${w.word} `;
+          if (template === 'viral-word-pop' || template === 'dynamic-bounce') {
+            kText += `{\\kf${durCs}\\t(0,${Math.min(durCs * 5, 120)},\\fscx112\\fscy112)\\t(${Math.min(durCs * 5, 120)},${durCs * 10},\\fscx100\\fscy100)}${w.word} `;
+          } else {
+            kText += `{\\kf${durCs}}${w.word} `;
           }
-          textFormatted = `{\\b1}${fireText.trim()}`;
-        } else {
-          // Fallback: highlight every other word in accent color
-          const words = textFormatted.split(' ');
-          textFormatted = `{\\b1}` + words.map((w, i) =>
-            i % 2 === 0 ? `{\\c${assSecondary}}${w}` : `{\\c${assPrimary}}${w}`
-          ).join(' ');
         }
-      } else if (template === 'word-pop') {
-        // Word pop: use karaoke timing if available for word-by-word display
-        if (seg.words && seg.words.length > 0) {
-          let popText = '';
-          for (const w of seg.words) {
-            const durCs = Math.max(1, Math.round((w.end - w.start) * 100));
-            popText += `{\\kf${durCs}}${w.word} `;
-          }
-          textFormatted = `{\\b1}${popText.trim()}`;
+        textFormatted = `{\\b1}${kText.trim()}`;
+      } else if (highlightMode === 'phrase-by-phrase' && seg.words && seg.words.length > 3) {
+        // Highlight in 3-4 word phrase chunks
+        const chunks: string[] = [];
+        const words = seg.words;
+        for (let i = 0; i < words.length; i += 3) {
+          const chunkWords = words.slice(i, i + 3);
+          const chunkDurCs = Math.max(1, Math.round((chunkWords[chunkWords.length - 1].end - chunkWords[0].start) * 100));
+          chunks.push(`{\\kf${chunkDurCs}}${chunkWords.map(w => w.word).join(' ')}`);
+        }
+        textFormatted = `{\\b1}${chunks.join(' ')}`;
+      } else if (highlightMode === 'entire-sentence') {
+        textFormatted = `{\\c${assSecondary}\\b1}${textFormatted}`;
+      } else {
+        // 'keyword-emphasis' mode: highlight 1-2 impactful words in accent color
+        const words = textFormatted.split(/\s+/);
+        if (words.length > 2) {
+          // Find longest or most impactful word to highlight
+          let bestIdx = 1;
+          let maxLen = 0;
+          words.forEach((w, idx) => {
+            const cleanW = w.replace(/[^\w]/g, '');
+            if (cleanW.length > maxLen) {
+              maxLen = cleanW.length;
+              bestIdx = idx;
+            }
+          });
+          words[bestIdx] = `{\\c${assSecondary}\\b1}${words[bestIdx]}{\\c${assPrimary}\\b0}`;
+          textFormatted = words.join(' ');
         }
       }
 
-      // Escape ASS braces and line breaks
+      // Template-specific signature treatments
+      if (template === 'news-lower-third' || template === 'news-broadcast') {
+        textFormatted = `{\\an2\\b1\\c&H0000FF&}[BREAKING] {\\c${assPrimary}\\b1}${textFormatted}`;
+      } else if (template === 'typewriter') {
+        textFormatted = `{\\fnCourier New\\b1}${textFormatted}_`;
+      } else if (template === 'neon-glow' || template === 'neon-captions') {
+        textFormatted = `{\\blur7\\b1\\c${assPrimary}}${textFormatted}{\\blur0}`;
+      } else if (template === 'hinglish-caption') {
+        textFormatted = `{\\fnNoto Sans Devanagari\\fs${Math.round(s.fontSize * 1.08)}}${textFormatted}`;
+      } else if (template === 'chapter-caption') {
+        textFormatted = `{\\fs${Math.round(s.fontSize * 1.35)}\\c${assSecondary}\\b1}CHAPTER\\N{\\fs${s.fontSize}\\c${assPrimary}\\b0}${textFormatted}`;
+      } else if (template === 'cinematic-two-line' || template === 'split-captions') {
+        textFormatted = `{\\an2\\q2}${textFormatted}`;
+      } else if (template === 'centered-impact') {
+        textFormatted = `{\\an5\\fs${Math.round(s.fontSize * 1.15)}\\b1}${textFormatted}`;
+      } else if (template === 'yellow-box-highlight') {
+        textFormatted = `{\\c&H000000&\\3c&H00D7FF&\\b1}${textFormatted}`;
+      }
+
+      // Escape line breaks for ASS
       const safeText = textFormatted.replace(/\r?\n/g, '\\N');
       assContent += `Dialogue: 0,${startStr},${endStr},Default,,0,0,0,,${safeText}\n`;
     }

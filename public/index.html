@@ -11,7 +11,7 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,800;1,600;1,800&family=Noto+Sans+Devanagari:wght@400;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,700&family=Noto+Sans+Devanagari:wght@400;600;700;800&family=Oswald:wght@500;600;700&family=Playfair+Display:ital,wght@0,600;0,800;1,600;1,800&family=Poppins:wght@400;500;600;700;800;900&family=Roboto:wght@400;500;700;900&family=Space+Grotesk:wght@500;700&display=swap');
     body {
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
       user-select: none;
@@ -62,26 +62,60 @@
       { id: 'AI, Technology and Innovation', name: 'AI & Deep Tech', icon: 'cpu', desc: 'Transformer models, robotics, neural hardware and future computing.' }
     ];
 
+    const CAMERA_PRESETS = [
+      { id: 'automatic_smart_zoom',     name: 'Automatic Smart Zoom',      emoji: '🤖', desc: 'Smooth cosine S-curve zoom toward speaker face.' },
+      { id: 'cinematic_slow_zoom_in',   name: 'Cinematic Slow Zoom In',    emoji: '🔍', desc: 'Continuous slow push-in building cinematic tension.' },
+      { id: 'cinematic_slow_zoom_out',  name: 'Cinematic Slow Zoom Out',   emoji: '🔭', desc: 'Starts close and pulls back smoothly to wide.' },
+      { id: 'smooth_face_tracking',     name: 'Smooth Face Tracking',      emoji: '👤', desc: 'Maintains optimal headroom and subject face centering.' },
+      { id: 'dynamic_speaker_zoom',     name: 'Dynamic Speaker Zoom',      emoji: '🎙️', desc: 'Organic breathing zoom matching speech cadence.' },
+      { id: 'podcast_focus_zoom',       name: 'Podcast Focus Zoom',        emoji: '🎧', desc: 'Snappy ease-in to speaker close-up with locked focus.' },
+      { id: 'punch_in_zoom',            name: 'Punch-In Zoom',             emoji: '💥', desc: 'Instant smooth 15-frame punch into subject.' },
+      { id: 'subtle_camera_push',       name: 'Subtle Camera Push',        emoji: '🎥', desc: 'Ultra-gentle 1.05x camera push for subtle depth.' },
+      { id: 'wide_to_close_transition', name: 'Wide-to-Close Transition',  emoji: '📐', desc: 'Dramatic push from wide establishing shot to close-up.' },
+      { id: 'documentary_camera_movement', name: 'Documentary Movement',   emoji: '📽️', desc: 'Slow organic drift with subtle horizontal motion.' },
+      { id: 'reaction_shot_focus',      name: 'Reaction Shot Focus',       emoji: '👀', desc: 'Holds wide then punches in on punchlines.' },
+      { id: 'static_professional_frame',name: 'Static Locked Frame',       emoji: '🔒', desc: 'Zero motion, locked tripod broadcast framing.' }
+    ];
+
     const CAPTION_TEMPLATES = [
-      { id: 'word-pop',           name: 'Word Pop',          emoji: '💥', desc: 'Each word pops in with scale animation — classic viral style.', preview: { bg: '#1a1a2e', text: '#FFFFFF', accent: '#FFD700', style: 'font-black text-2xl' } },
-      { id: 'karaoke-highlight',  name: 'Karaoke',           emoji: '🎤', desc: 'Word-by-word golden highlight as audio plays.', preview: { bg: '#0d0d0d', text: '#FFD700', accent: '#FF6B35', style: 'font-bold text-2xl' } },
-      { id: 'bold-keyword',       name: 'Bold Keyword',      emoji: '🔥', desc: 'Large bold text with one keyword in accent color.', preview: { bg: '#12121f', text: '#FFFFFF', accent: '#FF3B30', style: 'font-black text-2xl' } },
-      { id: 'neon-glow',          name: 'Neon Glow',         emoji: '✨', desc: 'Glowing cyan/magenta neon text — eye-catching night style.', preview: { bg: '#050510', text: '#00F5FF', accent: '#FF00AA', style: 'font-black text-2xl', glow: '#00F5FF' } },
-      { id: 'cinematic-subtitle', name: 'Netflix Style',     emoji: '🎬', desc: 'Dark bar at bottom, white clean text — Netflix/Prime style.', preview: { bg: 'rgba(0,0,0,0.85)', text: '#FFFFFF', accent: '#E50914', style: 'font-semibold text-xl' } },
-      { id: 'magazine-paper',     name: 'Magazine Cut',      emoji: '📰', desc: 'Newspaper cutout aesthetic — serif font, mixed weights.', preview: { bg: '#F5F0E8', text: '#1a1a1a', accent: '#CC0000', style: 'font-serif font-bold text-xl' } },
-      { id: 'fire-word',          name: 'Fire Words',        emoji: '🔴', desc: 'Words ignite in orange→red gradient with glow shadow.', preview: { bg: '#0a0a0a', text: '#FF6B00', accent: '#FF0000', style: 'font-black text-2xl' } },
-      { id: 'outline-caption',    name: 'Outline',           emoji: '⬜', desc: 'Heavy dark stroke outline for readability over any footage.', preview: { bg: 'transparent', text: '#FFFFFF', accent: '#000000', style: 'font-black text-2xl stroke' } },
-      { id: 'boxed-caption',      name: 'Boxed',             emoji: '⬛', desc: 'Semi-transparent dark box behind each caption line.', preview: { bg: 'rgba(0,0,0,0.7)', text: '#FFFFFF', accent: '#FFD700', style: 'font-bold text-xl' } },
-      { id: 'news-lower-third',   name: 'Breaking News',     emoji: '📺', desc: 'Broadcast news lower-third banner with red topic pill.', preview: { bg: '#001B6B', text: '#FFFFFF', accent: '#FF0000', style: 'font-bold text-lg' } },
-      { id: 'highlight-bar',      name: 'Highlight Bar',     emoji: '🟡', desc: 'Colored pill background expands behind each phrase.', preview: { bg: '#FFD700', text: '#000000', accent: '#FF6B35', style: 'font-black text-xl' } },
-      { id: 'minimal-white',      name: 'Minimal White',     emoji: '🤍', desc: 'Clean white typography with subtle shadow — timeless.', preview: { bg: 'transparent', text: '#FFFFFF', accent: '#CCCCCC', style: 'font-semibold text-xl' } },
-      { id: 'documentary-serif',  name: 'Documentary',       emoji: '🎥', desc: 'Playfair Display serif — warm, editorial, classic.', preview: { bg: 'transparent', text: '#F5E6C8', accent: '#D4A853', style: 'font-serif text-xl' } },
-      { id: 'typewriter',         name: 'Typewriter',        emoji: '⌨️', desc: 'Monospaced character-by-character reveal — hacker style.', preview: { bg: '#001100', text: '#00FF41', accent: '#00CC33', style: 'font-mono text-lg' } },
-      { id: 'hinglish-caption',   name: 'Hindi / Hinglish',  emoji: '🇮🇳', desc: 'Noto Sans Devanagari font — perfect for Hindi and Hinglish.', preview: { bg: '#FF9933', text: '#FFFFFF', accent: '#138808', style: 'font-bold text-xl' } },
-      { id: 'cinematic-editorial',name: 'Cinematic',         emoji: '🎞️', desc: 'Wide tracking, uppercase lettering, slow upward drift.', preview: { bg: 'transparent', text: '#E8DCC8', accent: '#C0A060', style: 'font-semibold tracking-widest uppercase text-lg' } },
-      { id: 'clean-two-line',     name: 'Two-Line Clean',    emoji: '📋', desc: 'Strict two-line wrap with TV safe margin constraints.', preview: { bg: 'transparent', text: '#FFFFFF', accent: '#AAAAAA', style: 'font-semibold text-xl' } },
-      { id: 'minimal-center',     name: 'Center Explainer',  emoji: '📌', desc: 'Centered subtitles with rounded pill — YouTube explainer.', preview: { bg: 'rgba(0,0,0,0.6)', text: '#FFFFFF', accent: '#4ECDC4', style: 'font-semibold text-xl' } },
-      { id: 'chapter-caption',    name: 'Chapter Title',     emoji: '📖', desc: 'Large section heading above concise subtitles.', preview: { bg: 'transparent', text: '#FFFFFF', accent: '#FFD700', style: 'font-black text-2xl' } },
+      { id: 'minimal-montserrat', name: 'Minimal Montserrat', styleNum: '01', emoji: '✨', desc: 'Montserrat Medium, clean white with yellow highlights, timeless documentary look.', font: 'Montserrat', preview: { bg: '#101018', text: '#FFFFFF', accent: '#FFD700', style: 'font-medium text-xl' } },
+      { id: 'yellow-karaoke',     name: 'Yellow Karaoke',     styleNum: '02', emoji: '🎤', desc: 'Word-by-word active word turns yellow, inactive remains crisp white.', font: 'Montserrat', preview: { bg: '#0c0c0c', text: '#FFD700', accent: '#FFFFFF', style: 'font-bold text-xl' } },
+      { id: 'mrbeast-bold',       name: 'MrBeast Inspired',   styleNum: '03', emoji: '⚡', desc: 'Bold thick typography, large animated keywords, high contrast punchy highlights.', font: 'Montserrat', preview: { bg: '#111827', text: '#FFFFFF', accent: '#FFDE00', style: 'font-black text-2xl uppercase' } },
+      { id: 'hormozi-bold',       name: 'Hormozi Bold',       styleNum: '04', emoji: '🔥', desc: 'Heavy bold typography, white words with vivid yellow keywords, tight tracking.', font: 'Montserrat', preview: { bg: '#0f172a', text: '#FFFFFF', accent: '#FFE600', style: 'font-black tracking-tight text-2xl uppercase' } },
+      { id: 'podcast-pro',        name: 'Podcast Pro',        styleNum: '05', emoji: '🎙️', desc: 'Clean modern typography, medium weight, white captions with subtle yellow highlights.', font: 'Poppins', preview: { bg: '#18181b', text: '#FFFFFF', accent: '#FFD700', style: 'font-semibold text-xl' } },
+      { id: 'netflix-doc',        name: 'Netflix Documentary',styleNum: '06', emoji: '🎬', desc: 'Elegant typography, white text, subtle letter spacing and dark lower bar.', font: 'Inter', preview: { bg: 'rgba(0,0,0,0.85)', text: '#F0F0F0', accent: '#E50914', style: 'font-medium tracking-wide text-lg' } },
+      { id: 'viral-word-pop',     name: 'Viral Word Pop',     styleNum: '07', emoji: '💥', desc: 'Active word enters with scale pop animation, yellow and white contrast.', font: 'Inter', preview: { bg: '#1e1b4b', text: '#FFFFFF', accent: '#FFD700', style: 'font-black text-2xl' } },
+      { id: 'typewriter',         name: 'Typewriter',         styleNum: '08', emoji: '⌨️', desc: 'Monospaced progressive typing effect with glowing terminal green or white text.', font: 'Courier New', preview: { bg: '#022c22', text: '#00FF66', accent: '#FFFFFF', style: 'font-mono font-bold text-lg' } },
+      { id: 'modern-kinetic',     name: 'Modern Kinetic',     styleNum: '09', emoji: '🚀', desc: 'Dynamic typography, rapid word entries, variable text emphasis.', font: 'Montserrat', preview: { bg: '#1e293b', text: '#FFFFFF', accent: '#FF3B30', style: 'font-extrabold text-2xl' } },
+      { id: 'clean-subtitle',     name: 'Clean Subtitle',     styleNum: '10', emoji: '🤍', desc: 'Simple white text, subtle shadow, zero distractions, maximum readability.', font: 'Inter', preview: { bg: 'transparent', text: '#FFFFFF', accent: '#CCCCCC', style: 'font-semibold text-xl' } },
+      { id: 'yellow-box-highlight', name: 'Yellow Box Highlight', styleNum: '11', emoji: '🟨', desc: 'Active word framed inside a bright yellow background box with black text.', font: 'Montserrat', preview: { bg: '#FFD700', text: '#000000', accent: '#FFFFFF', style: 'font-black text-xl' } },
+      { id: 'premium-editorial',  name: 'Premium Editorial',  styleNum: '12', emoji: '📰', desc: 'Playfair Display serif styling with warm cream tones and classic gold accents.', font: 'Playfair Display', preview: { bg: '#1c1917', text: '#F5E6C8', accent: '#D4AF37', style: 'font-serif text-xl' } },
+      { id: 'gaming-captions',    name: 'Gaming Captions',    styleNum: '13', emoji: '🎮', desc: 'Heavy bold font, thick text outlines, high-contrast electric neon highlights.', font: 'Oswald', preview: { bg: '#030712', text: '#00F5FF', accent: '#FF0077', style: 'font-black uppercase tracking-wider text-2xl' } },
+      { id: 'neon-captions',      name: 'Neon Captions',      styleNum: '14', emoji: '✨', desc: 'Modern glowing text with controlled cyan and magenta neon glow aura.', font: 'Inter', preview: { bg: '#050510', text: '#00F5FF', accent: '#FF00AA', style: 'font-black text-2xl', glow: '#00F5FF' } },
+      { id: 'cinematic-two-line', name: 'Cinematic Two-Line', styleNum: '15', emoji: '🎞️', desc: 'Strict two-line wrap with safe margins and golden keyword highlights.', font: 'Inter', preview: { bg: 'rgba(0,0,0,0.6)', text: '#FFFFFF', accent: '#FFD700', style: 'font-semibold text-lg' } },
+      { id: 'minimal-light',      name: 'Minimal Light',      styleNum: '16', emoji: '💡', desc: 'Montserrat Light (300 weight), thin clean modern look with delicate yellow accents.', font: 'Montserrat', preview: { bg: 'transparent', text: '#FFFFFF', accent: '#FFD700', style: 'font-light tracking-wide text-xl' } },
+      { id: 'dynamic-bounce',     name: 'Dynamic Bounce',     styleNum: '17', emoji: '🎾', desc: 'Word-by-word entrance with subtle elastic bounce and active emphasis.', font: 'Montserrat', preview: { bg: '#111827', text: '#FFFFFF', accent: '#FFD700', style: 'font-extrabold text-2xl' } },
+      { id: 'news-broadcast',     name: 'News Broadcast',     styleNum: '18', emoji: '📺', desc: 'Lower-third broadcast banner layout with red topic pill and ticker typography.', font: 'Inter', preview: { bg: '#001B6B', text: '#FFFFFF', accent: '#FF0000', style: 'font-bold text-lg' } },
+      { id: 'documentary-highlight', name: 'Documentary Highlight', styleNum: '19', emoji: '📽️', desc: 'Clean white text with warm yellow keyword accents and smooth transitions.', font: 'Playfair Display', preview: { bg: 'transparent', text: '#FFFFFF', accent: '#FFD700', style: 'font-serif text-xl' } },
+      { id: 'gradient-accent',    name: 'Gradient Accent',    styleNum: '20', emoji: '🌈', desc: 'White typography with modern cyan-to-purple gradient keyword accents.', font: 'Poppins', preview: { bg: '#0f172a', text: '#FFFFFF', accent: '#38BDF8', style: 'font-bold text-xl' } },
+      { id: 'centered-impact',    name: 'Centered Impact',    styleNum: '21', emoji: '🎯', desc: 'Large centered punchy captions, powerful phrase-based appearance.', font: 'Montserrat', preview: { bg: 'rgba(0,0,0,0.7)', text: '#FFFFFF', accent: '#FFDE00', style: 'font-black uppercase text-2xl' } },
+      { id: 'split-captions',     name: 'Split Captions',     styleNum: '22', emoji: '✂️', desc: 'Dynamic two-line composition with active line highlighted in yellow.', font: 'Inter', preview: { bg: 'transparent', text: '#FFFFFF', accent: '#FFD700', style: 'font-bold text-xl' } },
+      { id: 'social-minimal',     name: 'Social Media Minimal',styleNum: '23', emoji: '📱', desc: 'Medium typography, readable white text, subtle shadow, Reels/Shorts optimized.', font: 'Inter', preview: { bg: 'transparent', text: '#FFFFFF', accent: '#FFD700', style: 'font-medium text-xl' } },
+      { id: 'editorial-bold',     name: 'Editorial Bold',     styleNum: '24', emoji: '🖋️', desc: 'Strong modern typography, carefully spaced words with yellow keyword highlights.', font: 'Montserrat', preview: { bg: '#18181b', text: '#FFFFFF', accent: '#FFD700', style: 'font-black text-2xl' } },
+      { id: 'custom-pro',         name: 'Custom Professional',styleNum: '25', emoji: '⚙️', desc: 'Fully user-defined typography, colors, positioning, animation, and weights.', font: 'Inter', preview: { bg: '#1e1b4b', text: '#FFFFFF', accent: '#818CF8', style: 'font-bold text-xl' } },
+      // Legacy compatibility aliases
+      { id: 'word-pop',           name: 'Word Pop (Classic)', styleNum: '07', emoji: '💥', desc: 'Legacy word pop preset.', font: 'Inter', preview: { bg: '#1a1a2e', text: '#FFFFFF', accent: '#FFD700', style: 'font-black text-2xl' } },
+      { id: 'karaoke-highlight',  name: 'Karaoke (Classic)',  styleNum: '02', emoji: '🎤', desc: 'Legacy karaoke highlight.', font: 'Montserrat', preview: { bg: '#0d0d0d', text: '#FFD700', accent: '#FF6B35', style: 'font-bold text-2xl' } },
+      { id: 'bold-keyword',       name: 'Bold Keyword (Classic)', styleNum: '04', emoji: '🔥', desc: 'Legacy bold keyword.', font: 'Montserrat', preview: { bg: '#12121f', text: '#FFFFFF', accent: '#FF3B30', style: 'font-black text-2xl' } },
+      { id: 'neon-glow',          name: 'Neon Glow (Classic)', styleNum: '14', emoji: '✨', desc: 'Legacy neon glow.', font: 'Inter', preview: { bg: '#050510', text: '#00F5FF', accent: '#FF00AA', style: 'font-black text-2xl', glow: '#00F5FF' } },
+      { id: 'cinematic-subtitle', name: 'Netflix (Classic)',  styleNum: '06', emoji: '🎬', desc: 'Legacy Netflix subtitle.', font: 'Inter', preview: { bg: 'rgba(0,0,0,0.85)', text: '#FFFFFF', accent: '#E50914', style: 'font-semibold text-xl' } },
+      { id: 'magazine-paper',     name: 'Magazine Cut',       styleNum: '12', emoji: '📰', desc: 'Legacy magazine cutout.', font: 'Georgia', preview: { bg: '#F5F0E8', text: '#1a1a1a', accent: '#CC0000', style: 'font-serif font-bold text-xl' } },
+      { id: 'fire-word',          name: 'Fire Words',         styleNum: '07', emoji: '🔴', desc: 'Legacy fire words.', font: 'Montserrat', preview: { bg: '#0a0a0a', text: '#FF6B00', accent: '#FF0000', style: 'font-black text-2xl' } },
+      { id: 'outline-caption',    name: 'Outline Caption',    styleNum: '13', emoji: '⬜', desc: 'Heavy dark stroke outline.', font: 'Oswald', preview: { bg: 'transparent', text: '#FFFFFF', accent: '#000000', style: 'font-black text-2xl stroke' } },
+      { id: 'boxed-caption',      name: 'Boxed Caption',      styleNum: '11', emoji: '⬛', desc: 'Semi-transparent box.', font: 'Inter', preview: { bg: 'rgba(0,0,0,0.7)', text: '#FFFFFF', accent: '#FFD700', style: 'font-bold text-xl' } },
+      { id: 'news-lower-third',   name: 'Breaking News',      styleNum: '18', emoji: '📺', desc: 'Broadcast lower third.', font: 'Inter', preview: { bg: '#001B6B', text: '#FFFFFF', accent: '#FF0000', style: 'font-bold text-lg' } },
+      { id: 'hinglish-caption',   name: 'Hindi / Hinglish',   styleNum: '01', emoji: '🇮🇳', desc: 'Devanagari Unicode.', font: 'Noto Sans Devanagari', preview: { bg: '#FF9933', text: '#FFFFFF', accent: '#138808', style: 'font-bold text-xl' } },
+      { id: 'chapter-caption',    name: 'Chapter Title',      styleNum: '21', emoji: '📖', desc: 'Section heading.', font: 'Montserrat', preview: { bg: 'transparent', text: '#FFFFFF', accent: '#FFD700', style: 'font-black text-2xl' } }
     ];
 
     // ==========================================
@@ -617,7 +651,11 @@
                   }}
                   muted={isMuted}
                   playsInline
-                  class={`relative z-10 ${
+                  style={(!isRendered && (clip.custom_style || {}).cameraPreset !== 'static_professional_frame' && isPlaying)
+                    ? { transform: `scale(${parseFloat((clip.custom_style || {}).zoomIntensity || 1.15)})`, transition: 'transform 3s cubic-bezier(0.25, 1, 0.5, 1)' }
+                    : { transform: 'scale(1)', transition: 'transform 0.5s ease-out' }
+                  }
+                  class={`relative z-10 transition-transform origin-[50%_36%] ${
                     reframingMode === 'center_crop'
                       ? 'w-full h-full object-cover'
                       : reframingMode === 'split_screen'
@@ -626,20 +664,52 @@
                   }`}
                 />
 
-                {/* 3. Live Animated Caption Overlay (Simulating template before render) */}
-                {activeSubtitle && (
-                  <div class="absolute bottom-12 left-3 right-3 z-20 text-center pointer-events-none">
-                    <span class="inline-block px-3 py-1.5 rounded-lg bg-black/85 backdrop-blur-md text-amber-300 font-extrabold text-xs sm:text-sm tracking-wide border border-amber-400/40 shadow-xl uppercase animate-pulse">
-                      {activeSubtitle}
-                    </span>
-                  </div>
-                )}
+                {/* 3. Live Animated Caption Overlay (Simulating selected preset in real-time) */}
+                {activeSubtitle && (() => {
+                  const cs = clip.custom_style || {};
+                  const pos = cs.position || 'bottom';
+                  const posClass = pos === 'top' ? 'top-10' : pos === 'center' ? 'top-1/2 -translate-y-1/2' : pos === 'lower-third' ? 'bottom-24' : 'bottom-10';
+                  const fontFam = cs.fontFamily || 'Montserrat';
+                  const highlightCol = cs.highlightColor || '#FFD700';
+                  const textCol = cs.color || '#FFFFFF';
+                  const words = activeSubtitle.split(' ');
+                  return (
+                    <div class={`absolute ${posClass} left-3 right-3 z-20 text-center pointer-events-none transition-all`}>
+                      <span
+                        class="inline-block px-3 py-1.5 rounded-lg font-black text-xs sm:text-sm tracking-wide shadow-2xl"
+                        style={{
+                          backgroundColor: ['boxed-caption','netflix-doc','news-broadcast','yellow-box-highlight','yellow-karaoke'].includes(clip.caption_template) ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.65)',
+                          color: textCol,
+                          fontFamily: `${fontFam}, sans-serif`,
+                          border: `1px solid rgba(255,255,255,0.18)`
+                        }}
+                      >
+                        {words.map((w, i) => (
+                          <span
+                            key={i}
+                            style={{
+                              color: (i === 1 || i === words.length - 1) ? highlightCol : textCol,
+                              margin: '0 2px'
+                            }}
+                          >
+                            {w}
+                          </span>
+                        ))}
+                      </span>
+                    </div>
+                  );
+                })()}
 
-                {/* 4. Live Reframing Badge */}
-                <div class="absolute top-3 left-3 z-20">
+                {/* 4. Live Reframing & Smart Camera Badge */}
+                <div class="absolute top-3 left-3 z-20 flex flex-col space-y-1">
                   <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-900/90 text-indigo-300 border border-indigo-700/60 backdrop-blur-md">
                     {reframingMode === 'blur_background' ? '🎬 Live Blurred Backdrop' : reframingMode === 'center_crop' ? '🎯 Center Crop' : '👥 Split-Screen'}
                   </span>
+                  {(clip.custom_style || {}).cameraPreset && (clip.custom_style || {}).cameraPreset !== 'static_professional_frame' && (
+                    <span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-cyan-950/90 text-cyan-300 border border-cyan-700/60 backdrop-blur-md">
+                      📹 {((clip.custom_style || {}).cameraPreset || '').replace(/_/g, ' ')}
+                    </span>
+                  )}
                 </div>
               </div>
             ) : (
@@ -3555,88 +3625,201 @@
                                 </div>
                               </div>
 
-                              {/* ===== CAPTION STYLE STUDIO ===== */}
-                              <div class="bg-slate-950 border border-indigo-800/50 rounded-xl p-3 space-y-3">
+                              {/* ===== 1. AI SMART SPEAKER CAMERA — AUTO ZOOM & TRACKING ===== */}
+                              <div class="bg-slate-950 border border-cyan-900/60 rounded-xl p-3 space-y-3">
                                 <div class="flex items-center justify-between">
-                                  <span class="text-xs font-bold text-indigo-300 uppercase tracking-wider">✨ Caption Style Studio</span>
-                                  <span class="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">{CAPTION_TEMPLATES.length} styles</span>
+                                  <div class="flex items-center space-x-1.5">
+                                    <span class="text-sm">📹</span>
+                                    <span class="text-xs font-bold text-cyan-300 uppercase tracking-wider">Smart Speaker Camera & Zoom</span>
+                                  </div>
+                                  <span class="text-[9px] bg-cyan-950 text-cyan-400 border border-cyan-800/60 px-2 py-0.5 rounded-full font-mono font-semibold">Face Track • Easing</span>
                                 </div>
 
-                                {/* Style Gallery Cards */}
-                                <div class="grid grid-cols-2 gap-1.5 max-h-56 overflow-y-auto pr-0.5" style={{scrollbarWidth:'thin', scrollbarColor:'#334155 transparent'}}>
+                                {/* Camera Preset Selector (12 Presets) */}
+                                <div>
+                                  <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Camera Movement Preset (12)</label>
+                                  <select
+                                    value={(selectedClip.custom_style || {}).cameraPreset || 'automatic_smart_zoom'}
+                                    onChange={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), cameraPreset: e.target.value } })}
+                                    class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-cyan-200 focus:outline-none focus:border-cyan-500"
+                                  >
+                                    {CAMERA_PRESETS.map(p => (
+                                      <option key={p.id} value={p.id}>{p.emoji} {p.name}</option>
+                                    ))}
+                                  </select>
+                                  <p class="text-[10px] text-slate-500 mt-1 italic">
+                                    {(CAMERA_PRESETS.find(p => p.id === ((selectedClip.custom_style || {}).cameraPreset || 'automatic_smart_zoom')) || CAMERA_PRESETS[0]).desc}
+                                  </p>
+                                </div>
+
+                                {/* Zoom Intensity Presets */}
+                                <div>
+                                  <div class="flex items-center justify-between mb-1">
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Zoom Intensity</label>
+                                    <span class="text-[11px] font-mono text-cyan-400 font-bold">
+                                      {parseFloat((selectedClip.custom_style || {}).zoomIntensity || 1.15).toFixed(2)}x
+                                    </span>
+                                  </div>
+                                  <div class="grid grid-cols-4 gap-1 mb-2">
+                                    {[
+                                      { label: 'Subtle', val: 1.05 },
+                                      { label: 'Natural', val: 1.10 },
+                                      { label: 'Medium', val: 1.20 },
+                                      { label: 'Strong', val: 1.30 }
+                                    ].map(z => {
+                                      const currentZ = parseFloat((selectedClip.custom_style || {}).zoomIntensity || 1.15);
+                                      const isMatch = Math.abs(currentZ - z.val) < 0.03;
+                                      return (
+                                        <button
+                                          key={z.label}
+                                          onClick={() => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), zoomIntensity: z.val } })}
+                                          class={`py-1 rounded text-[10px] font-bold border transition ${
+                                            isMatch
+                                              ? 'bg-cyan-600 text-white border-cyan-400'
+                                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                                          }`}
+                                        >
+                                          {z.label} ({z.val}x)
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="1.02"
+                                    max="1.45"
+                                    step="0.01"
+                                    value={parseFloat((selectedClip.custom_style || {}).zoomIntensity || 1.15)}
+                                    onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), zoomIntensity: parseFloat(e.target.value) } })}
+                                    class="w-full h-1.5 rounded-full accent-cyan-400 cursor-pointer"
+                                  />
+                                </div>
+
+                                {/* Smart Headroom & Proportion Status */}
+                                <div class="flex items-center justify-between bg-slate-900/80 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[10px] text-slate-400">
+                                  <span>👤 Face Headroom: <strong class="text-emerald-400">36% Golden Safe Zone</strong></span>
+                                  <span>📈 Easing: <strong class="text-cyan-400">Smooth Cosine</strong></span>
+                                </div>
+                              </div>
+
+                              {/* ===== 2. PROFESSIONAL CAPTION STYLE STUDIO (25 PRESETS) ===== */}
+                              <div class="bg-slate-950 border border-indigo-800/50 rounded-xl p-3 space-y-3">
+                                <div class="flex items-center justify-between">
+                                  <span class="text-xs font-bold text-indigo-300 uppercase tracking-wider">✨ Professional Caption Studio</span>
+                                  <span class="text-[10px] text-indigo-400 bg-indigo-950 border border-indigo-800 px-2 py-0.5 rounded-full font-bold">25 Presets</span>
+                                </div>
+
+                                {/* Style Gallery Cards (25 Styles) */}
+                                <div class="grid grid-cols-2 gap-1.5 max-h-60 overflow-y-auto pr-0.5" style={{scrollbarWidth:'thin', scrollbarColor:'#4338ca transparent'}}>
                                   {[...new Map(CAPTION_TEMPLATES.map(t => [t.id, t])).values()].map(t => {
-                                    const isActive = (selectedClip.caption_template || 'word-pop') === t.id;
+                                    const currentTmpl = selectedClip.caption_template || 'minimal-montserrat';
+                                    const isActive = currentTmpl === t.id;
                                     return (
                                       <button
                                         key={t.id}
-                                        onClick={() => handleUpdateSelectedClip({ caption_template: t.id })}
+                                        onClick={() => handleUpdateSelectedClip({
+                                          caption_template: t.id,
+                                          custom_style: {
+                                            ...(selectedClip.custom_style || {}),
+                                            fontFamily: t.font || (selectedClip.custom_style || {}).fontFamily || 'Montserrat',
+                                            color: t.preview.text || (selectedClip.custom_style || {}).color || '#FFFFFF',
+                                            highlightColor: t.preview.accent || (selectedClip.custom_style || {}).highlightColor || '#FFD700'
+                                          }
+                                        })}
                                         class={`relative text-left rounded-xl p-2.5 border transition-all ${
                                           isActive
                                             ? 'border-indigo-500 bg-indigo-900/40 shadow-md shadow-indigo-900/40'
                                             : 'border-slate-800 bg-slate-900/60 hover:border-slate-600 hover:bg-slate-800/60'
                                         }`}
-                                        style={{minHeight:'62px'}}
+                                        style={{minHeight:'64px'}}
                                       >
                                         {/* Mini Preview Bar */}
-                                        <div class="rounded-md mb-1.5 px-1.5 py-1 flex items-center justify-center overflow-hidden" style={{
+                                        <div class="rounded-md mb-1 px-1.5 py-1 flex items-center justify-center overflow-hidden" style={{
                                           background: t.preview.bg || '#1a1a2e',
                                           border: '1px solid rgba(255,255,255,0.08)',
-                                          minHeight: '28px'
+                                          minHeight: '26px'
                                         }}>
                                           <span class="text-[11px] font-black truncate" style={{
                                             color: t.preview.text,
-                                            textShadow: t.preview.glow ? `0 0 8px ${t.preview.glow}, 0 0 16px ${t.preview.glow}` : '1px 1px 2px rgba(0,0,0,0.9)',
-                                            WebkitTextStroke: t.id === 'outline-caption' ? `1px ${t.preview.accent}` : undefined,
-                                            fontFamily: t.id === 'typewriter' ? 'monospace' : t.id === 'documentary-serif' || t.id === 'magazine-paper' ? 'Georgia, serif' : 'inherit',
-                                            letterSpacing: t.id === 'cinematic-editorial' ? '0.15em' : 'normal',
-                                            textTransform: t.id === 'cinematic-editorial' ? 'uppercase' : 'none'
+                                            textShadow: t.preview.glow ? `0 0 8px ${t.preview.glow}` : '1px 1px 2px rgba(0,0,0,0.9)',
+                                            WebkitTextStroke: t.id === 'outline-caption' || t.id === 'gaming-captions' ? `1px ${t.preview.accent}` : undefined,
+                                            fontFamily: t.font || 'Montserrat, sans-serif'
                                           }}>
                                             {t.emoji} {t.name.split(' ')[0]}
-                                            {t.preview.accent && t.id !== 'outline-caption' && (
-                                              <span style={{color: t.preview.accent}}>{t.id === 'karaoke-highlight' || t.id === 'bold-keyword' ? ` ★` : ''}</span>
-                                            )}
+                                            {t.preview.accent && <span style={{color: t.preview.accent}}> ★</span>}
                                           </span>
                                         </div>
                                         <div class="flex items-center justify-between">
-                                          <span class={`text-[10px] font-bold ${isActive ? 'text-indigo-300' : 'text-slate-400'}`}>{t.name}</span>
-                                          {isActive && <span class="text-[9px] bg-indigo-600 text-white px-1 py-0.5 rounded font-bold">✓</span>}
+                                          <span class={`text-[10px] font-bold truncate ${isActive ? 'text-indigo-300' : 'text-slate-400'}`}>
+                                            {t.styleNum ? `#${t.styleNum} ` : ''}{t.name}
+                                          </span>
+                                          {isActive && <span class="text-[9px] bg-indigo-600 text-white px-1 py-0.2 rounded font-bold">✓</span>}
                                         </div>
                                       </button>
                                     );
                                   })}
                                 </div>
 
+                                {/* Highlighting Mode Selector (5 Modes) */}
+                                <div>
+                                  <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Highlighting Mode (Voiceover Sync)</label>
+                                  <div class="grid grid-cols-3 gap-1">
+                                    {[
+                                      { id: 'word-by-word',     label: 'Word by Word', icon: '🎤' },
+                                      { id: 'keyword-emphasis', label: 'Keyword',      icon: '🔑' },
+                                      { id: 'phrase-by-phrase', label: 'Phrase',       icon: '📝' },
+                                      { id: 'entire-sentence',  label: 'Sentence',     icon: '📜' },
+                                      { id: 'no-highlighting',  label: 'Clean Text',   icon: '⚪' }
+                                    ].map(hm => {
+                                      const activeHm = (selectedClip.custom_style || {}).highlightMode || 'word-by-word';
+                                      const isCur = activeHm === hm.id;
+                                      return (
+                                        <button
+                                          key={hm.id}
+                                          onClick={() => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), highlightMode: hm.id } })}
+                                          class={`py-1 rounded text-[10px] font-semibold border transition ${
+                                            isCur ? 'bg-amber-600 text-white border-amber-400' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                                          }`}
+                                        >
+                                          {hm.icon} {hm.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
                                 {/* Font + Language Row */}
                                 <div class="grid grid-cols-2 gap-2">
                                   <div>
-                                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Font</label>
+                                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Typography Font</label>
                                     <select
-                                      value={(selectedClip.custom_style || {}).fontFamily || 'Inter'}
+                                      value={(selectedClip.custom_style || {}).fontFamily || 'Montserrat'}
                                       onChange={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), fontFamily: e.target.value } })}
                                       class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-slate-200 focus:outline-none focus:border-indigo-500"
                                     >
-                                      <option value="Inter">Inter (Default)</option>
+                                      <option value="Montserrat">Montserrat (Recommended)</option>
+                                      <option value="Inter">Inter</option>
                                       <option value="Poppins">Poppins</option>
-                                      <option value="Montserrat">Montserrat</option>
-                                      <option value="Oswald">Oswald (Impact)</option>
+                                      <option value="Roboto">Roboto</option>
                                       <option value="Bebas Neue">Bebas Neue</option>
+                                      <option value="Oswald">Oswald (Impact)</option>
                                       <option value="Anton">Anton</option>
-                                      <option value="Roboto Condensed">Roboto Condensed</option>
-                                      <option value="Courier New">Courier New (Mono)</option>
+                                      <option value="Space Grotesk">Space Grotesk</option>
                                       <option value="Playfair Display">Playfair Display (Serif)</option>
+                                      <option value="Courier New">Courier New (Typewriter)</option>
                                       <option value="Noto Sans Devanagari">Noto Sans Devanagari (Hindi)</option>
                                     </select>
                                   </div>
                                   <div>
-                                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Language</label>
+                                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Spoken Language</label>
                                     <select
                                       value={selectedClip.caption_language || 'auto'}
                                       onChange={(e) => {
                                         const lang = e.target.value;
-                                        const fontMap = { hi: 'Noto Sans Devanagari', en: 'Inter', hinglish: 'Poppins', auto: (selectedClip.custom_style || {}).fontFamily || 'Inter' };
+                                        const fontMap = { hi: 'Noto Sans Devanagari', en: 'Montserrat', hinglish: 'Poppins', auto: (selectedClip.custom_style || {}).fontFamily || 'Montserrat' };
                                         handleUpdateSelectedClip({
                                           caption_language: lang,
-                                          custom_style: { ...(selectedClip.custom_style || {}), fontFamily: fontMap[lang] || 'Inter' }
+                                          custom_style: { ...(selectedClip.custom_style || {}), fontFamily: fontMap[lang] || 'Montserrat' }
                                         });
                                       }}
                                       class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-slate-200 focus:outline-none focus:border-indigo-500"
@@ -3650,27 +3833,34 @@
                                   </div>
                                 </div>
 
-                                {/* Text Position */}
+                                {/* Safe Caption Positioning */}
                                 <div>
-                                  <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">📍 Text Position</label>
-                                  <div class="grid grid-cols-3 gap-1.5">
+                                  <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">📍 Safe Position (Avoid Face/Logos)</label>
+                                  <div class="grid grid-cols-4 gap-1">
                                     {[
-                                      { label: '▲ Top',    value: 80,  icon: '⬆️' },
-                                      { label: '● Center', value: 240, icon: '⏺️' },
-                                      { label: '▼ Bottom', value: 480, icon: '⬇️' }
+                                      { label: 'Bottom',   value: 480,  icon: '⬇️', pos: 'bottom' },
+                                      { label: 'Center',   value: 960,  icon: '⏺️', pos: 'center' },
+                                      { label: 'Top',      value: 1620, icon: '⬆️', pos: 'top' },
+                                      { label: 'Lower 3rd',value: 320,  icon: '📺', pos: 'lower-third' }
                                     ].map(pos => {
                                       const currentOffset = (selectedClip.custom_style || {}).verticalOffset;
                                       const isActive = currentOffset === pos.value || (!currentOffset && pos.value === 480);
                                       return (
                                         <button
-                                          key={pos.value}
-                                          onClick={() => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), verticalOffset: pos.value } })}
+                                          key={pos.label}
+                                          onClick={() => handleUpdateSelectedClip({
+                                            custom_style: {
+                                              ...(selectedClip.custom_style || {}),
+                                              verticalOffset: pos.value,
+                                              position: pos.pos
+                                            }
+                                          })}
                                           class={`py-1.5 rounded-lg text-[10px] font-bold border transition ${
                                             isActive
                                               ? 'bg-purple-700 border-purple-500 text-white'
                                               : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600'
                                           }`}
-                                        >{pos.icon} {pos.label.split(' ')[1]}</button>
+                                        >{pos.icon} {pos.label}</button>
                                       );
                                     })}
                                   </div>
@@ -3679,7 +3869,7 @@
                                 {/* Font Size Slider */}
                                 <div>
                                   <div class="flex items-center justify-between mb-1">
-                                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">🔡 Font Size</label>
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">🔡 Caption Size</label>
                                     <span class="text-[11px] font-mono text-indigo-300 font-bold">{(selectedClip.custom_style || {}).fontSize || 68}px</span>
                                   </div>
                                   <input
@@ -3691,9 +3881,6 @@
                                     onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), fontSize: parseInt(e.target.value) } })}
                                     class="w-full h-1.5 rounded-full accent-indigo-500 cursor-pointer"
                                   />
-                                  <div class="flex justify-between text-[9px] text-slate-600 mt-0.5">
-                                    <span>36px Small</span><span>68px Default</span><span>110px Large</span>
-                                  </div>
                                 </div>
 
                                 {/* Color Pickers */}
@@ -3712,10 +3899,8 @@
                                         value={(selectedClip.custom_style || {}).color || '#FFFFFF'}
                                         onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), color: e.target.value } })}
                                         class="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[11px] font-mono text-slate-200"
-                                        placeholder="#FFFFFF"
                                       />
                                     </div>
-                                    {/* Quick Presets */}
                                     <div class="flex gap-1 mt-1">
                                       {['#FFFFFF','#FFD700','#00F5FF','#FF3B30','#FF6B00'].map(c => (
                                         <button key={c} onClick={() => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), color: c } })}
@@ -3726,7 +3911,7 @@
                                     </div>
                                   </div>
                                   <div>
-                                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">⚡ Highlight</label>
+                                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">⚡ Active Word Highlight</label>
                                     <div class="flex items-center space-x-1.5">
                                       <input
                                         type="color"
@@ -3739,7 +3924,6 @@
                                         value={(selectedClip.custom_style || {}).highlightColor || '#FFD700'}
                                         onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), highlightColor: e.target.value } })}
                                         class="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[11px] font-mono text-slate-200"
-                                        placeholder="#FFD700"
                                       />
                                     </div>
                                     <div class="flex gap-1 mt-1">
@@ -3753,56 +3937,73 @@
                                   </div>
                                 </div>
 
-                                {/* Live CSS Preview of Current Style */}
+                                {/* Live CSS Preview with Camera & Subtitle Simulation */}
                                 {(() => {
-                                  const tmpl = CAPTION_TEMPLATES.find(t => t.id === (selectedClip.caption_template || 'word-pop')) || CAPTION_TEMPLATES[0];
+                                  const currentTmplId = selectedClip.caption_template || 'minimal-montserrat';
+                                  const tmpl = CAPTION_TEMPLATES.find(t => t.id === currentTmplId) || CAPTION_TEMPLATES[0];
                                   const cs = selectedClip.custom_style || {};
-                                  const previewText = selectedClip.hook ? selectedClip.hook.substring(0, 40) : 'मैंने दुनिया के सबसे बड़े...';
+                                  const cameraP = CAMERA_PRESETS.find(p => p.id === (cs.cameraPreset || 'automatic_smart_zoom')) || CAMERA_PRESETS[0];
+                                  const previewText = selectedClip.hook ? selectedClip.hook.substring(0, 42) : 'मैंने दुनिया के सबसे बड़े एथलीट्स...';
+                                  const words = previewText.split(' ');
                                   return (
-                                    <div class="rounded-xl overflow-hidden border border-slate-700">
-                                      <div class="text-[9px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1 bg-slate-900 flex items-center justify-between">
-                                        <span>👁️ Live Preview — {tmpl.name}</span>
-                                        <span class="text-indigo-400">CSS Simulation</span>
+                                    <div class="rounded-xl overflow-hidden border border-slate-700 mt-2">
+                                      <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 bg-slate-900 flex items-center justify-between">
+                                        <span>👁️ Live Simulation — {tmpl.name}</span>
+                                        <span class="text-cyan-400 font-mono">{cameraP.emoji} {cameraP.name} ({parseFloat(cs.zoomIntensity || 1.15).toFixed(2)}x)</span>
                                       </div>
-                                      <div class="relative flex items-end justify-center" style={{
-                                        background: 'linear-gradient(180deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%)',
-                                        height: '80px',
-                                        padding: '8px'
+                                      <div class="relative flex items-end justify-center overflow-hidden" style={{
+                                        background: 'linear-gradient(180deg, #111827 0%, #1e1b4b 50%, #030712 100%)',
+                                        height: '90px',
+                                        padding: '10px'
                                       }}>
-                                        {/* Simulated caption */}
+                                        {/* Camera Framing Indicator */}
+                                        <div class="absolute top-2 left-2 text-[9px] bg-cyan-950/80 border border-cyan-800 text-cyan-300 px-1.5 py-0.5 rounded flex items-center space-x-1">
+                                          <span>🎯 Smart Camera:</span>
+                                          <span class="font-bold">{cameraP.name}</span>
+                                        </div>
+
+                                        {/* Subtitle preview */}
                                         <div style={{
-                                          background: tmpl.id === 'boxed-caption' || tmpl.id === 'cinematic-subtitle' ? 'rgba(0,0,0,0.75)' :
-                                                      tmpl.id === 'news-lower-third' ? '#001B6B' :
-                                                      tmpl.id === 'highlight-bar' ? (cs.highlightColor || '#FFD700') :
+                                          background: ['boxed-caption','netflix-doc','news-broadcast','cinematic-two-line','centered-impact'].includes(tmpl.id) ? 'rgba(0,0,0,0.8)' :
+                                                      tmpl.id === 'yellow-box-highlight' ? '#FFD700' :
                                                       tmpl.id === 'magazine-paper' ? '#F5F0E8' : 'transparent',
-                                          padding: (tmpl.id === 'boxed-caption' || tmpl.id === 'news-lower-third' || tmpl.id === 'cinematic-subtitle' || tmpl.id === 'highlight-bar') ? '4px 10px' : '0',
-                                          borderRadius: '4px',
+                                          padding: ['boxed-caption','netflix-doc','news-broadcast','yellow-box-highlight'].includes(tmpl.id) ? '4px 10px' : '0',
+                                          borderRadius: '6px',
                                           textAlign: 'center'
                                         }}>
                                           <span style={{
                                             color: cs.color || tmpl.preview.text,
-                                            fontFamily: cs.fontFamily || (tmpl.id === 'typewriter' ? 'monospace' : tmpl.id === 'documentary-serif' || tmpl.id === 'magazine-paper' ? 'Georgia,serif' : 'Inter,sans-serif'),
+                                            fontFamily: cs.fontFamily || tmpl.font || 'Montserrat, sans-serif',
                                             fontSize: `${Math.round((cs.fontSize || 68) * 0.22)}px`,
-                                            fontWeight: ['bold-keyword','word-pop','neon-glow','fire-word','chapter-caption','outline-caption'].includes(tmpl.id) ? '900' : '600',
-                                            textShadow: tmpl.id === 'neon-glow' ? `0 0 8px ${cs.color || '#00F5FF'}, 0 0 20px ${cs.color || '#00F5FF'}` :
-                                                        tmpl.id === 'fire-word' ? '0 0 10px #FF6B00' :
-                                                        '1px 1px 3px rgba(0,0,0,0.9)',
-                                            WebkitTextStroke: tmpl.id === 'outline-caption' ? '0.5px black' : undefined,
-                                            letterSpacing: tmpl.id === 'cinematic-editorial' ? '0.1em' : 'normal',
-                                            textTransform: tmpl.id === 'cinematic-editorial' ? 'uppercase' : 'none',
+                                            fontWeight: '800',
+                                            textShadow: tmpl.id === 'neon-captions' || tmpl.id === 'neon-glow' ? `0 0 10px ${cs.color || '#00F5FF'}, 0 0 20px ${cs.color || '#00F5FF'}` :
+                                                        '1px 1px 3px rgba(0,0,0,0.95)',
+                                            WebkitTextStroke: tmpl.id === 'outline-caption' || tmpl.id === 'gaming-captions' ? '0.6px black' : undefined,
+                                            letterSpacing: tmpl.id === 'netflix-doc' ? '0.08em' : 'normal',
                                             display: 'block',
-                                            lineHeight: '1.3'
+                                            lineHeight: '1.25'
                                           }}>
-                                            {tmpl.id === 'news-lower-third' && <span style={{color: '#FF0000', fontWeight:'900', marginRight:'4px'}}>⬤</span>}
-                                            {previewText}
-                                            {tmpl.id === 'karaoke-highlight' && <span style={{color: cs.highlightColor || '#FFD700'}}> ★</span>}
+                                            {tmpl.id === 'news-broadcast' && <span style={{color: '#FF0000', fontWeight:'900', marginRight:'4px'}}>⬤</span>}
+                                            {words.map((w, idx) => (
+                                              <span
+                                                key={idx}
+                                                style={{
+                                                  color: (idx === 1 || idx === 3) ? (cs.highlightColor || tmpl.preview.accent) : (tmpl.id === 'yellow-box-highlight' ? '#000000' : (cs.color || tmpl.preview.text)),
+                                                  backgroundColor: tmpl.id === 'yellow-box-highlight' && idx === 1 ? '#000000' : undefined,
+                                                  padding: tmpl.id === 'yellow-box-highlight' && idx === 1 ? '1px 4px' : undefined,
+                                                  borderRadius: '3px',
+                                                  margin: '0 2px'
+                                                }}
+                                              >
+                                                {w}
+                                              </span>
+                                            ))}
                                           </span>
                                         </div>
                                       </div>
                                     </div>
                                   );
                                 })()}
-
                               </div>
                             </div>
 

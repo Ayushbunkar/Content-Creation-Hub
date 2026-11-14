@@ -430,8 +430,8 @@ export class QualityChecker {
           const subShot = { ...shot };
           subShot.id = `${shot.id}_part${k + 1}`;
           subShot.duration = subDur;
-          subShot.startSec = +(shot.startSec + k * subDur).toFixed(2);
-          subShot.endSec = +(shot.startSec + (k + 1) * subDur).toFixed(2);
+          subShot.startSec = +((shot.startSec || 0) + k * subDur).toFixed(2);
+          subShot.endSec = +((shot.startSec || 0) + (k + 1) * subDur).toFixed(2);
           subShot.startFrame = Math.round(subShot.startSec * 30);
           subShot.durationFrames = Math.round(subDur * 30);
           subShot.narration = words.slice(k * wordsPerCut, (k + 1) * wordsPerCut).join(' ') || shot.narration;

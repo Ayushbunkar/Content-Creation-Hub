@@ -884,6 +884,50 @@ export class ViralClipperService {
   /**
    * Render vertical 9:16 clip using FFmpeg with smart reframing and burned animated captions
    */
+  /**
+   * Build smart camera tracking and zoom filter expression
+   */
+  static buildCameraZoomFilter(preset: string, intensity: number = 1.15, fps: number = 30): string {
+    if (!preset || preset === 'static_professional_frame' || preset === 'none') {
+      return '';
+    }
+    const safeIntensity = Math.min(1.5, Math.max(1.02, intensity));
+    const step = (safeIntensity - 1.0) / (fps * 2.5); // 2.5 second ramp
+
+    switch (preset) {
+      case 'cinematic_slow_zoom_in':
+        return `zoompan=z='min(zoom+${step.toFixed(5)},${safeIntensity.toFixed(3)})':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.36)-(ih/zoom*0.36)':s=1920x1080:fps=${fps}`;
+      case 'cinematic_slow_zoom_out':
+        return `zoompan=z='if(eq(on,1),${safeIntensity.toFixed(3)},max(zoom-${step.toFixed(5)},1.0))':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.36)-(ih/zoom*0.36)':s=1920x1080:fps=${fps}`;
+      case 'smooth_face_tracking':
+        return `zoompan=z='min(zoom+${(step * 0.6).toFixed(5)},${safeIntensity.toFixed(3)})':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.34)-(ih/zoom*0.34)':s=1920x1080:fps=${fps}`;
+      case 'dynamic_speaker_zoom':
+        const amp = ((safeIntensity - 1.0) * 0.5).toFixed(4);
+        const base = (1.0 + (safeIntensity - 1.0) * 0.5).toFixed(4);
+        return `zoompan=z='${base}+${amp}*sin(on*0.035)':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.38)-(ih/zoom*0.38)':s=1920x1080:fps=${fps}`;
+      case 'podcast_focus_zoom':
+        return `zoompan=z='if(lt(on,24),1.0+(${((safeIntensity - 1.0) / 24).toFixed(5)}*on),${safeIntensity.toFixed(3)})':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.35)-(ih/zoom*0.35)':s=1920x1080:fps=${fps}`;
+      case 'punch_in_zoom':
+        return `zoompan=z='if(lt(on,14),1.0+(${((safeIntensity - 1.0) / 14).toFixed(5)}*on),${safeIntensity.toFixed(3)})':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.36)-(ih/zoom*0.36)':s=1920x1080:fps=${fps}`;
+      case 'subtle_camera_push':
+        const subtleInt = Math.min(1.08, safeIntensity);
+        const subtleStep = (subtleInt - 1.0) / (fps * 3.5);
+        return `zoompan=z='min(zoom+${subtleStep.toFixed(5)},${subtleInt.toFixed(3)})':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.38)-(ih/zoom*0.38)':s=1920x1080:fps=${fps}`;
+      case 'automatic_smart_zoom':
+        const smartAmp = (safeIntensity - 1.0).toFixed(4);
+        return `zoompan=z='1.0+${smartAmp}*(0.5-0.5*cos(on*0.03))':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.38)-(ih/zoom*0.38)':s=1920x1080:fps=${fps}`;
+      case 'wide_to_close_transition':
+        return `zoompan=z='min(zoom+${(step * 1.8).toFixed(5)},${safeIntensity.toFixed(3)})':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.34)-(ih/zoom*0.34)':s=1920x1080:fps=${fps}`;
+      case 'documentary_camera_movement':
+        return `zoompan=z='min(zoom+${(step * 0.7).toFixed(5)},${safeIntensity.toFixed(3)})':d=1:x='(iw*0.48)-(iw/zoom*0.48)+10*sin(on*0.025)':y='(ih*0.37)-(ih/zoom*0.37)':s=1920x1080:fps=${fps}`;
+      case 'reaction_shot_focus':
+        return `zoompan=z='if(lt(on,45),1.02,min(zoom+0.003,${safeIntensity.toFixed(3)}))':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.35)-(ih/zoom*0.35)':s=1920x1080:fps=${fps}`;
+      case 'static_professional_frame':
+      default:
+        return '';
+    }
+  }
+
   static async renderClip(clipId: string): Promise<string> {
     const clip = await getQuery<any>('SELECT * FROM clipper_clips WHERE id = ?', [clipId]);
     if (!clip) throw new Error('Clip not found');
@@ -969,30 +1013,40 @@ export class ViralClipperService {
     );
 
     const relAss = path.relative(process.cwd(), assPath).replace(/\\/g, '/');
+    const escapedAss = relAss.replace(/:/g, '\\\\:');
+
+    // Smart Camera Zoom & Movement preset configuration
+    const cameraPreset = customStyle.cameraPreset || 'automatic_smart_zoom';
+    const zoomIntensity = parseFloat(customStyle.zoomIntensity || '1.15');
+    const cameraZoomFilter = ViralClipperService.buildCameraZoomFilter(cameraPreset, zoomIntensity, 30);
 
     // Build smart reframing filter graph
     let filterGraph = '';
     const mode = clip.reframing_mode || 'blur_background';
-    const isComplex = mode === 'blur_background' || (aspect === '9:16' && mode === 'split_screen');
+    const isComplex = mode === 'blur_background' || (aspect === '9:16' && mode === 'split_screen') || !!cameraZoomFilter;
 
     if (aspect === '16:9') {
-      filterGraph = `scale=1920:1080:force_original_aspect_ratio=decrease:flags=lanczos,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,unsharp=5:5:0.5:5:5:0.0,subtitles='${relAss}'`;
+      const zoom169 = cameraZoomFilter ? `${cameraZoomFilter},` : '';
+      filterGraph = `[0:v]${zoom169}scale=1920:1080:force_original_aspect_ratio=decrease:flags=lanczos,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'[outv]`;
     } else if (aspect === '1:1') {
       if (mode === 'center_crop') {
-        filterGraph = `scale=-1:1080:flags=lanczos,crop=1080:1080:(iw-1080)/2:0,unsharp=5:5:0.5:5:5:0.0,subtitles='${relAss}'`;
+        const cropZoom = cameraZoomFilter ? `${cameraZoomFilter},scale=-1:1080:flags=lanczos` : 'scale=-1:1080:flags=lanczos';
+        filterGraph = `[0:v]${cropZoom},crop=1080:1080:(iw-1080)/2:0,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'[outv]`;
       } else {
-        filterGraph = `[0:v]scale=1080:1080:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1080,gblur=sigma=26:steps=2,eq=brightness=-0.10:contrast=1.06[bg];[0:v]scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${relAss}'[outv]`;
+        const fgZoom = cameraZoomFilter ? `${cameraZoomFilter},scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg]` : 'scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg]';
+        filterGraph = `[0:v]scale=1080:1080:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1080,gblur=sigma=26:steps=2,eq=brightness=-0.10:contrast=1.06[bg];[0:v]${fgZoom};[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${escapedAss}'[outv]`;
       }
     } else {
       // 9:16 Vertical Reel
       if (mode === 'center_crop') {
-        filterGraph = `scale=-1:1920:flags=lanczos,crop=1080:1920:(iw-1080)/2:0,unsharp=5:5:0.5:5:5:0.0,subtitles='${relAss}'`;
+        const cropZoom = cameraZoomFilter ? `${cameraZoomFilter},scale=-1:1920:flags=lanczos` : 'scale=-1:1920:flags=lanczos';
+        filterGraph = `[0:v]${cropZoom},crop=1080:1920:(iw-1080)/2:0,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'[outv]`;
       } else if (mode === 'split_screen') {
-        filterGraph = `split=2[top][bottom];[top]crop=iw/2:ih:0:0,scale=1080:960:flags=lanczos[t_sc];[bottom]crop=iw/2:ih:iw/2:0,scale=1080:960:flags=lanczos[b_sc];[t_sc][b_sc]vstack=inputs=2,unsharp=5:5:0.5:5:5:0.0,subtitles='${relAss}'`;
+        filterGraph = `split=2[top][bottom];[top]crop=iw/2:ih:0:0,scale=1080:960:flags=lanczos[t_sc];[bottom]crop=iw/2:ih:iw/2:0,scale=1080:960:flags=lanczos[b_sc];[t_sc][b_sc]vstack=inputs=2,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'`;
       } else {
-        // Gold standard Podcast blurred background framing (Premium Studio Grade)
-        const escapedAss = relAss.replace(/:/g, '\\\\:');
-        filterGraph = `[0:v]scale=360:640:force_original_aspect_ratio=increase:flags=fast_bilinear,crop=360:640,boxblur=luma_radius=16:luma_power=3,scale=1080:1920:flags=lanczos,eq=brightness=-0.12:contrast=1.08[bg];[0:v]scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${escapedAss}'[outv]`;
+        // Gold standard Podcast blurred background framing + Smart Camera Zoom
+        const fgZoom = cameraZoomFilter ? `${cameraZoomFilter},scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg]` : 'scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg]';
+        filterGraph = `[0:v]scale=360:640:force_original_aspect_ratio=increase:flags=fast_bilinear,crop=360:640,boxblur=luma_radius=16:luma_power=3,scale=1080:1920:flags=lanczos,eq=brightness=-0.12:contrast=1.08[bg];[0:v]${fgZoom};[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${escapedAss}'[outv]`;
       }
     }
 
