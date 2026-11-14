@@ -277,12 +277,32 @@ export class CaptionStudioService {
       : (targetWidth < targetHeight ? 480 : 80);
 
     const s = {
-      fontFamily: customStyle?.fontFamily || (template === 'documentary-serif' ? 'Playfair Display' : template === 'typewriter' ? 'Courier New' : 'Inter'),
+      fontFamily: customStyle?.fontFamily || (
+        template === 'documentary-serif' ? 'Playfair Display' :
+        template === 'typewriter' ? 'Courier New' :
+        template === 'magazine-paper' ? 'Georgia' :
+        template === 'hinglish-caption' ? 'Noto Sans Devanagari' :
+        'Inter'
+      ),
       fontSize: Math.round(baseFontSize * scaleFactor),
-      fontWeight: customStyle?.fontWeight || (template === 'bold-keyword' || template === 'outline-caption' ? '900' : '700'),
-      primaryColor: customStyle?.color || (template === 'karaoke-highlight' ? '#FFD700' : '#FFFFFF'),
-      accentColor: customStyle?.highlightColor || '#FF3B30',
-      outlineColor: customStyle?.outlineColor || '#000000',
+      fontWeight: customStyle?.fontWeight || (['bold-keyword','outline-caption','neon-glow','fire-word','word-pop','chapter-caption'].includes(template) ? '900' : '700'),
+      primaryColor: customStyle?.color || (
+        template === 'karaoke-highlight' ? '#FFD700' :
+        template === 'neon-glow' ? '#00F5FF' :
+        template === 'fire-word' ? '#FF6B00' :
+        template === 'magazine-paper' ? '#1a1a1a' :
+        template === 'typewriter' ? '#00FF41' :
+        '#FFFFFF'
+      ),
+      accentColor: customStyle?.highlightColor || (
+        template === 'neon-glow' ? '#FF00AA' :
+        template === 'fire-word' ? '#FF0000' :
+        template === 'magazine-paper' ? '#CC0000' :
+        '#FF3B30'
+      ),
+      outlineColor: customStyle?.outlineColor || (
+        template === 'magazine-paper' ? '#F5F0E8' : '#000000'
+      ),
       outlineWidth: Math.max(1, Math.round(baseOutlineWidth * scaleFactor)),
       shadowWidth: Math.max(0, Math.round(baseShadowWidth * scaleFactor)),
       alignment: customStyle?.alignment === 'center' ? 2 : customStyle?.alignment === 'left' ? 1 : 3,
@@ -302,7 +322,12 @@ export class CaptionStudioService {
     const assPrimary = hexToAssColor(s.primaryColor, '00');
     const assSecondary = hexToAssColor(s.accentColor, '00');
     const assOutline = hexToAssColor(s.outlineColor, '00');
-    const assBack = (template === 'boxed-caption' || template === 'news-lower-third') ? '&H70000000&' : '&H80000000&';
+    // BackColour (box background): opaque for boxed/news/cinematic, transparent for neon/outline
+    const assBack = (template === 'boxed-caption' || template === 'news-lower-third') ? '&H70000000&'
+      : template === 'cinematic-subtitle' ? '&HCC000000&'
+      : template === 'magazine-paper' ? '&HF0E8F5F0&'
+      : (template === 'neon-glow' || template === 'outline-caption' || template === 'fire-word') ? '&H00000000&'
+      : '&H80000000&';
 
     let assContent = `[Script Info]
 Title: Caption Studio Output
@@ -313,7 +338,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${s.fontFamily},${s.fontSize},${assPrimary},${assSecondary},${assOutline},${assBack},1,0,0,0,100,100,0,0,1,${s.outlineWidth},${s.shadowWidth},${s.alignment},40,40,${s.verticalMargin},1
+Style: Default,${s.fontFamily},${s.fontSize},${assPrimary},${assSecondary},${assOutline},${assBack},1,0,0,0,100,100,${template === 'cinematic-editorial' ? '3' : '0'},0,${(template === 'boxed-caption' || template === 'cinematic-subtitle' || template === 'magazine-paper' || template === 'news-lower-third') ? '4' : '1'},${s.outlineWidth},${s.shadowWidth},${s.alignment},40,40,${s.verticalMargin},1
 Style: Accent,${s.fontFamily},${s.fontSize},${assSecondary},${assPrimary},${assOutline},${assBack},1,0,0,0,100,100,0,0,1,${s.outlineWidth},${s.shadowWidth},${s.alignment},40,40,${s.verticalMargin},1
 
 [Events]
@@ -362,9 +387,52 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         }
         textFormatted = kText.trim();
       } else if (template === 'hinglish-caption') {
-        textFormatted = `{\\fnNoto Sans Devanagari}${textFormatted}`;
+        // Force Devanagari-compatible font and larger size for Hindi text
+        textFormatted = `{\\fnNoto Sans Devanagari\\fs${Math.round(s.fontSize * 1.1)}}${textFormatted}`;
       } else if (template === 'chapter-caption') {
         textFormatted = `{\\fs${Math.round(s.fontSize * 1.3)}\\b1}OVERVIEW\\N{\\fs${s.fontSize}\\b0}${textFormatted}`;
+      } else if (template === 'neon-glow') {
+        // Neon glow: use primary cyan color + blur tag for glow effect
+        // ASS \blur simulates glow — apply it to the whole line
+        textFormatted = `{\\blur6\\b1\\c${assPrimary}}${textFormatted}{\\blur0}`;
+      } else if (template === 'cinematic-subtitle') {
+        // Netflix/Prime style: clean white, centered, opaque dark bar (handled via BackColour in style)
+        // Keep text clean, 2-line max enforced in wrap
+        textFormatted = `{\\an2\\b0}${textFormatted}`;
+      } else if (template === 'magazine-paper') {
+        // Magazine cut-out: mixed weights, serif font forced
+        const words = textFormatted.split(' ');
+        const formatted = words.map((w, i) =>
+          i % 3 === 0 ? `{\\b1\\fs${Math.round(s.fontSize * 1.1)}}${w}{\\b0\\fs${s.fontSize}}` : w
+        ).join(' ');
+        textFormatted = `{\\fnGeorgia}${formatted}`;
+      } else if (template === 'fire-word') {
+        // Fire words: each word flickers orange→red using karaoke timing or static
+        if (seg.words && seg.words.length > 0) {
+          let fireText = '';
+          for (const w of seg.words) {
+            const durCs = Math.max(1, Math.round((w.end - w.start) * 100));
+            // Alternate between orange and red for drama
+            fireText += `{\\kf${durCs}\\c${assSecondary}}${w.word} `;
+          }
+          textFormatted = `{\\b1}${fireText.trim()}`;
+        } else {
+          // Fallback: highlight every other word in accent color
+          const words = textFormatted.split(' ');
+          textFormatted = `{\\b1}` + words.map((w, i) =>
+            i % 2 === 0 ? `{\\c${assSecondary}}${w}` : `{\\c${assPrimary}}${w}`
+          ).join(' ');
+        }
+      } else if (template === 'word-pop') {
+        // Word pop: use karaoke timing if available for word-by-word display
+        if (seg.words && seg.words.length > 0) {
+          let popText = '';
+          for (const w of seg.words) {
+            const durCs = Math.max(1, Math.round((w.end - w.start) * 100));
+            popText += `{\\kf${durCs}}${w.word} `;
+          }
+          textFormatted = `{\\b1}${popText.trim()}`;
+        }
       }
 
       // Escape ASS braces and line breaks

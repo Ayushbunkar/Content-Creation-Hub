@@ -63,21 +63,25 @@
     ];
 
     const CAPTION_TEMPLATES = [
-      { id: 'minimal-white', name: 'Minimal White', desc: 'Clean white typography with subtle shadow, two-line layout.' },
-      { id: 'bold-keyword', name: 'Bold Keyword', desc: 'Large bold typography with key concepts highlighted in accent color.' },
-      { id: 'karaoke-highlight', name: 'Karaoke Highlight', desc: 'Smooth word-by-word active color progression as audio plays.' },
-      { id: 'word-pop', name: 'Word Pop', desc: 'Each word enters with a dynamic scale pop animation.' },
-      { id: 'documentary-serif', name: 'Documentary Serif', desc: 'Playfair Display serif styling with warm classic elegance.' },
-      { id: 'news-lower-third', name: 'News Lower Third', desc: 'Broadcast news banner with red topic pill and white ticker text.' },
-      { id: 'typewriter', name: 'Typewriter', desc: 'Monospaced progressive character-by-character reveal.' },
-      { id: 'clean-two-line', name: 'Clean Two-Line', desc: 'Strict two-line wrap with TV safe margin constraints.' },
-      { id: 'boxed-caption', name: 'Boxed Caption', desc: 'High-contrast dark translucent box behind active phrases.' },
-      { id: 'outline-caption', name: 'Outline Caption', desc: 'Heavy dark stroke outline for readability over bright footage.' },
-      { id: 'highlight-bar', name: 'Highlight Bar', desc: 'Dynamic colored background pill expanding behind active phrase.' },
-      { id: 'minimal-center', name: 'Minimal Center', desc: 'Centered educational explainer subtitle with rounded corners.' },
-      { id: 'hinglish-caption', name: 'Hinglish Caption', desc: 'Devanagari & Latin Unicode font stack for mixed Hindi/English.' },
-      { id: 'chapter-caption', name: 'Chapter Caption', desc: 'Large uppercase section heading above concise subtitles.' },
-      { id: 'cinematic-editorial', name: 'Cinematic Editorial', desc: 'Wide tracking, uppercase lettering, and subtle upward drift.' }
+      { id: 'word-pop',           name: 'Word Pop',          emoji: '💥', desc: 'Each word pops in with scale animation — classic viral style.', preview: { bg: '#1a1a2e', text: '#FFFFFF', accent: '#FFD700', style: 'font-black text-2xl' } },
+      { id: 'karaoke-highlight',  name: 'Karaoke',           emoji: '🎤', desc: 'Word-by-word golden highlight as audio plays.', preview: { bg: '#0d0d0d', text: '#FFD700', accent: '#FF6B35', style: 'font-bold text-2xl' } },
+      { id: 'bold-keyword',       name: 'Bold Keyword',      emoji: '🔥', desc: 'Large bold text with one keyword in accent color.', preview: { bg: '#12121f', text: '#FFFFFF', accent: '#FF3B30', style: 'font-black text-2xl' } },
+      { id: 'neon-glow',          name: 'Neon Glow',         emoji: '✨', desc: 'Glowing cyan/magenta neon text — eye-catching night style.', preview: { bg: '#050510', text: '#00F5FF', accent: '#FF00AA', style: 'font-black text-2xl', glow: '#00F5FF' } },
+      { id: 'cinematic-subtitle', name: 'Netflix Style',     emoji: '🎬', desc: 'Dark bar at bottom, white clean text — Netflix/Prime style.', preview: { bg: 'rgba(0,0,0,0.85)', text: '#FFFFFF', accent: '#E50914', style: 'font-semibold text-xl' } },
+      { id: 'magazine-paper',     name: 'Magazine Cut',      emoji: '📰', desc: 'Newspaper cutout aesthetic — serif font, mixed weights.', preview: { bg: '#F5F0E8', text: '#1a1a1a', accent: '#CC0000', style: 'font-serif font-bold text-xl' } },
+      { id: 'fire-word',          name: 'Fire Words',        emoji: '🔴', desc: 'Words ignite in orange→red gradient with glow shadow.', preview: { bg: '#0a0a0a', text: '#FF6B00', accent: '#FF0000', style: 'font-black text-2xl' } },
+      { id: 'outline-caption',    name: 'Outline',           emoji: '⬜', desc: 'Heavy dark stroke outline for readability over any footage.', preview: { bg: 'transparent', text: '#FFFFFF', accent: '#000000', style: 'font-black text-2xl stroke' } },
+      { id: 'boxed-caption',      name: 'Boxed',             emoji: '⬛', desc: 'Semi-transparent dark box behind each caption line.', preview: { bg: 'rgba(0,0,0,0.7)', text: '#FFFFFF', accent: '#FFD700', style: 'font-bold text-xl' } },
+      { id: 'news-lower-third',   name: 'Breaking News',     emoji: '📺', desc: 'Broadcast news lower-third banner with red topic pill.', preview: { bg: '#001B6B', text: '#FFFFFF', accent: '#FF0000', style: 'font-bold text-lg' } },
+      { id: 'highlight-bar',      name: 'Highlight Bar',     emoji: '🟡', desc: 'Colored pill background expands behind each phrase.', preview: { bg: '#FFD700', text: '#000000', accent: '#FF6B35', style: 'font-black text-xl' } },
+      { id: 'minimal-white',      name: 'Minimal White',     emoji: '🤍', desc: 'Clean white typography with subtle shadow — timeless.', preview: { bg: 'transparent', text: '#FFFFFF', accent: '#CCCCCC', style: 'font-semibold text-xl' } },
+      { id: 'documentary-serif',  name: 'Documentary',       emoji: '🎥', desc: 'Playfair Display serif — warm, editorial, classic.', preview: { bg: 'transparent', text: '#F5E6C8', accent: '#D4A853', style: 'font-serif text-xl' } },
+      { id: 'typewriter',         name: 'Typewriter',        emoji: '⌨️', desc: 'Monospaced character-by-character reveal — hacker style.', preview: { bg: '#001100', text: '#00FF41', accent: '#00CC33', style: 'font-mono text-lg' } },
+      { id: 'hinglish-caption',   name: 'Hindi / Hinglish',  emoji: '🇮🇳', desc: 'Noto Sans Devanagari font — perfect for Hindi and Hinglish.', preview: { bg: '#FF9933', text: '#FFFFFF', accent: '#138808', style: 'font-bold text-xl' } },
+      { id: 'cinematic-editorial',name: 'Cinematic',         emoji: '🎞️', desc: 'Wide tracking, uppercase lettering, slow upward drift.', preview: { bg: 'transparent', text: '#E8DCC8', accent: '#C0A060', style: 'font-semibold tracking-widest uppercase text-lg' } },
+      { id: 'clean-two-line',     name: 'Two-Line Clean',    emoji: '📋', desc: 'Strict two-line wrap with TV safe margin constraints.', preview: { bg: 'transparent', text: '#FFFFFF', accent: '#AAAAAA', style: 'font-semibold text-xl' } },
+      { id: 'minimal-center',     name: 'Center Explainer',  emoji: '📌', desc: 'Centered subtitles with rounded pill — YouTube explainer.', preview: { bg: 'rgba(0,0,0,0.6)', text: '#FFFFFF', accent: '#4ECDC4', style: 'font-semibold text-xl' } },
+      { id: 'chapter-caption',    name: 'Chapter Title',     emoji: '📖', desc: 'Large section heading above concise subtitles.', preview: { bg: 'transparent', text: '#FFFFFF', accent: '#FFD700', style: 'font-black text-2xl' } },
     ];
 
     // ==========================================
@@ -3529,37 +3533,276 @@
                                 </div>
                               </div>
 
-                              {/* Smart Reframing & Caption Style Selectors */}
-                              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                  <label class="block text-xs font-bold text-slate-400 mb-1.5">
-                                    Reframing Treatment
-                                  </label>
-                                  <select
-                                    value={selectedClip.reframing_mode || 'blur_background'}
-                                    onChange={(e) => handleUpdateSelectedClip({ reframing_mode: e.target.value })}
-                                    class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-200 focus:outline-none focus:border-indigo-500"
-                                  >
-                                    <option value="blur_background">🎬 Blurred Studio Backdrop</option>
-                                    <option value="center_crop">🎯 Center Crop (Full 9:16)</option>
-                                    <option value="split_screen">👥 Split-Screen (Interview)</option>
-                                  </select>
+                              {/* Smart Reframing Selector */}
+                              <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+                                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">🎬 Reframing Treatment</label>
+                                <div class="grid grid-cols-3 gap-1.5">
+                                  {[
+                                    { v: 'blur_background', label: 'Blur BG', icon: '🌫️' },
+                                    { v: 'center_crop',     label: 'Center Crop', icon: '🎯' },
+                                    { v: 'split_screen',    label: 'Split Screen', icon: '👥' }
+                                  ].map(opt => (
+                                    <button
+                                      key={opt.v}
+                                      onClick={() => handleUpdateSelectedClip({ reframing_mode: opt.v })}
+                                      class={`px-2 py-2 rounded-lg text-[11px] font-bold transition ${
+                                        (selectedClip.reframing_mode || 'blur_background') === opt.v
+                                          ? 'bg-indigo-600 text-white border border-indigo-400'
+                                          : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                                      }`}
+                                    >{opt.icon} {opt.label}</button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* ===== CAPTION STYLE STUDIO ===== */}
+                              <div class="bg-slate-950 border border-indigo-800/50 rounded-xl p-3 space-y-3">
+                                <div class="flex items-center justify-between">
+                                  <span class="text-xs font-bold text-indigo-300 uppercase tracking-wider">✨ Caption Style Studio</span>
+                                  <span class="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">{CAPTION_TEMPLATES.length} styles</span>
                                 </div>
 
-                                <div>
-                                  <label class="block text-xs font-bold text-slate-400 mb-1.5">
-                                    Caption Style ({CAPTION_TEMPLATES.length})
-                                  </label>
-                                  <select
-                                    value={selectedClip.caption_template || 'word-pop'}
-                                    onChange={(e) => handleUpdateSelectedClip({ caption_template: e.target.value })}
-                                    class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-200 focus:outline-none focus:border-indigo-500"
-                                  >
-                                    {CAPTION_TEMPLATES.map(t => (
-                                      <option key={t.id} value={t.id}>{t.name}</option>
-                                    ))}
-                                  </select>
+                                {/* Style Gallery Cards */}
+                                <div class="grid grid-cols-2 gap-1.5 max-h-56 overflow-y-auto pr-0.5" style={{scrollbarWidth:'thin', scrollbarColor:'#334155 transparent'}}>
+                                  {[...new Map(CAPTION_TEMPLATES.map(t => [t.id, t])).values()].map(t => {
+                                    const isActive = (selectedClip.caption_template || 'word-pop') === t.id;
+                                    return (
+                                      <button
+                                        key={t.id}
+                                        onClick={() => handleUpdateSelectedClip({ caption_template: t.id })}
+                                        class={`relative text-left rounded-xl p-2.5 border transition-all ${
+                                          isActive
+                                            ? 'border-indigo-500 bg-indigo-900/40 shadow-md shadow-indigo-900/40'
+                                            : 'border-slate-800 bg-slate-900/60 hover:border-slate-600 hover:bg-slate-800/60'
+                                        }`}
+                                        style={{minHeight:'62px'}}
+                                      >
+                                        {/* Mini Preview Bar */}
+                                        <div class="rounded-md mb-1.5 px-1.5 py-1 flex items-center justify-center overflow-hidden" style={{
+                                          background: t.preview.bg || '#1a1a2e',
+                                          border: '1px solid rgba(255,255,255,0.08)',
+                                          minHeight: '28px'
+                                        }}>
+                                          <span class="text-[11px] font-black truncate" style={{
+                                            color: t.preview.text,
+                                            textShadow: t.preview.glow ? `0 0 8px ${t.preview.glow}, 0 0 16px ${t.preview.glow}` : '1px 1px 2px rgba(0,0,0,0.9)',
+                                            WebkitTextStroke: t.id === 'outline-caption' ? `1px ${t.preview.accent}` : undefined,
+                                            fontFamily: t.id === 'typewriter' ? 'monospace' : t.id === 'documentary-serif' || t.id === 'magazine-paper' ? 'Georgia, serif' : 'inherit',
+                                            letterSpacing: t.id === 'cinematic-editorial' ? '0.15em' : 'normal',
+                                            textTransform: t.id === 'cinematic-editorial' ? 'uppercase' : 'none'
+                                          }}>
+                                            {t.emoji} {t.name.split(' ')[0]}
+                                            {t.preview.accent && t.id !== 'outline-caption' && (
+                                              <span style={{color: t.preview.accent}}>{t.id === 'karaoke-highlight' || t.id === 'bold-keyword' ? ` ★` : ''}</span>
+                                            )}
+                                          </span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                          <span class={`text-[10px] font-bold ${isActive ? 'text-indigo-300' : 'text-slate-400'}`}>{t.name}</span>
+                                          {isActive && <span class="text-[9px] bg-indigo-600 text-white px-1 py-0.5 rounded font-bold">✓</span>}
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
                                 </div>
+
+                                {/* Font + Language Row */}
+                                <div class="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Font</label>
+                                    <select
+                                      value={(selectedClip.custom_style || {}).fontFamily || 'Inter'}
+                                      onChange={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), fontFamily: e.target.value } })}
+                                      class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-slate-200 focus:outline-none focus:border-indigo-500"
+                                    >
+                                      <option value="Inter">Inter (Default)</option>
+                                      <option value="Poppins">Poppins</option>
+                                      <option value="Montserrat">Montserrat</option>
+                                      <option value="Oswald">Oswald (Impact)</option>
+                                      <option value="Bebas Neue">Bebas Neue</option>
+                                      <option value="Anton">Anton</option>
+                                      <option value="Roboto Condensed">Roboto Condensed</option>
+                                      <option value="Courier New">Courier New (Mono)</option>
+                                      <option value="Playfair Display">Playfair Display (Serif)</option>
+                                      <option value="Noto Sans Devanagari">Noto Sans Devanagari (Hindi)</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Language</label>
+                                    <select
+                                      value={selectedClip.caption_language || 'auto'}
+                                      onChange={(e) => {
+                                        const lang = e.target.value;
+                                        const fontMap = { hi: 'Noto Sans Devanagari', en: 'Inter', hinglish: 'Poppins', auto: (selectedClip.custom_style || {}).fontFamily || 'Inter' };
+                                        handleUpdateSelectedClip({
+                                          caption_language: lang,
+                                          custom_style: { ...(selectedClip.custom_style || {}), fontFamily: fontMap[lang] || 'Inter' }
+                                        });
+                                      }}
+                                      class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-slate-200 focus:outline-none focus:border-indigo-500"
+                                    >
+                                      <option value="auto">🌐 Auto-Detect</option>
+                                      <option value="en">🇺🇸 English</option>
+                                      <option value="hi">🇮🇳 Hindi (हिंदी)</option>
+                                      <option value="hinglish">🔀 Hinglish</option>
+                                      <option value="ar">🇸🇦 Arabic / Urdu</option>
+                                    </select>
+                                  </div>
+                                </div>
+
+                                {/* Text Position */}
+                                <div>
+                                  <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">📍 Text Position</label>
+                                  <div class="grid grid-cols-3 gap-1.5">
+                                    {[
+                                      { label: '▲ Top',    value: 80,  icon: '⬆️' },
+                                      { label: '● Center', value: 240, icon: '⏺️' },
+                                      { label: '▼ Bottom', value: 480, icon: '⬇️' }
+                                    ].map(pos => {
+                                      const currentOffset = (selectedClip.custom_style || {}).verticalOffset;
+                                      const isActive = currentOffset === pos.value || (!currentOffset && pos.value === 480);
+                                      return (
+                                        <button
+                                          key={pos.value}
+                                          onClick={() => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), verticalOffset: pos.value } })}
+                                          class={`py-1.5 rounded-lg text-[10px] font-bold border transition ${
+                                            isActive
+                                              ? 'bg-purple-700 border-purple-500 text-white'
+                                              : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                                          }`}
+                                        >{pos.icon} {pos.label.split(' ')[1]}</button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                                {/* Font Size Slider */}
+                                <div>
+                                  <div class="flex items-center justify-between mb-1">
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">🔡 Font Size</label>
+                                    <span class="text-[11px] font-mono text-indigo-300 font-bold">{(selectedClip.custom_style || {}).fontSize || 68}px</span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="36"
+                                    max="110"
+                                    step="2"
+                                    value={(selectedClip.custom_style || {}).fontSize || 68}
+                                    onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), fontSize: parseInt(e.target.value) } })}
+                                    class="w-full h-1.5 rounded-full accent-indigo-500 cursor-pointer"
+                                  />
+                                  <div class="flex justify-between text-[9px] text-slate-600 mt-0.5">
+                                    <span>36px Small</span><span>68px Default</span><span>110px Large</span>
+                                  </div>
+                                </div>
+
+                                {/* Color Pickers */}
+                                <div class="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">🎨 Text Color</label>
+                                    <div class="flex items-center space-x-1.5">
+                                      <input
+                                        type="color"
+                                        value={(selectedClip.custom_style || {}).color || '#FFFFFF'}
+                                        onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), color: e.target.value } })}
+                                        class="w-8 h-8 rounded-lg border border-slate-700 cursor-pointer bg-transparent"
+                                      />
+                                      <input
+                                        type="text"
+                                        value={(selectedClip.custom_style || {}).color || '#FFFFFF'}
+                                        onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), color: e.target.value } })}
+                                        class="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[11px] font-mono text-slate-200"
+                                        placeholder="#FFFFFF"
+                                      />
+                                    </div>
+                                    {/* Quick Presets */}
+                                    <div class="flex gap-1 mt-1">
+                                      {['#FFFFFF','#FFD700','#00F5FF','#FF3B30','#FF6B00'].map(c => (
+                                        <button key={c} onClick={() => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), color: c } })}
+                                          class="w-5 h-5 rounded-md border border-slate-600 hover:scale-110 transition-transform"
+                                          style={{background: c}} title={c}
+                                        />
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">⚡ Highlight</label>
+                                    <div class="flex items-center space-x-1.5">
+                                      <input
+                                        type="color"
+                                        value={(selectedClip.custom_style || {}).highlightColor || '#FFD700'}
+                                        onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), highlightColor: e.target.value } })}
+                                        class="w-8 h-8 rounded-lg border border-slate-700 cursor-pointer bg-transparent"
+                                      />
+                                      <input
+                                        type="text"
+                                        value={(selectedClip.custom_style || {}).highlightColor || '#FFD700'}
+                                        onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), highlightColor: e.target.value } })}
+                                        class="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[11px] font-mono text-slate-200"
+                                        placeholder="#FFD700"
+                                      />
+                                    </div>
+                                    <div class="flex gap-1 mt-1">
+                                      {['#FFD700','#FF3B30','#00F5FF','#FF00AA','#4ECDC4'].map(c => (
+                                        <button key={c} onClick={() => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), highlightColor: c } })}
+                                          class="w-5 h-5 rounded-md border border-slate-600 hover:scale-110 transition-transform"
+                                          style={{background: c}} title={c}
+                                        />
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Live CSS Preview of Current Style */}
+                                {(() => {
+                                  const tmpl = CAPTION_TEMPLATES.find(t => t.id === (selectedClip.caption_template || 'word-pop')) || CAPTION_TEMPLATES[0];
+                                  const cs = selectedClip.custom_style || {};
+                                  const previewText = selectedClip.hook ? selectedClip.hook.substring(0, 40) : 'मैंने दुनिया के सबसे बड़े...';
+                                  return (
+                                    <div class="rounded-xl overflow-hidden border border-slate-700">
+                                      <div class="text-[9px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1 bg-slate-900 flex items-center justify-between">
+                                        <span>👁️ Live Preview — {tmpl.name}</span>
+                                        <span class="text-indigo-400">CSS Simulation</span>
+                                      </div>
+                                      <div class="relative flex items-end justify-center" style={{
+                                        background: 'linear-gradient(180deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%)',
+                                        height: '80px',
+                                        padding: '8px'
+                                      }}>
+                                        {/* Simulated caption */}
+                                        <div style={{
+                                          background: tmpl.id === 'boxed-caption' || tmpl.id === 'cinematic-subtitle' ? 'rgba(0,0,0,0.75)' :
+                                                      tmpl.id === 'news-lower-third' ? '#001B6B' :
+                                                      tmpl.id === 'highlight-bar' ? (cs.highlightColor || '#FFD700') :
+                                                      tmpl.id === 'magazine-paper' ? '#F5F0E8' : 'transparent',
+                                          padding: (tmpl.id === 'boxed-caption' || tmpl.id === 'news-lower-third' || tmpl.id === 'cinematic-subtitle' || tmpl.id === 'highlight-bar') ? '4px 10px' : '0',
+                                          borderRadius: '4px',
+                                          textAlign: 'center'
+                                        }}>
+                                          <span style={{
+                                            color: cs.color || tmpl.preview.text,
+                                            fontFamily: cs.fontFamily || (tmpl.id === 'typewriter' ? 'monospace' : tmpl.id === 'documentary-serif' || tmpl.id === 'magazine-paper' ? 'Georgia,serif' : 'Inter,sans-serif'),
+                                            fontSize: `${Math.round((cs.fontSize || 68) * 0.22)}px`,
+                                            fontWeight: ['bold-keyword','word-pop','neon-glow','fire-word','chapter-caption','outline-caption'].includes(tmpl.id) ? '900' : '600',
+                                            textShadow: tmpl.id === 'neon-glow' ? `0 0 8px ${cs.color || '#00F5FF'}, 0 0 20px ${cs.color || '#00F5FF'}` :
+                                                        tmpl.id === 'fire-word' ? '0 0 10px #FF6B00' :
+                                                        '1px 1px 3px rgba(0,0,0,0.9)',
+                                            WebkitTextStroke: tmpl.id === 'outline-caption' ? '0.5px black' : undefined,
+                                            letterSpacing: tmpl.id === 'cinematic-editorial' ? '0.1em' : 'normal',
+                                            textTransform: tmpl.id === 'cinematic-editorial' ? 'uppercase' : 'none',
+                                            display: 'block',
+                                            lineHeight: '1.3'
+                                          }}>
+                                            {tmpl.id === 'news-lower-third' && <span style={{color: '#FF0000', fontWeight:'900', marginRight:'4px'}}>⬤</span>}
+                                            {previewText}
+                                            {tmpl.id === 'karaoke-highlight' && <span style={{color: cs.highlightColor || '#FFD700'}}> ★</span>}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+
                               </div>
                             </div>
 
