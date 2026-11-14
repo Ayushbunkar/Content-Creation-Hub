@@ -289,8 +289,8 @@ export class ViralClipperService {
       // Fast-path: Check for YouTube official / auto subtitles (completes in ~2 seconds instead of minutes)
       if (!transcriptData && project.source_type === 'youtube' && project.source_url) {
         try {
-          this.broadcast({ projectId, stage: 'transcribing', progress: 55, message: 'Fetching YouTube subtitles...' });
-          transcriptData = await this.extractYouTubeSubtitles(project.source_url, captionsDir, projectId);
+          this.broadcast({ projectId, stage: 'transcribing', progress: 55, message: `Fetching YouTube subtitles (${language || 'en'})...` });
+          transcriptData = await this.extractYouTubeSubtitles(project.source_url, captionsDir, projectId, language || 'en');
           if (transcriptData && transcriptData.segments && transcriptData.segments.length > 0) {
             fs.writeFileSync(transcriptJsonPath, JSON.stringify(transcriptData, null, 2), 'utf-8');
             await runQuery('UPDATE clipper_projects SET transcript_json = ? WHERE id = ?', [
@@ -389,19 +389,277 @@ export class ViralClipperService {
   }
 
   /**
+   * Helper: Parse VTT/SRT text content into structured segments with word-level timings
+   */
+  public static parseVttContent(content: string, timeFilter?: { start: number; end: number }): TranscriptSegment[] {
+    const segments: TranscriptSegment[] = [];
+    const timePattern = /(\d+:\d+:\d+\.\d+|\d+:\d+\.\d+)\s*-->\s*(\d+:\d+:\d+\.\d+|\d+:\d+\.\d+)/;
+    const lines = content.split(/\r?\n/);
+
+    const parseTs = (str: string) => {
+      const parts = str.split(':');
+      if (parts.length === 3) return parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseFloat(parts[2]);
+      if (parts.length === 2) return parseInt(parts[0], 10) * 60 + parseFloat(parts[1]);
+      return 0;
+    };
+
+    let i = 0;
+    let segId = 1;
+    while (i < lines.length) {
+      const line = lines[i].trim();
+      const match = timePattern.exec(line);
+      if (match) {
+        const startTs = parseTs(match[1]);
+        const endTs = parseTs(match[2]);
+        i++;
+        const textLines: string[] = [];
+        while (i < lines.length && lines[i].trim() && !timePattern.test(lines[i])) {
+          let clean = lines[i].trim().replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ');
+          if (clean && !clean.startsWith('align:') && !clean.startsWith('position:') && !clean.startsWith('line:')) {
+            textLines.push(clean);
+          }
+          i++;
+        }
+        let cleanText = textLines.join(' ').trim();
+        cleanText = cleanText.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+
+        const isTitleCard = line.includes('line:0%') || line.includes('line:10%') || line.includes('position:0%');
+        if (cleanText && !isTitleCard) {
+          // If timeFilter is specified, check boundary overlap
+          if (timeFilter) {
+            if (endTs <= timeFilter.start || startTs >= timeFilter.end) {
+              continue;
+            }
+          }
+
+          // Deduplicate identical or near-identical cues from YouTube VTT
+          const lastSeg = segments[segments.length - 1];
+          if (lastSeg && (
+            (lastSeg.text.trim() === cleanText.trim()) ||
+            (lastSeg.text.includes(cleanText) && Math.abs(lastSeg.start - startTs) < 1.0)
+          )) {
+            continue;
+          }
+
+          const words = cleanText.split(/\s+/).filter(Boolean);
+          const wordDur = (endTs - startTs) / Math.max(1, words.length);
+          const wordsArr = words.map((w, wIdx) => ({
+            word: w,
+            start: +(startTs + wIdx * wordDur).toFixed(3),
+            end: +(startTs + (wIdx + 1) * wordDur).toFixed(3),
+            probability: 0.98
+          }));
+
+          segments.push({
+            id: segId++,
+            start: +startTs.toFixed(3),
+            end: +endTs.toFixed(3),
+            text: cleanText,
+            words: wordsArr
+          });
+        }
+        continue;
+      }
+      i++;
+    }
+    return segments;
+  }
+
+  /**
+   * Retrieve segments for a specific language from disk if available
+   */
+  public static getProjectLanguageSegments(projectId: string, language: string, timeFilter?: { start: number; end: number }): TranscriptSegment[] | null {
+    const captionsDir = path.join(process.cwd(), 'storage', 'captions');
+    if (!fs.existsSync(captionsDir)) return null;
+
+    const files = fs.readdirSync(captionsDir).filter(f => f.startsWith(`ytsub_${projectId}`) && (f.endsWith('.vtt') || f.endsWith('.srt')));
+    if (files.length === 0) return null;
+
+    let chosenFile: string | undefined;
+    if (language === 'en') {
+      chosenFile = files.find(f => f.includes('.en-orig.') || f.includes('.en.') || f.includes('.en-US.') || f.includes('.en-GB.')) ||
+                   files.find(f => !f.includes('.hi.')) ||
+                   files[0];
+    } else if (language === 'hi') {
+      chosenFile = files.find(f => f.includes('.hi.')) || files[0];
+    } else {
+      chosenFile = files.find(f => f.includes('.en-orig.') || f.includes('.en.')) || files[0];
+    }
+
+    if (!chosenFile) return null;
+    const fullPath = path.join(captionsDir, chosenFile);
+    if (!fs.existsSync(fullPath)) return null;
+
+    const content = fs.readFileSync(fullPath, 'utf-8');
+    const segs = this.parseVttContent(content, timeFilter);
+    return segs.length > 0 ? segs : null;
+  }
+
+  /**
+   * Translate segments to English or target language using Python translator bridge
+   */
+  public static async translateSegments(segments: TranscriptSegment[], targetLang: 'en' | 'hi' = 'en'): Promise<TranscriptSegment[]> {
+    if (!segments || segments.length === 0) return [];
+    return new Promise((resolve) => {
+      const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
+      const pythonExe = fs.existsSync(venvPy) ? venvPy : 'python';
+
+      const script = `
+import urllib.request, urllib.parse, json, sys
+
+data = json.loads(sys.stdin.read())
+target_lang = sys.argv[1] if len(sys.argv) > 1 else 'en'
+
+def translate_text(t):
+    if not t or not t.strip():
+        return t
+    url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={target_lang}&dt=t&q=" + urllib.parse.quote(t)
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            res = json.loads(resp.read().decode('utf-8'))
+            return ''.join([part[0] for part in res[0] if part[0]])
+    except Exception:
+        return t
+
+results = []
+for seg in data:
+    txt = seg.get('text', '')
+    translated = translate_text(txt)
+    words = translated.split()
+    start_ts = seg.get('start', 0)
+    end_ts = seg.get('end', 0)
+    word_dur = (end_ts - start_ts) / max(1, len(words))
+    words_arr = []
+    for idx, w in enumerate(words):
+        words_arr.append({
+            'word': w,
+            'start': round(start_ts + idx * word_dur, 3),
+            'end': round(start_ts + (idx + 1) * word_dur, 3),
+            'probability': 0.98
+        })
+    results.append({
+        'id': seg.get('id', 0),
+        'start': start_ts,
+        'end': end_ts,
+        'text': translated,
+        'words': words_arr
+    })
+
+print(json.dumps(results))
+`;
+      const p = spawn(pythonExe, ['-c', script, targetLang], {
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      });
+      let stdout = '';
+      p.stdout.on('data', d => { stdout += d.toString(); });
+      p.stdin.write(JSON.stringify(segments));
+      p.stdin.end();
+      p.on('close', code => {
+        try {
+          if (code === 0 && stdout.trim()) {
+            resolve(JSON.parse(stdout));
+          } else {
+            resolve(segments);
+          }
+        } catch {
+          resolve(segments);
+        }
+      });
+      p.on('error', () => resolve(segments));
+    });
+  }
+
+  /**
+   * Switch or translate a clip's language to English or Hindi
+   */
+  public static async setClipLanguage(clipId: string, language: 'en' | 'hi' | 'hinglish'): Promise<any> {
+    const clip = await getQuery<any>('SELECT * FROM clipper_clips WHERE id = ?', [clipId]);
+    if (!clip) throw new Error('Clip not found');
+
+    let segments: TranscriptSegment[] = [];
+
+    // 1. Try finding native subtitle track for project
+    if (language === 'en' || language === 'hi') {
+      const nativeSegs = this.getProjectLanguageSegments(clip.project_id, language, { start: clip.start_time, end: clip.end_time });
+      if (nativeSegs && nativeSegs.length > 0) {
+        segments = nativeSegs;
+      }
+    }
+
+    // 2. If native not found, translate existing segments
+    if (segments.length === 0 && clip.transcript_segments) {
+      try {
+        const rawSegs = JSON.parse(clip.transcript_segments);
+        segments = await this.translateSegments(rawSegs, language === 'hi' ? 'hi' : 'en');
+      } catch (e) {
+        console.warn('Translation error in setClipLanguage:', e);
+      }
+    }
+
+    if (segments.length === 0 && clip.transcript_segments) {
+      segments = JSON.parse(clip.transcript_segments);
+    }
+
+    // New hook/summary
+    const newHook = segments.length > 0 ? segments[0].text : clip.hook;
+    const fontMap: Record<string, string> = {
+      en: 'Montserrat',
+      hi: 'Noto Sans Devanagari',
+      hinglish: 'Poppins',
+      auto: 'Montserrat'
+    };
+    const currentCustomStyle = clip.custom_style ? JSON.parse(clip.custom_style) : {};
+    currentCustomStyle.fontFamily = fontMap[language] || 'Montserrat';
+
+    await runQuery(`
+      UPDATE clipper_clips SET
+        caption_language = ?,
+        hook = ?,
+        transcript_segments = ?,
+        custom_style = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [
+      language,
+      newHook,
+      JSON.stringify(segments),
+      JSON.stringify(currentCustomStyle),
+      clipId
+    ]);
+
+    const updated = await getQuery<any>('SELECT * FROM clipper_clips WHERE id = ?', [clipId]);
+    return {
+      ...updated,
+      transcript_segments: JSON.parse(updated.transcript_segments || '[]'),
+      custom_style: JSON.parse(updated.custom_style || '{}'),
+      virality_metrics: JSON.parse(updated.virality_metrics || '{}')
+    };
+  }
+
+  /**
    * Fast-path: Download YouTube subtitles directly via yt-dlp if available
    */
-  private static async extractYouTubeSubtitles(url: string, captionsDir: string, projectId: string): Promise<any | null> {
+  private static async extractYouTubeSubtitles(
+    url: string,
+    captionsDir: string,
+    projectId: string,
+    requestedLanguage: string = 'en'
+  ): Promise<any | null> {
     return new Promise((resolve) => {
       const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
       const pythonExe = fs.existsSync(venvPy) ? venvPy : 'python';
       const outputPrefix = path.join(captionsDir, `ytsub_${projectId}`);
 
+      const subLangs = requestedLanguage === 'hi'
+        ? 'hi,en,hi-Latn,en-orig'
+        : 'en,en-orig,en-US,en-GB,hi,hi-Latn';
+
       const args = [
         '-m', 'yt_dlp',
         '--write-sub',
         '--write-auto-sub',
-        '--sub-lang', 'hi,en,hi-Latn,en-orig',
+        '--sub-lang', subLangs,
         '--skip-download',
         '--sub-format', 'vtt/srt/best',
         '-o', outputPrefix,
@@ -418,72 +676,20 @@ export class ViralClipperService {
             return resolve(null);
           }
 
-          const chosenFile = files.find(f => f.includes('.hi.')) || files[0];
+          let chosenFile: string | undefined;
+          if (requestedLanguage === 'hi') {
+            chosenFile = files.find(f => f.includes('.hi.')) || files[0];
+          } else if (requestedLanguage === 'en') {
+            chosenFile = files.find(f => f.includes('.en-orig.') || f.includes('.en.') || f.includes('.en-US.') || f.includes('.en-GB.')) ||
+                         files.find(f => !f.includes('.hi.')) ||
+                         files[0];
+          } else {
+            chosenFile = files.find(f => f.includes('.en-orig.') || f.includes('.en.')) || files.find(f => f.includes('.hi.')) || files[0];
+          }
+
           const fullPath = path.join(captionsDir, chosenFile);
           const content = fs.readFileSync(fullPath, 'utf-8');
-
-          const segments: TranscriptSegment[] = [];
-          const timePattern = /(\d+:\d+:\d+\.\d+|\d+:\d+\.\d+)\s*-->\s*(\d+:\d+:\d+\.\d+|\d+:\d+\.\d+)/;
-          const lines = content.split(/\r?\n/);
-
-          const parseTs = (str: string) => {
-            const parts = str.split(':');
-            if (parts.length === 3) return parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseFloat(parts[2]);
-            if (parts.length === 2) return parseInt(parts[0], 10) * 60 + parseFloat(parts[1]);
-            return 0;
-          };
-
-          let i = 0;
-          let segId = 1;
-          while (i < lines.length) {
-            const line = lines[i].trim();
-            const match = timePattern.exec(line);
-            if (match) {
-              const startTs = parseTs(match[1]);
-              const endTs = parseTs(match[2]);
-              i++;
-              const textLines: string[] = [];
-              while (i < lines.length && lines[i].trim() && !timePattern.test(lines[i])) {
-                let clean = lines[i].trim().replace(/<[^>]+>/g, '');
-                if (clean && !clean.startsWith('align:') && !clean.startsWith('position:')) {
-                  textLines.push(clean);
-                }
-                i++;
-              }
-              const cleanText = textLines.join(' ').trim();
-              const isTitleCard = line.includes('line:0%') || line.includes('line:10%') || line.includes('position:0%');
-              if (cleanText && !isTitleCard) {
-                // Deduplicate identical or near-identical cues from YouTube VTT
-                const lastSeg = segments[segments.length - 1];
-                if (lastSeg && (
-                  (lastSeg.text.trim() === cleanText.trim()) ||
-                  (lastSeg.text.includes(cleanText) && Math.abs(lastSeg.start - startTs) < 1.0)
-                )) {
-                  // Duplicate or redundant nested cue, skip
-                  continue;
-                }
-
-                const words = cleanText.split(/\s+/);
-                const wordDur = (endTs - startTs) / Math.max(1, words.length);
-                const wordsArr = words.map((w, wIdx) => ({
-                  word: w,
-                  start: +(startTs + wIdx * wordDur).toFixed(3),
-                  end: +(startTs + (wIdx + 1) * wordDur).toFixed(3),
-                  probability: 0.98
-                }));
-
-                segments.push({
-                  id: segId++,
-                  start: +startTs.toFixed(3),
-                  end: +endTs.toFixed(3),
-                  text: cleanText,
-                  words: wordsArr
-                });
-              }
-              continue;
-            }
-            i++;
-          }
+          const segments = this.parseVttContent(content);
 
           if (segments.length > 0) {
             resolve({
@@ -950,8 +1156,33 @@ export class ViralClipperService {
     const outputFilename = `clip_${clip.id}_${cleanTitle}_9x16.mp4`;
     const outputPath = path.join(outputDir, outputFilename);
 
-    const segments: TranscriptSegment[] = clip.transcript_segments ? JSON.parse(clip.transcript_segments) : [];
+    let segments: TranscriptSegment[] = clip.transcript_segments ? JSON.parse(clip.transcript_segments) : [];
     const customStyle = clip.custom_style ? JSON.parse(clip.custom_style) : {};
+
+    // Auto-fix: if target language is English ('en') or auto, and captions currently contain Devanagari Hindi characters,
+    // automatically retrieve native English track or translate to English so rendered captions are in English!
+    const rawSegmentsStr = clip.transcript_segments || '';
+    const containsHindiChars = /[\u0900-\u097F]/.test(rawSegmentsStr);
+    const requestedLang = clip.caption_language || 'en';
+
+    if (requestedLang === 'en' && containsHindiChars) {
+      console.log(`[ViralClipper] Clip ${clipId} has caption_language='en' but contains Hindi characters. Auto-switching to English...`);
+      const nativeEn = this.getProjectLanguageSegments(clip.project_id, 'en', { start: clip.start_time, end: clip.end_time });
+      if (nativeEn && nativeEn.length > 0) {
+        segments = nativeEn;
+        await runQuery('UPDATE clipper_clips SET caption_language = "en", transcript_segments = ? WHERE id = ?', [
+          JSON.stringify(nativeEn), clipId
+        ]);
+      } else {
+        const translated = await this.translateSegments(segments, 'en');
+        if (translated && translated.length > 0) {
+          segments = translated;
+          await runQuery('UPDATE clipper_clips SET caption_language = "en", transcript_segments = ? WHERE id = ?', [
+            JSON.stringify(translated), clipId
+          ]);
+        }
+      }
+    }
 
     // Deduplicate any overlapping or identical subtitle cues (cleaning legacy duplicate cues)
     const deduplicatedSegments: TranscriptSegment[] = [];
@@ -1042,7 +1273,7 @@ export class ViralClipperService {
         const cropZoom = cameraZoomFilter ? `${cameraZoomFilter},scale=-1:1920:flags=lanczos` : 'scale=-1:1920:flags=lanczos';
         filterGraph = `[0:v]${cropZoom},crop=1080:1920:(iw-1080)/2:0,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'[outv]`;
       } else if (mode === 'split_screen') {
-        filterGraph = `split=2[top][bottom];[top]crop=iw/2:ih:0:0,scale=1080:960:flags=lanczos[t_sc];[bottom]crop=iw/2:ih:iw/2:0,scale=1080:960:flags=lanczos[b_sc];[t_sc][b_sc]vstack=inputs=2,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'`;
+        filterGraph = `[0:v]split=2[top][bottom];[top]crop=iw/2:ih:0:0,scale=1080:960:flags=lanczos[t_sc];[bottom]crop=iw/2:ih:iw/2:0,scale=1080:960:flags=lanczos[b_sc];[t_sc][b_sc]vstack=inputs=2,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'[outv]`;
       } else {
         // Gold standard Podcast blurred background framing + Smart Camera Zoom
         const fgZoom = cameraZoomFilter ? `${cameraZoomFilter},scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg]` : 'scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg]';

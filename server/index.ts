@@ -1333,6 +1333,43 @@ app.put('/api/clipper/clips/:clipId', async (req, res) => {
   }
 });
 
+// 6b. Explicitly switch language or translate clip captions (e.g. Hindi <-> English)
+app.post('/api/clipper/clips/:clipId/set-language', async (req, res) => {
+  try {
+    const clipId = String(req.params.clipId);
+    const { language } = req.body;
+    if (!language) return res.status(400).json({ error: 'language is required' });
+
+    const updatedClip = await ViralClipperService.setClipLanguage(clipId, language);
+    res.json({ success: true, clip: updatedClip });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 6c. Switch entire project's clips to target language (e.g. English)
+app.post('/api/clipper/projects/:id/set-language', async (req, res) => {
+  try {
+    const projectId = String(req.params.id);
+    const { language } = req.body;
+    if (!language) return res.status(400).json({ error: 'language is required' });
+
+    const clips = await allQuery<any>('SELECT id FROM clipper_clips WHERE project_id = ?', [projectId]);
+    const updatedClips = [];
+    for (const c of clips) {
+      try {
+        const u = await ViralClipperService.setClipLanguage(c.id, language);
+        updatedClips.push(u);
+      } catch (e) {
+        console.warn(`Error setting language for clip ${c.id}:`, e);
+      }
+    }
+    res.json({ success: true, count: updatedClips.length, clips: updatedClips });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 7. Render single clip
 app.post('/api/clipper/clips/:clipId/render', async (req, res) => {
   try {
