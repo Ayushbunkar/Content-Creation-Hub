@@ -1821,6 +1821,36 @@ app.post('/api/audio-police/generate-ai-music', async (req, res) => {
   }
 });
 
+// ==========================================
+// 7. PAPER STYLE ANIMATION STUDIO ROUTES
+// ==========================================
+import { PaperStudioService } from './paperStudio';
+
+app.all('/api/paper-studio/ideas', async (req, res) => {
+  try {
+    const query = req.body?.query || req.query?.query;
+    const ideas = PaperStudioService.generate10FreshIdeas(typeof query === 'string' ? query : undefined);
+    res.json({ success: true, count: ideas.length, ideas });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/paper-studio/plan', async (req, res) => {
+  try {
+    const { idea, duration, aspectRatio } = req.body;
+    if (!idea) return res.status(400).json({ error: 'idea object is required' });
+    const plan = PaperStudioService.generateProductionPlan(
+      idea,
+      parseInt(String(duration || 30), 10),
+      aspectRatio || '9:16'
+    );
+    res.json({ success: true, plan });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Start server
 async function main() {
   await initDatabase();

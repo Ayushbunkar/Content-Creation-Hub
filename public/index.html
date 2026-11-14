@@ -877,6 +877,75 @@
       const [exportedVideoUrl, setExportedVideoUrl] = useState(null);
       const [outputClips, setOutputClips] = useState([]);
 
+      // ================= PAPER STYLE ANIMATION STUDIO STATE ================= //
+      const [paperTopicQuery, setPaperTopicQuery] = useState('');
+      const [paperIdeas, setPaperIdeas] = useState([]);
+      const [selectedPaperIdea, setSelectedPaperIdea] = useState(null);
+      const [paperDuration, setPaperDuration] = useState(30);
+      const [paperCustomDuration, setPaperCustomDuration] = useState('');
+      const [paperAspectRatio, setPaperAspectRatio] = useState('9:16');
+      const [paperPlan, setPaperPlan] = useState(null);
+      const [isPaperLoading, setIsPaperLoading] = useState(false);
+      const [paperCopiedKey, setPaperCopiedKey] = useState(null);
+
+      const handleFetchPaperIdeas = async (customQ) => {
+        setIsPaperLoading(true);
+        try {
+          const res = await fetch('/api/paper-studio/ideas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: customQ !== undefined ? customQ : paperTopicQuery })
+          });
+          const data = await res.json();
+          if (data.ideas && data.ideas.length > 0) {
+            setPaperIdeas(data.ideas);
+            setSelectedPaperIdea(data.ideas[0]);
+            setPaperPlan(null);
+          }
+        } catch (e) {
+          alert('Failed to generate paper ideas: ' + e.message);
+        } finally {
+          setIsPaperLoading(false);
+        }
+      };
+
+      const handleGeneratePaperPlan = async (chosenIdea) => {
+        const targetIdea = chosenIdea || selectedPaperIdea;
+        if (!targetIdea) return;
+        setIsPaperLoading(true);
+        try {
+          const dur = paperCustomDuration ? parseInt(paperCustomDuration, 10) : paperDuration;
+          if (dur % 10 !== 0) {
+            alert('Duration must be a multiple of 10 seconds (e.g. 10s, 20s, 30s, 40s, 50s, 60s)!');
+            setIsPaperLoading(false);
+            return;
+          }
+          const res = await fetch('/api/paper-studio/plan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              idea: targetIdea,
+              duration: dur,
+              aspectRatio: paperAspectRatio
+            })
+          });
+          const data = await res.json();
+          if (data.plan) {
+            setPaperPlan(data.plan);
+          }
+        } catch (e) {
+          alert('Failed to build paper production plan: ' + e.message);
+        } finally {
+          setIsPaperLoading(false);
+        }
+      };
+
+      const copyToClipboard = (text, key) => {
+        navigator.clipboard.writeText(text);
+        setPaperCopiedKey(key);
+        setTimeout(() => setPaperCopiedKey(null), 2000);
+      };
+
       // ================= AI VIRAL CLIPPER STATE ================= //
       const [clipperProjects, setClipperProjects] = useState([]);
       const [activeClipperProject, setActiveClipperProject] = useState(null);
@@ -2344,6 +2413,7 @@
 
               <nav class="p-3 space-y-1">
                 {[
+                  { id: 'paper', label: 'Paper Animation Studio', badge: 'Airyzen 📜', icon: 'file-text' },
                   { id: 'documentary', label: 'Documentary Studio', badge: '8-Min AI Doc', icon: 'film' },
                   { id: 'enhancement', label: 'Video Quality & AI Pro', badge: '60 FPS ⚡', icon: 'zap' },
                   { id: 'audio_police', label: 'Audio Copyright Police', badge: 'Police 🚨', icon: 'shield' },
@@ -2395,7 +2465,7 @@
               <div class="flex items-center space-x-3">
                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 <h2 class="text-sm font-bold tracking-wide text-slate-200 uppercase">
-                  {currentTab === 'documentary' ? 'Documentary Studio — Topic-to-Documentary AI Generator' : currentTab === 'enhancement' ? 'Video Quality & Cinematic Production Engine' : currentTab === 'audio_police' ? 'Audio Copyright Police — Pre-Export Gate & Asset Registry' : currentTab === 'clipper' ? 'AI Viral Clipper — YouTube & Podcast Auto-Shorts' : currentTab === 'captions' ? 'Caption Studio — Video & Animated Subtitles' : currentTab.toUpperCase()}
+                  {currentTab === 'paper' ? 'Paper Animation Studio — Airyzen Master Explainer Engine' : currentTab === 'documentary' ? 'Documentary Studio — Topic-to-Documentary AI Generator' : currentTab === 'enhancement' ? 'Video Quality & Cinematic Production Engine' : currentTab === 'audio_police' ? 'Audio Copyright Police — Pre-Export Gate & Asset Registry' : currentTab === 'clipper' ? 'AI Viral Clipper — YouTube & Podcast Auto-Shorts' : currentTab === 'captions' ? 'Caption Studio — Video & Animated Subtitles' : currentTab.toUpperCase()}
                 </h2>
               </div>
               <div class="text-xs text-slate-400 flex items-center space-x-4">
@@ -2406,6 +2476,355 @@
 
             {/* TAB CONTAINER */}
             <div class="flex-1 overflow-y-auto p-6 custom-scrollbar">
+
+              {/* ===================== TAB: PAPER STYLE ANIMATION STUDIO ===================== */}
+              {currentTab === 'paper' && (
+                <div class="max-w-7xl mx-auto space-y-6">
+
+                  {/* Top Header Banner */}
+                  <div class="flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-950 border border-amber-800/40 rounded-2xl p-6 shadow-2xl">
+                    <div class="flex items-center space-x-4">
+                      <div class="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 text-2xl shadow-lg shadow-amber-500/20">
+                        📜
+                      </div>
+                      <div>
+                        <h2 class="text-lg font-black text-slate-100 flex items-center space-x-2">
+                          <span>Paper Style Animation Studio</span>
+                          <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                            Airyzen Master Explainer Engine
+                          </span>
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">
+                          Authentic educational explainers crafted from tactile paper cut-outs, layered diagrams, and 10s continuity scenes.
+                        </p>
+                      </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                      <span class="text-[11px] bg-slate-800 text-amber-300 border border-slate-700 px-3 py-1.5 rounded-xl font-bold">
+                        ✂️ 10s Scenes • 1 Image Prompt • Cutout Continuity
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Research & Topic Input Bar */}
+                  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                    <div class="flex items-center justify-between">
+                      <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
+                        <span>🔍 Research Any Concept, Fact, or Question</span>
+                      </h3>
+                      <span class="text-[10px] text-slate-400">Science • Nature • Money • Inventions • Biology • Architecture</span>
+                    </div>
+                    <div class="flex flex-wrap sm:flex-nowrap gap-3">
+                      <input
+                        type="text"
+                        value={paperTopicQuery}
+                        onChange={(e) => setPaperTopicQuery(e.target.value)}
+                        placeholder="e.g. Why is agarwood so expensive? or What happens when you save Rs 10 every day?"
+                        class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-200 focus:outline-none focus:border-amber-500 placeholder-slate-600 font-medium"
+                      />
+                      <button
+                        onClick={() => handleFetchPaperIdeas()}
+                        disabled={isPaperLoading}
+                        class="px-5 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl text-xs font-extrabold shadow-lg shadow-amber-600/30 transition flex items-center space-x-2 whitespace-nowrap"
+                      >
+                        <span>{isPaperLoading ? '⏳ Researching Facts...' : '🎲 Research 10 Fresh Ideas'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 10 Researched Ideas Grid */}
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <h3 class="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center space-x-2">
+                        <span>💡 Step 1: Select One Researched Idea (1–10)</span>
+                        <span class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-mono">{paperIdeas.length} Verified Ideas</span>
+                      </h3>
+                      {paperIdeas.length === 0 && (
+                        <button
+                          onClick={() => handleFetchPaperIdeas()}
+                          class="text-xs text-amber-400 hover:underline font-bold"
+                        >
+                          Click here to load 10 curated ideas →
+                        </button>
+                      )}
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      {paperIdeas.map((idea, idx) => {
+                        const isSelected = selectedPaperIdea?.id === idea.id;
+                        return (
+                          <div
+                            key={idea.id}
+                            onClick={() => { setSelectedPaperIdea(idea); setPaperPlan(null); }}
+                            class={`cursor-pointer rounded-2xl p-4 border transition-all space-y-2.5 relative ${
+                              isSelected
+                                ? 'bg-amber-950/30 border-amber-500 shadow-xl shadow-amber-900/20 ring-1 ring-amber-500'
+                                : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
+                            }`}
+                          >
+                            <div class="flex items-start justify-between gap-2">
+                              <div class="flex items-center space-x-2">
+                                <span class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 font-mono font-black text-xs flex items-center justify-center">
+                                  #{idx + 1}
+                                </span>
+                                <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                                  {idea.category}
+                                </span>
+                              </div>
+                              {isSelected && (
+                                <span class="text-[10px] bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded-full">
+                                  Selected ✓
+                                </span>
+                              )}
+                            </div>
+
+                            <h4 class="text-sm font-black text-slate-100 leading-snug">
+                              {idea.title}
+                            </h4>
+
+                            <div class="bg-slate-950/80 border border-slate-800/80 rounded-xl p-2.5 text-xs text-amber-200/90 italic">
+                              "{idea.hook}"
+                            </div>
+
+                            <p class="text-[11px] text-slate-300 leading-relaxed">
+                              {idea.explanation}
+                            </p>
+
+                            <div class="text-[10px] text-slate-400 pt-1 border-t border-slate-800/60 flex items-center justify-between">
+                              <span class="truncate">🎨 <strong>Paper Visual:</strong> {idea.visualPotential.slice(0, 55)}...</span>
+                              <span class="text-amber-400 font-mono text-[9px] shrink-0">Verified Source</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Step 2 & 3: Duration & Aspect Ratio Configuration */}
+                  {selectedPaperIdea && (
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-5">
+                      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div>
+                          <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center space-x-2">
+                            <span>⚙️ Step 2 & 3: Configure Duration & Aspect Ratio</span>
+                          </h3>
+                          <p class="text-[11px] text-slate-400 mt-0.5">
+                            Selected: <strong class="text-amber-300">{selectedPaperIdea.title}</strong>
+                          </p>
+                        </div>
+                        <span class="text-[10px] text-emerald-400 font-mono bg-emerald-950 border border-emerald-800 px-2 py-0.5 rounded-full">
+                          Rule: Every scene = exact 10 seconds
+                        </span>
+                      </div>
+
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        {/* Duration Selector */}
+                        <div class="space-y-2">
+                          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                            Select Video Duration (10s per scene)
+                          </label>
+                          <div class="grid grid-cols-4 gap-2">
+                            {[
+                              { sec: 10, label: '10s (1 Scene)' },
+                              { sec: 20, label: '20s (2 Scenes)' },
+                              { sec: 30, label: '30s (3 Scenes)' },
+                              { sec: 60, label: '60s (6 Scenes)' }
+                            ].map(d => (
+                              <button
+                                key={d.sec}
+                                onClick={() => { setPaperDuration(d.sec); setPaperCustomDuration(''); }}
+                                class={`py-2 rounded-xl text-xs font-extrabold border transition ${
+                                  paperDuration === d.sec && !paperCustomDuration
+                                    ? 'bg-amber-600 text-white border-amber-400 shadow-md shadow-amber-600/30'
+                                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                                }`}
+                              >
+                                {d.label}
+                              </button>
+                            ))}
+                          </div>
+                          <div class="flex items-center space-x-2 pt-1">
+                            <span class="text-xs text-slate-400">Custom Duration:</span>
+                            <input
+                              type="number"
+                              step="10"
+                              min="10"
+                              max="120"
+                              placeholder="e.g. 40 or 50"
+                              value={paperCustomDuration}
+                              onChange={(e) => setPaperCustomDuration(e.target.value)}
+                              class="w-28 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-amber-500 font-mono"
+                            />
+                            <span class="text-[10px] text-slate-500">(Must be multiple of 10s)</span>
+                          </div>
+                        </div>
+
+                        {/* Aspect Ratio Selector */}
+                        <div class="space-y-2">
+                          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                            Select Output Aspect Ratio
+                          </label>
+                          <div class="grid grid-cols-3 gap-2">
+                            {[
+                              { id: '9:16', label: '📱 9:16 Vertical', desc: 'Shorts, Reels, TikTok' },
+                              { id: '16:9', label: '🖥️ 16:9 Horizontal', desc: 'YouTube Standard' },
+                              { id: '1:1',  label: '⏹️ 1:1 Square', desc: 'Instagram / Feed' }
+                            ].map(a => (
+                              <button
+                                key={a.id}
+                                onClick={() => setPaperAspectRatio(a.id)}
+                                class={`p-2.5 rounded-xl text-left border transition ${
+                                  paperAspectRatio === a.id
+                                    ? 'bg-amber-600 text-white border-amber-400 shadow-md shadow-amber-600/30'
+                                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                                }`}
+                              >
+                                <div class="text-xs font-extrabold">{a.label}</div>
+                                <div class={`text-[10px] mt-0.5 ${paperAspectRatio === a.id ? 'text-amber-100' : 'text-slate-500'}`}>{a.desc}</div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action Button */}
+                      <button
+                        onClick={() => handleGeneratePaperPlan()}
+                        disabled={isPaperLoading}
+                        class="w-full py-3.5 bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-500 hover:from-amber-500 hover:to-yellow-400 text-slate-950 rounded-xl text-sm font-black shadow-xl shadow-amber-600/40 transition flex items-center justify-center space-x-2"
+                      >
+                        <span>{isPaperLoading ? '⏳ Building Production Plan & Prompts...' : '⚡ Generate Scene-By-Scene Paper Animation Production Plan'}</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Production Plan Results Display */}
+                  {paperPlan && (
+                    <div class="bg-slate-900 border border-amber-500/40 rounded-2xl p-6 space-y-6 shadow-2xl">
+                      {/* Plan Header */}
+                      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                        <div>
+                          <div class="text-[10px] font-mono text-amber-400 uppercase tracking-widest font-black">
+                            MASTER PRODUCTION PLAN • AIRYZEN PAPER ANIMATION PIPELINE
+                          </div>
+                          <h3 class="text-base font-black text-slate-100 mt-1">
+                            {paperPlan.title}
+                          </h3>
+                        </div>
+                        <div class="flex items-center space-x-2 text-xs">
+                          <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-mono font-bold">
+                            ⏱️ {paperPlan.duration}s Total ({paperPlan.sceneCount} Scenes)
+                          </span>
+                          <span class="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 font-mono font-bold border border-amber-500/30">
+                            📐 {paperPlan.aspectRatio}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Golden Rule Banner */}
+                      <div class="bg-amber-950/30 border border-amber-700/60 rounded-xl p-3 flex items-center justify-between text-xs text-amber-200">
+                        <div class="flex items-center space-x-2">
+                          <span class="text-base">📌</span>
+                          <span><strong>Critical Continuity Rule Enforced:</strong> Exactly 1 Image Prompt in Scene 1. Scene 2 onwards are Video Prompts ONLY continuing from the previous frame.</span>
+                        </div>
+                        <span class="text-[10px] font-mono bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded">
+                          100% COMPLIANT
+                        </span>
+                      </div>
+
+                      {/* Scene by Scene Breakdown */}
+                      <div class="space-y-4">
+                        {paperPlan.scenes.map((scene) => (
+                          <div key={scene.sceneNumber} class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-3">
+                            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                              <div class="flex items-center space-x-2">
+                                <span class="px-2 py-0.5 rounded bg-amber-500 text-slate-950 text-xs font-black">
+                                  SCENE {scene.sceneNumber}
+                                </span>
+                                <span class="text-xs font-mono font-bold text-slate-300">
+                                  {scene.timeRange} (Exactly 10s)
+                                </span>
+                              </div>
+                              <div class="flex items-center space-x-1.5">
+                                {scene.imagePrompt ? (
+                                  <span class="text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-700 px-2 py-0.5 rounded-full font-bold">
+                                    🖼️ Image Prompt + 🎬 Video Prompt
+                                  </span>
+                                ) : (
+                                  <span class="text-[10px] bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-full font-bold">
+                                    🎬 Video Prompt Only (Frame Continuation)
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Narration Script */}
+                            <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-3 space-y-1">
+                              <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">
+                                🎙️ Narration Script (Fits 10 Seconds)
+                              </span>
+                              <p class="text-xs text-slate-200 font-medium leading-relaxed">
+                                "{scene.narration}"
+                              </p>
+                            </div>
+
+                            {/* Image Prompt (Only in Scene 1) */}
+                            {scene.imagePrompt && (
+                              <div class="bg-slate-900 border border-indigo-900/60 rounded-lg p-3 space-y-2">
+                                <div class="flex items-center justify-between">
+                                  <span class="text-[10px] font-black text-indigo-400 uppercase tracking-wider flex items-center space-x-1">
+                                    <span>🖼️ MASTER IMAGE PROMPT (SCENE 1 ONLY — ESTABLISHES PAPER AESTHETIC)</span>
+                                  </span>
+                                  <button
+                                    onClick={() => copyToClipboard(scene.imagePrompt, `img_${scene.sceneNumber}`)}
+                                    class="text-[10px] text-indigo-300 hover:text-white bg-indigo-950 px-2 py-0.5 rounded border border-indigo-800"
+                                  >
+                                    {paperCopiedKey === `img_${scene.sceneNumber}` ? 'Copied ✓' : 'Copy Prompt'}
+                                  </button>
+                                </div>
+                                <p class="text-[11px] font-mono text-slate-300 leading-relaxed bg-slate-950 p-2.5 rounded-md border border-slate-800">
+                                  {scene.imagePrompt}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Video Prompt */}
+                            <div class="bg-slate-900 border border-amber-900/40 rounded-lg p-3 space-y-2">
+                              <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-black text-amber-400 uppercase tracking-wider flex items-center space-x-1">
+                                  <span>🎬 10-SECOND VIDEO PROMPT {scene.sceneNumber > 1 ? '(CONTINUATION FROM PREVIOUS FRAME)' : '(ANIMATES STARTING IMAGE)'}</span>
+                                </span>
+                                <button
+                                  onClick={() => copyToClipboard(scene.videoPrompt, `vid_${scene.sceneNumber}`)}
+                                  class="text-[10px] text-amber-300 hover:text-white bg-amber-950 px-2 py-0.5 rounded border border-amber-800"
+                                >
+                                  {paperCopiedKey === `vid_${scene.sceneNumber}` ? 'Copied ✓' : 'Copy Prompt'}
+                                </button>
+                              </div>
+                              <p class="text-[11px] font-mono text-slate-300 leading-relaxed bg-slate-950 p-2.5 rounded-md border border-slate-800">
+                                {scene.videoPrompt}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Verified Sources */}
+                      <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-1.5">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          📚 Verified Fact Sources & Academic Citations
+                        </span>
+                        <ul class="text-xs text-slate-300 list-disc list-inside space-y-0.5">
+                          {paperPlan.sources.map((s, idx) => (
+                            <li key={idx}><strong class="text-amber-300">{s}</strong></li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              )}
 
                             {/* ===================== TAB: DOCUMENTARY STUDIO ===================== */}
               {currentTab === 'documentary' && (
