@@ -3592,46 +3592,52 @@
       return (
         <div class="flex h-screen bg-slate-950">
           {/* LEFT NAVIGATION SIDEBAR */}
-          <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-screen flex-shrink-0">
-            <div class="p-5 border-b border-slate-800 flex items-center space-x-3 flex-shrink-0">
-              <div class="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/30">
-                AI
-              </div>
-              <div>
-                <h1 class="text-sm font-bold tracking-wide uppercase text-slate-100">Local Studio</h1>
-                <p class="text-xs text-indigo-400 font-medium">Production Platform</p>
+          <aside class="w-64 bg-slate-900/95 border-r border-slate-800/80 flex flex-col h-screen flex-shrink-0 backdrop-blur-md">
+            <div class="p-4 border-b border-slate-800/80 flex items-center justify-between flex-shrink-0 bg-slate-950/40">
+              <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center font-black text-white shadow-lg shadow-indigo-600/30">
+                  AI
+                </div>
+                <div>
+                  <h1 class="text-xs font-black tracking-wider uppercase text-slate-100">Local Studio</h1>
+                  <p class="text-[10px] text-indigo-400 font-semibold tracking-wide">Production Platform</p>
+                </div>
               </div>
             </div>
 
             <div class="flex-1 overflow-y-auto custom-scrollbar p-3">
-              <nav class="space-y-1">
+              <nav class="space-y-1.5">
                 {[
-                  { id: 'stream_clipper', label: 'Stream Chat Clipper', badge: 'Live / VOD ⚡', icon: 'tv' },
-                  { id: 'paper', label: 'Paper Animation Studio', badge: 'Paper 📜', icon: 'file-text' },
-                  { id: 'documentary', label: 'Cinematic Doc Engine', badge: 'Doc Engine 🎬', icon: 'film' },
-                  { id: 'enhancement', label: 'Video Quality & AI Pro', badge: '60 FPS ⚡', icon: 'zap' },
-                  { id: 'audio_police', label: 'Audio Copyright Police', badge: 'Police 🚨', icon: 'shield' },
-                  { id: 'clipper', label: 'AI Viral Clipper', badge: 'Viral 🔥', icon: 'scissors' },
-                  { id: 'captions', label: 'Caption Studio', badge: 'Pro', icon: 'type' },
-                  { id: 'new', label: 'New AI Video', icon: 'plus-circle' },
-                  { id: 'progress', label: 'Job Pipeline', icon: 'activity' },
-                  { id: 'editor', label: 'AI Video Editor', icon: 'sliders' },
-                  { id: 'social', label: 'Social Studio', icon: 'share-2' },
-                  { id: 'library', label: 'Project Library', icon: 'folder' },
-                  { id: 'curated', label: 'Curated Topics', icon: 'compass' },
+                  { id: 'stream_clipper', label: 'Stream Chat Clipper', badge: 'Live / VOD ⚡' },
+                  { id: 'paper', label: 'Paper Animation Studio', badge: 'Paper 📜' },
+                  { id: 'documentary', label: 'Cinematic Doc Engine', badge: 'Doc Engine 🎬' },
+                  { id: 'enhancement', label: 'Video Quality & AI Pro', badge: '60 FPS ⚡' },
+                  { id: 'audio_police', label: 'Audio Copyright Police', badge: 'Police 🚨' },
+                  { id: 'clipper', label: 'AI Viral Clipper', badge: 'Viral 🔥' },
+                  { id: 'captions', label: 'Caption Studio', badge: 'Pro' },
+                  { id: 'new', label: 'New AI Video' },
+                  { id: 'progress', label: 'Job Pipeline' },
+                  { id: 'editor', label: 'AI Video Editor' },
+                  { id: 'social', label: 'Social Studio' },
+                  { id: 'library', label: 'Project Library' },
+                  { id: 'curated', label: 'Curated Topics' },
                 ].map(item => (
                   <button
                     key={item.id}
                     onClick={() => setCurrentTab(item.id)}
-                    class={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition ${
+                    class={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
                       currentTab === item.id
-                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                        : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                        ? 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-600/30 font-bold border-l-4 border-amber-400 pl-3'
+                        : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
                     }`}
                   >
                     <span>{item.label}</span>
                     {item.badge && (
-                      <span class="text-[10px] font-bold bg-indigo-500 text-white px-1.5 py-0.5 rounded">
+                      <span class={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                        currentTab === item.id
+                          ? 'bg-white/20 text-white'
+                          : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                      }`}>
                         {item.badge}
                       </span>
                     )}
@@ -3640,14 +3646,22 @@
               </nav>
             </div>
 
-            <div class="p-4 border-t border-slate-800 text-xs text-slate-500">
-              <div class="flex items-center justify-between mb-1">
-                <span>Hardware</span>
-                <span class="text-emerald-400 font-semibold">GTX 1650 (Local)</span>
+            <div class="p-3.5 border-t border-slate-800/80 text-xs text-slate-400 bg-slate-950/60 space-y-2">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-slate-500">Hardware</span>
+                <span class="text-emerald-400 font-semibold flex items-center space-x-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  <span>GTX 1650 (Local)</span>
+                </span>
               </div>
-              <div class="flex items-center justify-between">
-                <span>Engines</span>
-                <span class="text-slate-300">Whisper • FFmpeg • Remotion</span>
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-slate-500">Engines</span>
+                <span class="text-slate-300 font-mono text-[10px]">Whisper • FFmpeg • Remotion</span>
+              </div>
+              <div class="pt-2 border-t border-slate-800/60 flex items-center justify-center space-x-1.5 text-[11px] text-slate-400">
+                <span>Made with</span>
+                <span class="text-rose-500 animate-pulse text-xs">❤️</span>
+                <span class="text-indigo-300 font-bold tracking-wide">by Ayush Bunkar</span>
               </div>
             </div>
           </aside>
@@ -3655,16 +3669,24 @@
           {/* MAIN CONTENT AREA */}
           <main class="flex-1 flex flex-col overflow-hidden">
             {/* TOP HEADER */}
-            <header class="h-14 border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 flex items-center justify-between">
-              <div class="flex items-center space-x-3">
-                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <h2 class="text-sm font-bold tracking-wide text-slate-200 uppercase">
+            <header class="h-14 border-b border-slate-800/80 bg-slate-900/70 backdrop-blur-md px-6 flex items-center justify-between flex-shrink-0 z-10 shadow-sm">
+              <div class="flex items-center space-x-3 min-w-0">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0 shadow-lg shadow-emerald-400/50"></span>
+                <h2 class="text-xs sm:text-sm font-black tracking-wide text-slate-100 uppercase truncate">
                   {currentTab === 'stream_clipper' ? 'Stream Chat Viral Clipper — Indian & Global Stream Extraction Engine' : currentTab === 'paper' ? 'Paper Animation Studio — Master Explainer Engine' : currentTab === 'documentary' ? 'CINEMATIC DOCUMENTARY ENGINE — TOPIC & SCRIPT INVESTIGATION' : currentTab === 'enhancement' ? 'Video Quality & Cinematic Production Engine' : currentTab === 'audio_police' ? 'Audio Copyright Police — Pre-Export Gate & Asset Registry' : currentTab === 'clipper' ? 'AI Viral Clipper — YouTube & Podcast Auto-Shorts' : currentTab === 'captions' ? 'Caption Studio — Video & Animated Subtitles' : currentTab.toUpperCase()}
                 </h2>
               </div>
-              <div class="text-xs text-slate-400 flex items-center space-x-4">
-                <span>Local Zero-Cost Pipeline</span>
-                <span class="px-2 py-0.5 rounded bg-slate-800 text-indigo-400 font-mono">127.0.0.1:3000</span>
+              <div class="text-xs text-slate-400 flex items-center space-x-3 flex-shrink-0">
+                <span class="hidden md:inline px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-slate-300 font-medium text-[11px]">
+                  Local Zero-Cost Pipeline
+                </span>
+                <span class="px-2.5 py-1 rounded-lg bg-indigo-950/80 text-indigo-300 border border-indigo-700/50 font-mono text-[11px] shadow-sm">
+                  127.0.0.1:3000
+                </span>
+                <div class="flex items-center space-x-1.5 px-3 py-1 bg-gradient-to-r from-indigo-950/60 to-purple-950/60 border border-indigo-500/30 rounded-full text-[11px]">
+                  <span class="text-slate-400">By</span>
+                  <span class="font-bold text-slate-200">Ayush Bunkar</span>
+                </div>
               </div>
             </header>
 
@@ -7881,17 +7903,17 @@
               {currentTab === 'captions' && (
                 <div class="max-w-7xl mx-auto space-y-6">
                   {/* Top Bar: Project Switcher & Upload Button */}
-                  <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-900 border border-slate-800 rounded-xl p-4">
-                    <div class="flex items-center space-x-3">
+                  <div class="flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800/80 shadow-xl rounded-2xl p-5">
+                    <div class="flex items-center space-x-4">
                       <div>
-                        <label class="block text-[11px] font-bold uppercase text-slate-400 mb-1">Active Caption Project</label>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Active Caption Project</label>
                         <select
                           value={activeCapProject?.id || ''}
                           onChange={(e) => {
                             const p = capProjects.find(x => x.id === e.target.value);
                             if (p) selectCaptionProject(p);
                           }}
-                          class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-200 min-w-[220px]"
+                          class="bg-slate-950 border border-slate-700/80 hover:border-indigo-500 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-100 min-w-[260px] shadow-inner focus:outline-none focus:ring-1 focus:ring-indigo-500 transition"
                         >
                           {capProjects.length === 0 && <option value="">No Uploaded Videos</option>}
                           {capProjects.map(p => (
@@ -7903,13 +7925,13 @@
                       </div>
 
                       {activeCapProject && (
-                        <div class="flex items-center space-x-2 pt-4">
-                          <span class={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                        <div class="flex items-center space-x-2 pt-5">
+                          <span class={`text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wide border ${
                             activeCapProject.status === 'completed' || activeCapProject.status === 'ready'
-                              ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                              ? 'bg-emerald-950/80 text-emerald-300 border-emerald-700/60 shadow-sm shadow-emerald-950'
                               : activeCapProject.status === 'transcribing' || activeCapProject.status === 'exporting'
-                              ? 'bg-amber-950 text-amber-400 animate-pulse'
-                              : 'bg-slate-800 text-slate-400'
+                              ? 'bg-amber-950/80 text-amber-300 border-amber-700/60 animate-pulse shadow-sm shadow-amber-950'
+                              : 'bg-slate-800 text-slate-300 border-slate-700'
                           }`}>
                             {activeCapProject.status}
                           </span>
@@ -7920,7 +7942,7 @@
                               setActiveCapProject(null);
                               fetchCaptionProjects();
                             }}
-                            class="text-xs text-rose-400 hover:text-rose-300 font-medium px-2 py-1"
+                            class="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-950/50 rounded-lg px-2.5 py-1 transition font-medium"
                           >
                             Delete
                           </button>
@@ -7940,7 +7962,7 @@
                             }
                           }}
                           defaultValue=""
-                          class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                          class="bg-slate-950 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-sm"
                         >
                           <option value="" disabled>🎬 Open Rendered Output Clip ({outputClips.length})...</option>
                           {outputClips.map((c) => (
@@ -7951,7 +7973,7 @@
                         </select>
                       )}
 
-                      <label class="cursor-pointer px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-xs shadow-md shadow-indigo-600/30 transition flex items-center space-x-2">
+                      <label class="cursor-pointer px-5 py-2.5 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-indigo-600/30 transition flex items-center space-x-2 active:scale-95">
                         <span>+ Upload Video / Audio</span>
                         <input
                           type="file"
@@ -8025,52 +8047,62 @@
                   {/* ACTIVE PROJECT WORKSPACE */}
                   {activeCapProject && (
                     <div class="space-y-6">
-                      {/* Media Diagnostics & Transcription Toolbar */}
-                      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs">
-                        <div class="flex items-center space-x-6 text-slate-400 font-mono">
-                          <div><span class="text-slate-500">File:</span> <span class="text-slate-200">{activeCapProject.file_info?.filename}</span></div>
-                          <div><span class="text-slate-500">Resolution:</span> <span class="text-indigo-400 font-bold">{activeCapProject.file_info?.width}x{activeCapProject.file_info?.height}</span></div>
-                          <div><span class="text-slate-500">Duration:</span> <span class="text-slate-200">{activeCapProject.file_info?.durationSeconds ? activeCapProject.file_info.durationSeconds.toFixed(1) + 's' : 'N/A'}</span></div>
-                          <div><span class="text-slate-500">FPS:</span> <span class="text-slate-200">{activeCapProject.file_info?.fps}</span></div>
-                          <div><span class="text-slate-500">Video/Audio:</span> <span class="text-slate-200">{activeCapProject.file_info?.videoCodec} / {activeCapProject.file_info?.audioCodec}</span></div>
+                      {/* Media Diagnostics & Accelerated Transcription Toolbar */}
+                      <div class="bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800/80 shadow-lg rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs">
+                        <div class="flex flex-wrap items-center gap-2.5 font-mono text-xs">
+                          <span class="px-3 py-1 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 shadow-inner">
+                            📁 <span class="text-slate-500">File:</span> <strong class="text-slate-100">{activeCapProject.file_info?.filename}</strong>
+                          </span>
+                          <span class="px-3 py-1 bg-indigo-950/40 border border-indigo-800/40 rounded-xl text-indigo-300">
+                            📐 <strong>{activeCapProject.file_info?.width}x{activeCapProject.file_info?.height}</strong>
+                          </span>
+                          <span class="px-3 py-1 bg-slate-950 border border-slate-800 rounded-xl text-slate-300">
+                            ⏱ <strong>{activeCapProject.file_info?.durationSeconds ? activeCapProject.file_info.durationSeconds.toFixed(1) + 's' : 'N/A'}</strong>
+                          </span>
+                          <span class="px-3 py-1 bg-emerald-950/40 border border-emerald-800/40 rounded-xl text-emerald-300">
+                            ⚡ <strong>{activeCapProject.file_info?.fps} FPS</strong>
+                          </span>
+                          <span class="px-3 py-1 bg-slate-950 border border-slate-800 rounded-xl text-slate-400">
+                            🎬 {activeCapProject.file_info?.videoCodec} / {activeCapProject.file_info?.audioCodec}
+                          </span>
                         </div>
 
                         {/* Whisper Controls */}
-                        <div class="flex items-center space-x-3">
+                        <div class="flex items-center space-x-2.5">
                           <select
                             value={transcribeLang}
                             onChange={(e) => setTranscribeLang(e.target.value)}
-                            class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200"
+                            class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                           >
-                            <option value="auto">Language: Auto-Detect</option>
-                            <option value="en">English</option>
-                            <option value="hi">Hindi (हिन्दी)</option>
-                            <option value="es">Spanish</option>
-                            <option value="fr">French</option>
-                            <option value="de">German</option>
-                            <option value="ja">Japanese</option>
+                            <option value="auto">🌐 Language: Auto-Detect</option>
+                            <option value="hi">🇮🇳 Hindi (हिन्दी)</option>
+                            <option value="en">🇺🇸 English</option>
+                            <option value="es">🇪🇸 Spanish</option>
+                            <option value="fr">🇫🇷 French</option>
+                            <option value="de">🇩🇪 German</option>
+                            <option value="ja">🇯🇵 Japanese</option>
                           </select>
 
                           <select
                             value={transcribeModel}
                             onChange={(e) => setTranscribeModel(e.target.value)}
-                            class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200"
+                            class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                           >
-                            <option value="base">Model: Base (Fast/Balanced)</option>
-                            <option value="tiny">Model: Tiny (Ultra-Fast)</option>
-                            <option value="small">Model: Small (High Accuracy)</option>
+                            <option value="tiny">⚡ Turbo CTranslate2 (~10s)</option>
+                            <option value="base">🎯 Base Balanced (~25s)</option>
+                            <option value="small">💎 Small (High Accuracy)</option>
                           </select>
 
                           <button
                             onClick={() => triggerTranscription()}
                             disabled={isTranscribing}
-                            class={`px-3 py-1 rounded font-bold text-xs text-white transition ${
+                            class={`px-4 py-2 rounded-xl font-bold text-xs text-white shadow-lg transition flex items-center space-x-1.5 ${
                               isTranscribing
-                                ? 'bg-amber-600 animate-pulse cursor-not-allowed'
-                                : 'bg-emerald-600 hover:bg-emerald-500'
+                                ? 'bg-amber-600 animate-pulse shadow-amber-600/30 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 shadow-emerald-600/30 active:scale-95'
                             }`}
                           >
-                            {isTranscribing ? `Transcribing (${transcribeProgress}%)` : (activeCapProject.transcript_json ? 'Re-Transcribe' : '🎙️ Transcribe Audio')}
+                            <span>{isTranscribing ? `⏳ Transcribing (${transcribeProgress}%)` : (activeCapProject.transcript_json ? '🔄 Re-Transcribe' : '🎙️ Transcribe Audio')}</span>
                           </button>
                         </div>
                       </div>
@@ -11473,6 +11505,37 @@
               )}
 
             </div>
+
+            {/* FIXED STUDIO STATUS FOOTER BAR ACROSS ALL PAGES */}
+            <footer class="h-10 border-t border-slate-800/80 bg-slate-950/95 backdrop-blur-md px-6 flex items-center justify-between text-xs text-slate-400 select-none flex-shrink-0 z-30">
+              <div class="flex items-center space-x-3">
+                <span class="flex items-center space-x-1.5 text-slate-300 font-semibold">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span class="text-slate-200">Local AI Video Studio</span>
+                </span>
+                <span class="text-slate-700 hidden sm:inline">•</span>
+                <span class="text-slate-400 font-mono text-[11px] hidden sm:inline">100% Zero-Cost Local Pipeline</span>
+                <span class="text-slate-700 hidden md:inline">•</span>
+                <span class="text-emerald-400 font-mono text-[11px] hidden md:inline">GTX 1650 Active</span>
+              </div>
+
+              {/* MADE BY AYUSH BUNKAR BADGE */}
+              <div class="flex items-center space-x-2 bg-gradient-to-r from-indigo-950/90 via-purple-950/90 to-slate-900 border border-indigo-500/40 px-4 py-1 rounded-full shadow-lg shadow-indigo-950/50">
+                <span class="text-slate-300 text-xs font-medium">Made with</span>
+                <span class="text-rose-500 animate-pulse text-sm">❤️</span>
+                <span class="text-xs font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 via-purple-300 to-amber-300 tracking-wider uppercase">
+                  by Ayush Bunkar
+                </span>
+              </div>
+
+              <div class="hidden sm:flex items-center space-x-3 text-[11px] text-slate-400 font-mono">
+                <span>Whisper CTranslate2</span>
+                <span class="text-slate-700">•</span>
+                <span>Remotion 4.0</span>
+                <span class="text-slate-700">•</span>
+                <span>FFmpeg</span>
+              </div>
+            </footer>
           </main>
         </div>
       );

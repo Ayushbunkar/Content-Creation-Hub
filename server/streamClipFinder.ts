@@ -504,6 +504,7 @@ export class StreamClipFinderService {
           const ytdlp = spawn(venvPy, [
             '-m', 'yt_dlp',
             '--js-runtimes', nodeRuntime,
+            '--remote-components', 'ejs:github',
             '--download-sections', timeSpec,
             '--force-keyframes-at-cuts',
             '--no-playlist',
@@ -774,6 +775,7 @@ export class StreamClipFinderService {
         '-map', '[v]',
         '-map', '1:a',
         '-c:v', 'libx264',
+        '-pix_fmt', 'yuv420p',
         '-preset', 'ultrafast',
         '-t', String(dur),
         outputPath

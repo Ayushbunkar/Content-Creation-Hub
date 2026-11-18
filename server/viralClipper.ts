@@ -128,7 +128,7 @@ export class ViralClipperService {
       const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
       const pythonExe = fs.existsSync(venvPy) ? venvPy : 'python';
       const nodeRuntime = process.execPath ? `node:${process.execPath}` : 'node';
-      const args = ['-m', 'yt_dlp', '--js-runtimes', nodeRuntime, '--dump-json', '--no-playlist', url];
+      const args = ['-m', 'yt_dlp', '--js-runtimes', nodeRuntime, '--remote-components', 'ejs:github', '--dump-json', '--no-playlist', url];
       const p = spawn(pythonExe, args);
       let stdout = '';
       let stderr = '';
@@ -228,6 +228,7 @@ export class ViralClipperService {
       const args = [
         '-m', 'yt_dlp',
         '--js-runtimes', nodeRuntime,
+        '--remote-components', 'ejs:github',
         '--no-playlist',
         '-f', 'bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         '--merge-output-format', 'mp4',
@@ -865,6 +866,7 @@ print(json.dumps(results))
       const args = [
         '-m', 'yt_dlp',
         '--js-runtimes', nodeRuntime,
+        '--remote-components', 'ejs:github',
         '--write-sub',
         '--write-auto-sub',
         '--sub-lang', subLangs,
