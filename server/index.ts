@@ -22,6 +22,7 @@ import { ScenePlanningEngine } from './scenePlanningEngine';
 import { SoundDesignSystem, SFX_CATALOG, BGM_CATALOG } from './soundDesignSystem';
 import { QualityControlEngine } from './qualityControlEngine';
 import { PerformanceResourceManager } from './resourceManager';
+import { SocialPublisher } from './socialPublisher';
 
 const app = express();
 const server = http.createServer(app);
@@ -2467,6 +2468,94 @@ app.post('/api/system/cleanup', (req, res) => {
     const result = PerformanceResourceManager.cleanupTempFiles(maxAgeMs);
     res.json({ success: true, ...result });
   } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// SOCIAL PUBLISHING PIPELINE (YOUTUBE & INSTAGRAM)
+// ==========================================
+
+// Get connected social accounts status
+app.get('/api/social/accounts', (req, res) => {
+  try {
+    const accounts = SocialPublisher.getAccounts();
+    res.json({ success: true, accounts });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Connect account profile / credentials
+app.post('/api/social/connect-account', (req, res) => {
+  try {
+    const { platform, details } = req.body;
+    if (!platform || (platform !== 'youtube' && platform !== 'instagram')) {
+      return res.status(400).json({ error: 'Valid platform (youtube or instagram) is required' });
+    }
+    const updated = SocialPublisher.connectAccount(platform, details || {});
+    res.json({ success: true, accounts: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Disconnect account
+app.post('/api/social/disconnect-account', (req, res) => {
+  try {
+    const { platform } = req.body;
+    if (!platform || (platform !== 'youtube' && platform !== 'instagram')) {
+      return res.status(400).json({ error: 'Valid platform (youtube or instagram) is required' });
+    }
+    const updated = SocialPublisher.disconnectAccount(platform);
+    res.json({ success: true, accounts: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Generate viral titles, descriptions, and trending hashtags from clip context
+app.post('/api/social/generate-metadata', (req, res) => {
+  try {
+    const { streamerName, headlineHook, transcriptSnippet, gameOrTopic, duration, platform } = req.body;
+    const metadata = SocialPublisher.generateMetadata({
+      streamerName,
+      headlineHook,
+      transcriptSnippet,
+      gameOrTopic,
+      duration,
+      platform
+    });
+    res.json({ success: true, metadata });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 1-Click Publish to YouTube Shorts and/or Instagram Reels
+app.post('/api/social/publish', async (req, res) => {
+  try {
+    const { filePath, platforms, title, description, hashtags, privacy, streamerName } = req.body;
+    if (!filePath) {
+      return res.status(400).json({ error: 'filePath is required' });
+    }
+    if (!platforms || !Array.isArray(platforms) || platforms.length === 0) {
+      return res.status(400).json({ error: 'platforms array is required (e.g. ["youtube", "instagram"])' });
+    }
+
+    const results = await SocialPublisher.publishVideo({
+      filePath,
+      platforms,
+      title: title || 'Viral Reel #shorts',
+      description: description || '',
+      hashtags: hashtags || [],
+      privacy: privacy || 'public',
+      streamerName: streamerName || 'Creator'
+    });
+
+    res.json({ success: true, results });
+  } catch (err: any) {
+    console.error('[SocialPublisher] Publish error:', err);
     res.status(500).json({ error: err.message });
   }
 });

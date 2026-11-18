@@ -230,7 +230,7 @@ export class ViralClipperService {
         '--js-runtimes', nodeRuntime,
         '--remote-components', 'ejs:github',
         '--no-playlist',
-        '-f', 'bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        '-f', 'bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/230+234/231+234/311+234/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
         '--merge-output-format', 'mp4',
         '-o', outputTemplate,
         url
