@@ -1425,7 +1425,7 @@ app.get('/api/clipper/projects/:id', async (req, res) => {
 // 3. Create clipper project from YouTube URL, local path, or existing clip
 app.post('/api/clipper/projects/create', async (req, res) => {
   try {
-    const { sourceType, url, localPath, targetDuration, clipCountTarget, language } = req.body;
+    const { sourceType, url, localPath, targetDuration, clipCountTarget, language, modelName } = req.body;
     const projectId = 'clip_proj_' + Date.now();
 
     let title = 'Clipping Project';
@@ -1468,7 +1468,8 @@ app.post('/api/clipper/projects/create', async (req, res) => {
     ViralClipperService.processSource(projectId, {
       targetDuration: targetDuration || '30-60',
       clipCountTarget: clipCountTarget || 5,
-      language: language || 'auto'
+      language: language || 'auto',
+      modelName: modelName || 'tiny'
     }).catch(err => {
       console.error(`Clipper project ${projectId} background error:`, err);
     });
@@ -1516,11 +1517,12 @@ app.post('/api/clipper/upload', async (req, res) => {
           probeInfo.fps
         ]);
 
-        // Trigger processing immediately
+        // Trigger processing immediately with accelerated CTranslate2
         ViralClipperService.processSource(projectId, {
           targetDuration: '30-60',
           clipCountTarget: 5,
-          language: 'auto'
+          language: 'auto',
+          modelName: 'tiny'
         }).catch(console.error);
 
         const project = await getQuery('SELECT * FROM clipper_projects WHERE id = ?', [projectId]);

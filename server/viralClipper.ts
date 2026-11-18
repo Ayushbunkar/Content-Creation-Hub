@@ -284,7 +284,7 @@ export class ViralClipperService {
    */
   static async processSource(
     projectId: string,
-    options: { targetDuration?: string; clipCountTarget?: number; language?: string } = {}
+    options: { targetDuration?: string; clipCountTarget?: number; language?: string; modelName?: string } = {}
   ): Promise<void> {
     const project = await getQuery<any>('SELECT * FROM clipper_projects WHERE id = ?', [projectId]);
     if (!project) throw new Error('Clipper project not found');
@@ -292,6 +292,7 @@ export class ViralClipperService {
     const targetDuration = options.targetDuration || project.target_duration || '30-60';
     const clipCountTarget = options.clipCountTarget || project.clip_count_target || 5;
     const language = options.language || 'auto';
+    const modelName = options.modelName || 'tiny';
 
     try {
       let videoPath = path.isAbsolute(project.video_path) ? project.video_path : path.join(process.cwd(), project.video_path);
@@ -416,7 +417,7 @@ export class ViralClipperService {
         transcriptData = await this.executeWhisper(audioPath, transcriptJsonPath, language, probe.durationSeconds, (pct) => {
           const overallPct = Math.min(78, 50 + Math.round(pct * 0.28));
           this.broadcast({ projectId, stage: 'transcribing', progress: overallPct, message: `Transcribing dialogue: ${pct}%...` });
-        }, projectId);
+        }, projectId, modelName);
         await runQuery('UPDATE clipper_projects SET transcript_json = ? WHERE id = ?', [
           JSON.stringify(transcriptData), projectId
         ]);
@@ -927,7 +928,8 @@ print(json.dumps(results))
     language: string,
     totalDuration: number = 0,
     onProgress?: (pct: number) => void,
-    projectId?: string
+    projectId?: string,
+    modelName: string = 'tiny'
   ): Promise<any> {
     return new Promise((resolve, reject) => {
       const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
@@ -938,7 +940,7 @@ print(json.dumps(results))
         scriptPath,
         audioPath,
         outputPath,
-        '--model', 'base',
+        '--model', modelName || 'tiny',
         '--language', language || 'auto',
         '--device', 'cpu'
       ];

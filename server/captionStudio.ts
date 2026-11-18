@@ -175,7 +175,7 @@ export class CaptionStudioService {
   /**
    * Run Whisper transcription with word timestamps
    */
-  static async transcribeMedia(projectId: string, language = 'auto', modelName = 'base'): Promise<void> {
+  static async transcribeMedia(projectId: string, language = 'auto', modelName = 'tiny'): Promise<void> {
     const project = await getQuery<any>('SELECT * FROM caption_projects WHERE id = ?', [projectId]);
     if (!project) throw new Error('Caption project not found');
 
@@ -198,7 +198,7 @@ export class CaptionStudioService {
         scriptPath,
         audioPath,
         jsonOutputPath,
-        '--model', modelName || 'base',
+        '--model', modelName || 'tiny',
         '--language', language || 'auto',
         '--device', 'cpu'
       ];
