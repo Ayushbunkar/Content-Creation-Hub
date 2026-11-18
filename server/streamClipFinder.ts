@@ -334,7 +334,7 @@ export class StreamClipFinderService {
     streamerName?: string;
     cropMode?: 'blur_pad' | 'center_crop' | 'smart_zoom' | 'source_16_9' | 'square_1_1' | 'split_speed_60_40' | 'split_50_50' | 'split_30_70' | 'split_70_30';
     blurIntensity?: 'subtle' | 'medium' | 'heavy';
-    camPosition?: 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right' | 'auto_center';
+    camPosition?: 'auto_detect' | 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right' | 'auto_center';
     captionStyle?: 'speed_center' | 'yellow_black' | 'white_black' | 'bottom_standard' | 'center_only';
     isDemo?: boolean;
   }): Promise<{
@@ -351,7 +351,7 @@ export class StreamClipFinderService {
       streamerName = 'Streamer',
       cropMode = 'split_speed_60_40',
       blurIntensity = 'medium',
-      camPosition = 'top_left',
+      camPosition = 'auto_detect',
       captionStyle = 'speed_center',
       isDemo = false
     } = options as any;
@@ -650,6 +650,16 @@ export class StreamClipFinderService {
     else if (cropMode === 'split_70_30') dividerY = 1344;
     else dividerY = 960;
 
+    let detectedCamCrop: string | undefined = undefined;
+    if ((camPosition === 'auto_detect' || !camPosition) && cropMode.startsWith('split_')) {
+      console.log(`[streamClipper] 🤖 Running AI Facecam Detector on ${path.basename(tempRawPath)}...`);
+      const detection = await this.detectStreamerFacecam(tempRawPath, dividerY);
+      if (detection && detection.ffmpeg_cam_crop) {
+        detectedCamCrop = detection.ffmpeg_cam_crop;
+        console.log(`[streamClipper] ✅ Streamer facecam detected: ${detection.position_label} -> ${detectedCamCrop}`);
+      }
+    }
+
     console.log(`[streamClipper] Generating viral captions (style: ${captionStyle}, divider: ${dividerY}px) for moment #${moment.rank}...`);
     const tempAssPath = path.join(process.cwd(), 'storage', 'stream_clips', `captions_${clipId}.ass`);
     const tempJsonPath = path.join(process.cwd(), 'storage', 'stream_clips', `captions_${clipId}.json`);
@@ -657,7 +667,7 @@ export class StreamClipFinderService {
 
     // Step 3: FFmpeg Dual Split / Gaussian blur / Smart Zoom with burned Center Hook captions
     console.log(`[streamClipper] Cropping and formatting ${cropMode} video (cam: ${camPosition}, blur: ${blurIntensity}) with burned captions...`);
-    await this.processVerticalCrop(tempRawPath, finalClipPath, moment, streamerName, cropMode, tempAssPath, blurIntensity, camPosition);
+    await this.processVerticalCrop(tempRawPath, finalClipPath, moment, streamerName, cropMode, tempAssPath, blurIntensity, camPosition, detectedCamCrop);
 
     // Clean up temporary raw and caption files
     try {
@@ -677,6 +687,78 @@ export class StreamClipFinderService {
       duration: moment.duration,
       transcript: captionResult?.cues || []
     };
+  }
+
+  /**
+   * Run Computer Vision facecam detection on the stream clip using OpenCV Haar cascades
+   * to automatically locate the persistent streamer facecam box (x, y, w, h).
+   */
+  static async detectStreamerFacecam(videoPath: string, camH: number = 768): Promise<{
+    success: boolean;
+    face_detected: boolean;
+    position_label: string;
+    ffmpeg_cam_crop: string;
+    message?: string;
+  }> {
+    const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
+    const scriptPath = path.join(process.cwd(), 'scripts', 'detect_streamer_facecam.py');
+
+    if (!fs.existsSync(scriptPath) || !fs.existsSync(videoPath)) {
+      return {
+        success: false,
+        face_detected: false,
+        position_label: 'top_left',
+        ffmpeg_cam_crop: 'crop=iw*0.42:ih*0.52:0:0'
+      };
+    }
+
+    return new Promise((resolve) => {
+      const proc = spawn(venvPy, [scriptPath, videoPath, '--cam_h', String(camH)]);
+      let stdout = '';
+      let stderr = '';
+
+      proc.stdout.on('data', (d) => { stdout += d.toString(); });
+      proc.stderr.on('data', (d) => { stderr += d.toString(); });
+
+      const timer = setTimeout(() => {
+        try { proc.kill(); } catch (e) {}
+        console.warn('[FacecamDetector] Timed out after 20s, falling back to top_left');
+        resolve({
+          success: false,
+          face_detected: false,
+          position_label: 'top_left',
+          ffmpeg_cam_crop: 'crop=iw*0.42:ih*0.52:0:0'
+        });
+      }, 20000);
+
+      proc.on('close', () => {
+        clearTimeout(timer);
+        try {
+          const lines = stdout.trim().split('\n');
+          const lastLine = lines[lines.length - 1];
+          const data = JSON.parse(lastLine);
+          console.log(`[FacecamDetector] Auto-detected streamer: ${data.position_label} (${data.ffmpeg_cam_crop})`);
+          resolve(data);
+        } catch (e) {
+          resolve({
+            success: false,
+            face_detected: false,
+            position_label: 'top_left',
+            ffmpeg_cam_crop: 'crop=iw*0.42:ih*0.52:0:0'
+          });
+        }
+      });
+
+      proc.on('error', () => {
+        clearTimeout(timer);
+        resolve({
+          success: false,
+          face_detected: false,
+          position_label: 'top_left',
+          ffmpeg_cam_crop: 'crop=iw*0.42:ih*0.52:0:0'
+        });
+      });
+    });
   }
 
   /**
@@ -752,7 +834,8 @@ export class StreamClipFinderService {
     mode: string = 'split_speed_60_40',
     assPath?: string,
     blurLevel: 'subtle' | 'medium' | 'heavy' = 'medium',
-    camPosition: 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right' | 'auto_center' = 'top_left'
+    camPosition: 'auto_detect' | 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right' | 'auto_center' = 'auto_detect',
+    customCamCrop?: string
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       let filterComplex = '';
@@ -764,16 +847,18 @@ export class StreamClipFinderService {
       if (blurLevel === 'subtle') blurParams = 'boxblur=10:3';
       else if (blurLevel === 'heavy') blurParams = 'boxblur=45:12';
 
-      // Streamer camera crop region based on user choice or streamer layout
-      let camCrop = 'crop=iw*0.42:ih*0.52:0:0'; // top_left (Speed / CarryisLive / Kai standard)
-      if (camPosition === 'top_right') {
-        camCrop = 'crop=iw*0.42:ih*0.52:iw*0.58:0';
-      } else if (camPosition === 'bottom_left') {
-        camCrop = 'crop=iw*0.42:ih*0.52:0:ih*0.48';
-      } else if (camPosition === 'bottom_right') {
-        camCrop = 'crop=iw*0.42:ih*0.52:iw*0.58:ih*0.48';
-      } else if (camPosition === 'auto_center') {
-        camCrop = 'crop=iw*0.48:ih*0.60:(iw-iw*0.48)/2:0';
+      // Streamer camera crop region based on AI detection or user manual choice
+      let camCrop = customCamCrop || 'crop=iw*0.42:ih*0.52:0:0'; // top_left default fallback
+      if (!customCamCrop) {
+        if (camPosition === 'top_right') {
+          camCrop = 'crop=iw*0.42:ih*0.52:iw*0.58:0';
+        } else if (camPosition === 'bottom_left') {
+          camCrop = 'crop=iw*0.42:ih*0.52:0:ih*0.48';
+        } else if (camPosition === 'bottom_right') {
+          camCrop = 'crop=iw*0.42:ih*0.52:iw*0.58:ih*0.48';
+        } else if (camPosition === 'auto_center') {
+          camCrop = 'crop=iw*0.48:ih*0.60:(iw-iw*0.48)/2:0';
+        }
       }
 
       if (mode.startsWith('split_')) {

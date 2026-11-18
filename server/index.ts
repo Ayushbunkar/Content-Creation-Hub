@@ -24,6 +24,27 @@ import { QualityControlEngine } from './qualityControlEngine';
 import { PerformanceResourceManager } from './resourceManager';
 import { SocialPublishingService } from './social';
 
+// Load .env configuration
+try {
+  const envPath = path.join(process.cwd(), '.env');
+  if (fs.existsSync(envPath)) {
+    const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#') || !line.includes('=')) continue;
+      const eqIdx = line.indexOf('=');
+      const k = line.slice(0, eqIdx).trim();
+      const v = line.slice(eqIdx + 1).trim();
+      if (k && !process.env[k]) {
+        process.env[k] = v;
+      }
+    }
+    console.log('[ENV] Loaded configuration from .env successfully');
+  }
+} catch (e) {
+  console.warn('[ENV] Note loading .env:', e);
+}
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -2388,7 +2409,7 @@ app.post('/api/stream-clipper/render-clip', async (req, res) => {
       streamerName: streamerName || 'Creator',
       cropMode: cropMode || 'split_speed_60_40',
       blurIntensity: blurIntensity || 'medium',
-      camPosition: camPosition || 'top_left',
+      camPosition: camPosition || 'auto_detect',
       captionStyle: captionStyle || 'speed_center',
       isDemo: Boolean(isDemo)
     });
@@ -2414,7 +2435,7 @@ app.post('/api/stream-clipper/render-all', async (req, res) => {
           streamerName: streamerName || 'Creator',
           cropMode: moment.customCropMode || cropMode || 'split_speed_60_40',
           blurIntensity: moment.customBlurIntensity || blurIntensity || 'medium',
-          camPosition: moment.customCamPosition || camPosition || 'top_left',
+          camPosition: moment.customCamPosition || camPosition || 'auto_detect',
           captionStyle: moment.customCaptionStyle || captionStyle || 'speed_center'
         });
         renderedClips.push({ ...result, momentRank: moment.rank });

@@ -1532,7 +1532,7 @@
       const [streamGapSec, setStreamGapSec] = useState(90);
       const [streamMinMultiplier, setStreamMinMultiplier] = useState(3.0);
       const [streamCropMode, setStreamCropMode] = useState('split_speed_60_40'); // 'split_speed_60_40' | 'split_50_50' | 'split_30_70' | 'split_70_30' | 'blur_pad' | 'center_crop' | 'smart_zoom' | 'square_1_1' | 'source_16_9'
-      const [streamCamPosition, setStreamCamPosition] = useState('top_left'); // 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right' | 'auto_center'
+      const [streamCamPosition, setStreamCamPosition] = useState('auto_detect'); // 'auto_detect' | 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right' | 'auto_center'
       const [streamCaptionStyle, setStreamCaptionStyle] = useState('speed_center'); // 'speed_center' | 'yellow_black' | 'white_black' | 'bottom_standard' | 'center_only'
       const [streamBlurIntensity, setStreamBlurIntensity] = useState('medium'); // 'subtle' | 'medium' | 'heavy'
       const [momentFramingOverrides, setMomentFramingOverrides] = useState({});
@@ -4384,11 +4384,12 @@
                             disabled={!streamCropMode.startsWith('split_')}
                             class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 disabled:opacity-40"
                           >
+                            <option value="auto_detect">🤖 AI Auto-Detect (Finds Streamer Facecam Automatically)</option>
                             <option value="top_left">📍 Top-Left (Speed / CarryisLive / Kai standard)</option>
                             <option value="top_right">📍 Top-Right</option>
                             <option value="bottom_left">📍 Bottom-Left</option>
                             <option value="bottom_right">📍 Bottom-Right</option>
-                            <option value="auto_center">🎯 Auto Center / Main Subject</option>
+                            <option value="auto_center">🎯 Center Frame</option>
                           </select>
                         </div>
 
@@ -4599,6 +4600,7 @@
                                     }}
                                     class="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs text-slate-200"
                                   >
+                                    <option value="auto_detect">🤖 AI Auto-Detect (Auto-frame Facecam)</option>
                                     <option value="top_left">📍 Top-Left</option>
                                     <option value="top_right">📍 Top-Right</option>
                                     <option value="bottom_left">📍 Bottom-Left</option>
