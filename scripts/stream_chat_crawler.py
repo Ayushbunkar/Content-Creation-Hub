@@ -17,6 +17,7 @@ import argparse
 import math
 import re
 import subprocess
+import collections
 from collections import Counter
 from datetime import timedelta
 
@@ -661,8 +662,8 @@ def analyze_chat_spikes(messages, bucket_sec=10, rolling_window_sec=300, min_mul
                     "multiplier": sm["multiplier"],
                     "msg_count": 8,
                     "weighted_score": 10.0,
-                    "emotes": collections.Counter(sm["top_emotes"]),
-                    "sample_messages": sm["sample_messages"]
+                    "emotes": Counter(sm.get("top_emotes", [])),
+                    "sample_messages": sm.get("sample_messages", ["Stream Dialogue & Action"])
                 })
                 if len(selected) >= top_k:
                     break
@@ -811,11 +812,13 @@ def main():
                 pass
         moments = generate_real_stream_moments(args.url or '', total_duration_sec=stream_dur, top_k=args.top, before_sec=args.before, after_sec=args.after)
 
+    total_dur_sec = max([m.get('time_in_seconds', 0) for m in messages], default=0) if messages else 0
+
     result = {
         "success": True,
         "total_messages": len(messages),
-        "total_duration_sec": max(m['time_in_seconds'] for m in messages) if messages else 0,
-        "total_duration_formatted": format_time(max(m['time_in_seconds'] for m in messages)) if messages else "00:00",
+        "total_duration_sec": total_dur_sec,
+        "total_duration_formatted": format_time(total_dur_sec),
         "region": args.region,
         "moments_count": len(moments),
         "moments": moments
