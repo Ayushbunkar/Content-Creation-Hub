@@ -319,7 +319,7 @@ def generate_real_stream_moments(url, total_duration_sec=3600, top_k=4, before_s
         })
     return moments
 
-def fetch_youtube_live_chat(url, max_messages=50000, timeout_sec=28):
+def fetch_youtube_live_chat(url, max_messages=50000, timeout_sec=28, force_fresh=False):
     """Downloads real YouTube live chat replay via yt-dlp with caching and all fragment support"""
     vid = resolve_youtube_video_id(url)
     if not vid:
@@ -329,7 +329,7 @@ def fetch_youtube_live_chat(url, max_messages=50000, timeout_sec=28):
     os.makedirs(chat_dir, exist_ok=True)
     out_base = os.path.join(chat_dir, f"chat_{vid}")
 
-    # 1. Search all cached files matching this video
+    # 1. Search cached files matching this video
     chat_patterns = [
         f"{out_base}.live_chat.json",
         f"{out_base}.live_chat.json.part",
@@ -343,11 +343,25 @@ def fetch_youtube_live_chat(url, max_messages=50000, timeout_sec=28):
                 if fpath not in candidate_files:
                     candidate_files.append(fpath)
 
-    for cf in candidate_files:
-        msgs = parse_live_chat_file(cf, max_messages=max_messages)
-        if len(msgs) >= 10:
-            print(f"[crawler] Found cached YouTube live chat in {os.path.basename(cf)} ({len(msgs)} real messages)!", file=sys.stderr)
-            return msgs
+    # If force_fresh is requested or cache is older than 120s on active broadcasts, clean up stale chunks
+    if force_fresh and candidate_files:
+        for cf in candidate_files:
+            try:
+                if os.path.exists(cf):
+                    os.unlink(cf)
+            except Exception:
+                pass
+        candidate_files = []
+    elif candidate_files:
+        # Check freshness of newest file
+        newest_mtime = max(os.path.getmtime(cf) for cf in candidate_files)
+        # If cache is very recent (< 90 seconds old), reuse it
+        if (time.time() - newest_mtime) < 90.0:
+            for cf in candidate_files:
+                msgs = parse_live_chat_file(cf, max_messages=max_messages)
+                if len(msgs) >= 10:
+                    print(f"[crawler] Found fresh cached YouTube live chat in {os.path.basename(cf)} ({len(msgs)} real messages)!", file=sys.stderr)
+                    return msgs
 
     # 2. Call yt-dlp to stream live chat JSON
     venv_ytdlp = os.path.join(os.getcwd(), '.venv-tts', 'Scripts', 'yt-dlp.exe')
@@ -408,11 +422,11 @@ def fetch_youtube_live_chat(url, max_messages=50000, timeout_sec=28):
 
     return []
 
-def fetch_online_chat(url, max_messages=50000):
+def fetch_online_chat(url, max_messages=50000, force_fresh=False):
     messages = []
     # If YouTube, use yt-dlp live chat extraction
     if 'youtube.com' in url or 'youtu.be' in url or not url.startswith('http'):
-        messages = fetch_youtube_live_chat(url, max_messages=max_messages)
+        messages = fetch_youtube_live_chat(url, max_messages=max_messages, force_fresh=force_fresh)
         if messages:
             return messages
         
@@ -560,18 +574,56 @@ def analyze_chat_spikes(messages, bucket_sec=10, rolling_window_sec=300, min_mul
                 "sample_messages": b["messages"] if b["messages"] else ["Live Chat Activity"]
             })
 
-    # Filter with non-maximum suppression (min_gap_sec)
+    # Effective gap between highlights that dynamically scales with stream length and top_k
+    span_time = max(60.0, max_time - min_start_offset)
+    effective_gap = min(float(min_gap_sec), max(18.0, span_time / max(2, top_k + 1)))
+
+    # Filter with non-maximum suppression (effective_gap)
     selected = []
     for cand in candidates:
-        overlap = False
-        for s in selected:
-            if abs(cand["peak_time"] - s["peak_time"]) < min_gap_sec:
-                overlap = True
-                break
-        if not overlap:
+        if not any(abs(cand["peak_time"] - s["peak_time"]) < effective_gap for s in selected):
             selected.append(cand)
             if len(selected) >= top_k:
                 break
+
+    # If selected count is still below top_k, backfill with remaining distinct high-energy activity buckets
+    if len(selected) < top_k and total_buckets > 0:
+        remaining_buckets = sorted(
+            [(i, buckets[i], multipliers[i]) for i in range(total_buckets) if buckets[i]["count"] > 0 and (i * bucket_sec) >= min_start_offset],
+            key=lambda item: (item[2] * 2.0 + item[1]["count"] * 1.5 + item[1]["weighted_score"]),
+            reverse=True
+        )
+        for i, b, mult in remaining_buckets:
+            cand_time = i * bucket_sec
+            if any(abs(cand_time - s["peak_time"]) < effective_gap for s in selected):
+                continue
+            selected.append({
+                "bucket_idx": i,
+                "peak_time": cand_time,
+                "multiplier": round(max(1.8, mult), 2),
+                "msg_count": max(b["count"], 6),
+                "weighted_score": round(b["weighted_score"], 1),
+                "emotes": b["emotes"],
+                "sample_messages": b["messages"] if b["messages"] else ["Stream Dialogue & Action"]
+            })
+            if len(selected) >= top_k:
+                break
+
+    # Sort selected moments by strength (multiplier and message count)
+    selected.sort(key=lambda c: (c["multiplier"] * 1.5 + c["msg_count"]), reverse=True)
+
+    VIRAL_HOOK_TEMPLATES = [
+        ("CHAT WENT COMPLETELY CRAZY! 🔥", "High Hype Moment"),
+        ("UNREAL LAUGHTER & ROAST 😂💀", "Funny / LMAO Spurt"),
+        ("INSANE GOD CLUTCH PLAY! ⚡", "Unreal Clutch Play"),
+        ("HE DID NOT SEE THIS COMING! 🤯", "Instant Shock"),
+        ("SUPER CHAT & DONO EXPLOSION! 💰", "Super Chat Peak"),
+        ("BRO LOST HIS MIND LIVE! 😱", "Rage & Reaction"),
+        ("CHAT SPAMMING OP NON-STOP! 🚀", "Chat Overload"),
+        ("PURE GOLD STREAMER MOMENT! ✨", "Streamer Highlight"),
+        ("THE MOST INTENSE ROUND! 💥", "Intense Battle"),
+        ("CANNOT BELIEVE HE DID THIS! 💀", "Unexpected Chaos")
+    ]
 
     # Format output moments
     moments = []
@@ -589,21 +641,22 @@ def analyze_chat_spikes(messages, bucket_sec=10, rolling_window_sec=300, min_mul
         
         # Determine sentiment & catchy hook
         emotes_str = " ".join(top_emotes)
+        hook_tpl = VIRAL_HOOK_TEMPLATES[(rank - 1) % len(VIRAL_HOOK_TEMPLATES)]
         if any(k in emotes_str for k in ['😂', '🤣', 'lmao', 'kekw', 'omegalul', 'lol', 'icant']):
             sentiment = "Funny / LMAO Spurt"
-            hook = "CHAT LOST IT HERE! 😂💀"
+            hook = f"CHAT LOST IT HERE! 😂💀 (#{rank})"
         elif any(k in emotes_str for k in ['clutch', 'op', 'baap', 'fire', '🔥', 'god']):
             sentiment = "Unreal Clutch / God Play"
-            hook = "UNREAL CLUTCH MOMENT! 🔥"
+            hook = f"UNREAL CLUTCH MOMENT! 🔥 (#{rank})"
         elif any(k in emotes_str for k in ['wtf', 'dead', 'nahh', '💀', 'khatam', 'choke']):
             sentiment = "Instant Shock / Disaster"
-            hook = "HE DID NOT SEE THIS COMING! 💀"
+            hook = f"HE DID NOT SEE THIS COMING! 💀 (#{rank})"
         elif any(k in emotes_str for k in ['w', 'sheesh', 'pog', 'poggers', 'goat']):
             sentiment = "Massive W / Hype Reaction"
-            hook = "MASSIVE W IN THE CHAT! 🏆"
+            hook = f"MASSIVE W IN THE CHAT! 🏆 (#{rank})"
         else:
-            sentiment = "Explosive Chat Spike"
-            hook = "CHAT WENT COMPLETELY CRAZY!"
+            hook = f"{hook_tpl[0]}"
+            sentiment = hook_tpl[1]
 
         moments.append({
             "rank": rank,
@@ -640,6 +693,7 @@ def main():
     parser.add_argument("--max_messages", type=int, default=30000, help="Max chat messages to download")
     parser.add_argument("--output_moments", type=str, default=None, help="Output path for moments.json")
     parser.add_argument("--output_chat", type=str, default=None, help="Output path for raw chat.json")
+    parser.add_argument("--fresh", action="store_true", help="Force fresh live chat crawl bypassing stale caches")
 
     args = parser.parse_args()
 
@@ -656,8 +710,8 @@ def main():
             elif isinstance(data, dict) and 'messages' in data:
                 messages = data['messages']
     elif args.url:
-        print(f"[crawler] Scraping chat directly from {args.url}...", file=sys.stderr)
-        messages = fetch_online_chat(args.url, max_messages=args.max_messages)
+        print(f"[crawler] Scraping chat directly from {args.url} (fresh={args.fresh})...", file=sys.stderr)
+        messages = fetch_online_chat(args.url, max_messages=args.max_messages, force_fresh=args.fresh)
     else:
         print(json.dumps({"error": "Must provide --url, --chat_file, or --demo"}), file=sys.stdout)
         sys.exit(1)

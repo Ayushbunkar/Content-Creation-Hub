@@ -249,6 +249,8 @@ export class StreamClipFinderService {
     if (options.after) args.push('--after', String(options.after));
     if (options.gap) args.push('--gap', String(options.gap));
     if (options.multiplier) args.push('--multiplier', String(options.multiplier));
+    // Always request fresh crawl so re-analyzing live broadcasts continuously finds new moments
+    args.push('--fresh');
 
     return new Promise((resolve, reject) => {
       const proc = spawn(pythonExe, args);
