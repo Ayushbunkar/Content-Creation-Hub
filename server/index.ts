@@ -2379,15 +2379,17 @@ app.post('/api/stream-clipper/analyze', async (req, res) => {
 // 3. Render a single clip segment as 9:16 vertical video
 app.post('/api/stream-clipper/render-clip', async (req, res) => {
   try {
-    const { url, moment, streamerName, cropMode, blurIntensity, isDemo } = req.body;
+    const { url, moment, streamerName, cropMode, blurIntensity, camPosition, captionStyle, isDemo } = req.body;
     if (!moment) return res.status(400).json({ error: 'moment object is required' });
 
     const result = await StreamClipFinderService.renderClip({
       url: url || '',
       moment,
       streamerName: streamerName || 'Creator',
-      cropMode: cropMode || 'blur_pad',
+      cropMode: cropMode || 'split_speed_60_40',
       blurIntensity: blurIntensity || 'medium',
+      camPosition: camPosition || 'top_left',
+      captionStyle: captionStyle || 'speed_center',
       isDemo: Boolean(isDemo)
     });
     res.json(result);
@@ -2400,7 +2402,7 @@ app.post('/api/stream-clipper/render-clip', async (req, res) => {
 // 4. Render all moments in batch
 app.post('/api/stream-clipper/render-all', async (req, res) => {
   try {
-    const { url, moments, streamerName, cropMode, blurIntensity } = req.body;
+    const { url, moments, streamerName, cropMode, blurIntensity, camPosition, captionStyle } = req.body;
     if (!moments || !Array.isArray(moments)) return res.status(400).json({ error: 'moments array is required' });
 
     const renderedClips = [];
@@ -2410,8 +2412,10 @@ app.post('/api/stream-clipper/render-all', async (req, res) => {
           url: url || '',
           moment,
           streamerName: streamerName || 'Creator',
-          cropMode: moment.customCropMode || cropMode || 'blur_pad',
-          blurIntensity: moment.customBlurIntensity || blurIntensity || 'medium'
+          cropMode: moment.customCropMode || cropMode || 'split_speed_60_40',
+          blurIntensity: moment.customBlurIntensity || blurIntensity || 'medium',
+          camPosition: moment.customCamPosition || camPosition || 'top_left',
+          captionStyle: moment.customCaptionStyle || captionStyle || 'speed_center'
         });
         renderedClips.push({ ...result, momentRank: moment.rank });
       } catch (clipErr: any) {

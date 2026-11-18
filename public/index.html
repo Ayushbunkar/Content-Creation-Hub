@@ -1531,7 +1531,9 @@
       const [streamAfterSec, setStreamAfterSec] = useState(10);
       const [streamGapSec, setStreamGapSec] = useState(90);
       const [streamMinMultiplier, setStreamMinMultiplier] = useState(3.0);
-      const [streamCropMode, setStreamCropMode] = useState('blur_pad'); // 'blur_pad' | 'center_crop' | 'smart_zoom' | 'square_1_1' | 'source_16_9'
+      const [streamCropMode, setStreamCropMode] = useState('split_speed_60_40'); // 'split_speed_60_40' | 'split_50_50' | 'split_30_70' | 'split_70_30' | 'blur_pad' | 'center_crop' | 'smart_zoom' | 'square_1_1' | 'source_16_9'
+      const [streamCamPosition, setStreamCamPosition] = useState('top_left'); // 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right' | 'auto_center'
+      const [streamCaptionStyle, setStreamCaptionStyle] = useState('speed_center'); // 'speed_center' | 'yellow_black' | 'white_black' | 'bottom_standard' | 'center_only'
       const [streamBlurIntensity, setStreamBlurIntensity] = useState('medium'); // 'subtle' | 'medium' | 'heavy'
       const [momentFramingOverrides, setMomentFramingOverrides] = useState({});
       const [batchRenderProgress, setBatchRenderProgress] = useState(null);
@@ -1763,6 +1765,8 @@
         const override = momentFramingOverrides[moment.rank] || {};
         const chosenCropMode = override.cropMode || streamCropMode;
         const chosenBlur = override.blurIntensity || streamBlurIntensity;
+        const chosenCam = override.camPosition || streamCamPosition;
+        const chosenCaptionStyle = override.captionStyle || streamCaptionStyle;
 
         try {
           const res = await fetch('/api/stream-clipper/render-clip', {
@@ -1774,6 +1778,8 @@
               streamerName: streamAnalysisResult?.streamerName || selectedStreamer?.name || 'Creator',
               cropMode: chosenCropMode,
               blurIntensity: chosenBlur,
+              camPosition: chosenCam,
+              captionStyle: chosenCaptionStyle,
               isDemo: Boolean(streamAnalysisResult?.isDemo || streamAnalysisResult?.url === 'Demo Stream Simulation')
             })
           });
@@ -4340,11 +4346,14 @@
                           <select
                             value={streamTopCount}
                             onChange={(e) => setStreamTopCount(Number(e.target.value))}
-                            class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
+                            class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-bold"
                           >
                             <option value={3}>Top 3 Explosive Moments</option>
-                            <option value={5}>Top 5 Viral Clips</option>
+                            <option value={5}>Top 5 Viral Clips (Recommended)</option>
                             <option value={10}>Top 10 Highlights</option>
+                            <option value={15}>Top 15 Viral Reels</option>
+                            <option value={20}>Top 20 Mega Batch (Full Stream Reels)</option>
+                            <option value={25}>Top 25 Ultra Batch</option>
                           </select>
                         </div>
 
@@ -4353,13 +4362,48 @@
                           <select
                             value={streamCropMode}
                             onChange={(e) => setStreamCropMode(e.target.value)}
-                            class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
+                            class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-bold"
                           >
+                            <option value="split_speed_60_40">🔥 9:16 Split: 40% Cam Top / 60% Game (Speed Style)</option>
+                            <option value="split_50_50">⚖️ 9:16 Split: 50% Cam Top / 50% Game (Equal 50/50)</option>
+                            <option value="split_30_70">🎮 9:16 Split: 30% Cam Top / 70% Game (Max Gameplay)</option>
+                            <option value="split_70_30">🎙️ 9:16 Split: 70% Cam Top / 30% Game (Max Streamer)</option>
                             <option value="blur_pad">🪟 9:16 Gaussian Blur Pad (Reels Standard)</option>
                             <option value="smart_zoom">🔍 9:16 Smart Speaker Zoom & Face Tracking</option>
                             <option value="center_crop">✂️ 9:16 Direct Center Punch-in</option>
                             <option value="square_1_1">⬛ 1:1 Square (Instagram Feed)</option>
                             <option value="source_16_9">📺 16:9 Original Widescreen</option>
+                          </select>
+                        </div>
+
+                        <div class="col-span-2 sm:col-span-1">
+                          <label class="text-[11px] font-semibold text-slate-400 block mb-1">Streamer Webcam Position</label>
+                          <select
+                            value={streamCamPosition}
+                            onChange={(e) => setStreamCamPosition(e.target.value)}
+                            disabled={!streamCropMode.startsWith('split_')}
+                            class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 disabled:opacity-40"
+                          >
+                            <option value="top_left">📍 Top-Left (Speed / CarryisLive / Kai standard)</option>
+                            <option value="top_right">📍 Top-Right</option>
+                            <option value="bottom_left">📍 Bottom-Left</option>
+                            <option value="bottom_right">📍 Bottom-Right</option>
+                            <option value="auto_center">🎯 Auto Center / Main Subject</option>
+                          </select>
+                        </div>
+
+                        <div class="col-span-2 sm:col-span-1">
+                          <label class="text-[11px] font-semibold text-slate-400 block mb-1">Center Hook Caption Style</label>
+                          <select
+                            value={streamCaptionStyle}
+                            onChange={(e) => setStreamCaptionStyle(e.target.value)}
+                            class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-medium"
+                          >
+                            <option value="speed_center">🔥 Center Divider Hook (Speed Reel Style - Bold White)</option>
+                            <option value="yellow_black">⭐ Center Divider Hook (Speed Reel Style - Bold Yellow)</option>
+                            <option value="white_black">⚪ Heavy White Center Hook + Spoken Words</option>
+                            <option value="bottom_standard">💬 Standard Bottom 3/4 Subtitles</option>
+                            <option value="center_only">🎯 Center Hook Only (No voice subtitles)</option>
                           </select>
                         </div>
 
@@ -4530,11 +4574,36 @@
                                     }}
                                     class="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-200"
                                   >
+                                    <option value="split_speed_60_40">🔥 Split 40/60 (Speed Style)</option>
+                                    <option value="split_50_50">⚖️ Split 50/50 Equal</option>
+                                    <option value="split_30_70">🎮 Split 30/70 (Max Game)</option>
+                                    <option value="split_70_30">🎙️ Split 70/30 (Max Cam)</option>
                                     <option value="blur_pad">🪟 Gaussian Blur Pad</option>
                                     <option value="smart_zoom">🔍 Smart Speaker Zoom</option>
                                     <option value="center_crop">✂️ Direct Center Crop</option>
                                     <option value="square_1_1">⬛ 1:1 Square</option>
                                     <option value="source_16_9">📺 16:9 Original</option>
+                                  </select>
+                                </div>
+
+                                <div class="flex items-center space-x-2">
+                                  <span class="text-[11px] font-bold text-slate-400">Webcam:</span>
+                                  <select
+                                    value={(momentFramingOverrides[moment.rank]?.camPosition) || streamCamPosition}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setMomentFramingOverrides(prev => ({
+                                        ...prev,
+                                        [moment.rank]: { ...(prev[moment.rank] || {}), camPosition: val }
+                                      }));
+                                    }}
+                                    class="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs text-slate-200"
+                                  >
+                                    <option value="top_left">📍 Top-Left</option>
+                                    <option value="top_right">📍 Top-Right</option>
+                                    <option value="bottom_left">📍 Bottom-Left</option>
+                                    <option value="bottom_right">📍 Bottom-Right</option>
+                                    <option value="auto_center">🎯 Center</option>
                                   </select>
                                 </div>
 

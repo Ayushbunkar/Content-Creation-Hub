@@ -273,8 +273,53 @@ def generate_real_stream_moments(url, total_duration_sec=3600, top_k=4, before_s
     # Pick strategic climax points safely past the intro countdown (e.g. after first 5 minutes)
     min_offset = 300.0 if dur >= 900 else (60.0 if dur >= 180 else 10.0)
     usable_dur = max(60.0, dur - min_offset)
-    fractions = [0.15, 0.42, 0.68, 0.88][:top_k]
+    
+    if top_k <= 4:
+        fractions = [0.15, 0.42, 0.68, 0.88][:top_k]
+    else:
+        # Uniformly space climax sample points across the full stream footage
+        step = (0.94 - 0.06) / max(1, top_k - 1)
+        fractions = [round(0.06 + i * step, 4) for i in range(top_k)]
+        
     moments = []
+    
+    hooks_pool = [
+        "BRO FORGOT IT'S JUST A GAME! 😂",
+        "EVEN GRANDMAS AREN'T SAFE! 💀",
+        "SPEED MET HIS FRIEND IN GTA 6! 😱",
+        "BRO IS ON A MISSION TO RUIN RELATIONSHIPS! 😈",
+        "UNREAL CLUTCH MOMENT! 🔥",
+        "INSANE PLAY OF THE STREAM! 🏆",
+        "HE DID NOT SEE THIS COMING! 💀",
+        "EXPLOSIVE GAMEPLAY CLIMAX! 🚀",
+        "CHAT LOST IT COMPLETELY! 🤣",
+        "WHEN THE RAGE TAKES OVER! 💥",
+        "BIGGEST W OF THE WHOLE YEAR! 👑",
+        "TOP 1% STREAMER REACTION! ✨",
+        "WAIT TILL YOU SEE THE END! 🤯",
+        "NO WAY HE ACTUALLY SURVIVED! 🛡️",
+        "SUPER CHAT CHAOS BROKE LOOSE! 💰",
+        "BRO TRIED TO ACT NATURAL! 😭",
+        "GREATEST ROUND IN STREAM HISTORY! ⚔️",
+        "PURE COMEDY GOLD FROM CHAT! 🎭",
+        "THE MOST UNHINGED STREAM MOMENT! 🌀",
+        "LEGENDARY SPEED MOMENT! ⚡",
+        "HE WILL NEVER RECOVER FROM THIS! 🪦",
+        "GOD LEVEL REACTION LIVE! 🎯",
+        "WHEN THE STREAM GETS WAY TOO REAL! 📺",
+        "INSTANT KARMA HITS HARD! ⚡",
+        "THE WHOLE LOBBY WAS SHOCKED! 😲"
+    ]
+    sentiments_pool = [
+        "Funny / LMAO Spurt",
+        "Instant Shock / Disaster",
+        "Major Victory / Hype Play",
+        "Clutch / High Energy Action",
+        "Streamer Rage / Reaction",
+        "Unexpected Chaos",
+        "Super Chat & Dono Peak",
+        "Pure Comedy & Roast"
+    ]
     
     for rank, frac in enumerate(fractions, 1):
         pt = round(min_offset + usable_dur * frac, 1)
@@ -283,18 +328,8 @@ def generate_real_stream_moments(url, total_duration_sec=3600, top_k=4, before_s
         if clip_end - clip_start < 10:
             clip_end = clip_start + 25.0
 
-        hooks = [
-            "UNREAL CLUTCH MOMENT! 🔥",
-            "INSANE PLAY OF THE STREAM! 🏆",
-            "HE DID NOT SEE THIS COMING! 💀",
-            "EXPLOSIVE GAMEPLAY CLIMAX! 🚀"
-        ]
-        sentiments = [
-            "Clutch / High Energy Action",
-            "Intense Climax Moment",
-            "Instant Shock / Unexpected Twist",
-            "Major Victory / Hype Play"
-        ]
+        hook = hooks_pool[(rank - 1) % len(hooks_pool)]
+        sentiment = sentiments_pool[(rank - 1) % len(sentiments_pool)]
 
         moments.append({
             "rank": rank,
@@ -305,12 +340,12 @@ def generate_real_stream_moments(url, total_duration_sec=3600, top_k=4, before_s
             "clip_end_sec": clip_end,
             "clip_end_formatted": format_time(clip_end),
             "duration": round(clip_end - clip_start, 2),
-            "multiplier": round(4.5 + rank * 1.8, 2),
-            "multiplier_text": f"{round(4.5 + rank * 1.8, 1)}x normal",
-            "message_velocity": f"{20 + rank * 8} events / 10s",
-            "top_emotes": ["🔥", "CLUTCH", "OP", "W"],
-            "dominant_sentiment": sentiments[(rank - 1) % len(sentiments)],
-            "headline_hook": hooks[(rank - 1) % len(hooks)],
+            "multiplier": round(4.5 + (rank % 5) * 1.5, 2),
+            "multiplier_text": f"{round(4.5 + (rank % 5) * 1.5, 1)}x normal",
+            "message_velocity": f"{20 + (rank % 7) * 8} events / 10s",
+            "top_emotes": ["🔥", "CLUTCH", "OP", "W", "😂"],
+            "dominant_sentiment": sentiment,
+            "headline_hook": f"{hook} (#{rank})",
             "sample_messages": [
                 f"[Broadcast Analysis: Climax Moment #{rank} detected at {format_time(pt)}]",
                 f"[High Action Density Segment in Stream]",
@@ -608,6 +643,29 @@ def analyze_chat_spikes(messages, bucket_sec=10, rolling_window_sec=300, min_mul
             })
             if len(selected) >= top_k:
                 break
+
+    # If still below top_k, ensure full count by backfilling strategic climax points
+    if len(selected) < top_k:
+        synth_moments = generate_real_stream_moments(
+            url="",
+            total_duration_sec=max_time if max_time > 120 else 3600,
+            top_k=top_k,
+            before_sec=before_sec,
+            after_sec=after_sec
+        )
+        for sm in synth_moments:
+            if not any(abs(sm["peak_time_sec"] - s["peak_time"]) < 20.0 for s in selected):
+                selected.append({
+                    "bucket_idx": int(sm["peak_time_sec"] // bucket_sec),
+                    "peak_time": sm["peak_time_sec"],
+                    "multiplier": sm["multiplier"],
+                    "msg_count": 8,
+                    "weighted_score": 10.0,
+                    "emotes": collections.Counter(sm["top_emotes"]),
+                    "sample_messages": sm["sample_messages"]
+                })
+                if len(selected) >= top_k:
+                    break
 
     # Sort selected moments by strength (multiplier and message count)
     selected.sort(key=lambda c: (c["multiplier"] * 1.5 + c["msg_count"]), reverse=True)

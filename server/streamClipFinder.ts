@@ -332,8 +332,10 @@ export class StreamClipFinderService {
     url: string;
     moment: StreamMoment;
     streamerName?: string;
-    cropMode?: 'blur_pad' | 'center_crop' | 'smart_zoom' | 'source_16_9' | 'square_1_1';
+    cropMode?: 'blur_pad' | 'center_crop' | 'smart_zoom' | 'source_16_9' | 'square_1_1' | 'split_speed_60_40' | 'split_50_50' | 'split_30_70' | 'split_70_30';
     blurIntensity?: 'subtle' | 'medium' | 'heavy';
+    camPosition?: 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right' | 'auto_center';
+    captionStyle?: 'speed_center' | 'yellow_black' | 'white_black' | 'bottom_standard' | 'center_only';
     isDemo?: boolean;
   }): Promise<{
     success: boolean;
@@ -343,7 +345,16 @@ export class StreamClipFinderService {
     duration: number;
     transcript?: any[];
   }> {
-    let { url, moment, streamerName = 'Streamer', cropMode = 'blur_pad', blurIntensity = 'medium', isDemo = false } = options;
+    let {
+      url,
+      moment,
+      streamerName = 'Streamer',
+      cropMode = 'split_speed_60_40',
+      blurIntensity = 'medium',
+      camPosition = 'top_left',
+      captionStyle = 'speed_center',
+      isDemo = false
+    } = options as any;
     const clipId = `stream_${Date.now()}_rank${moment.rank}_${Math.random().toString(36).substring(2, 7)}`;
     const outputDir = path.join(process.cwd(), 'output', 'stream_clips');
     fs.mkdirSync(outputDir, { recursive: true });
@@ -632,15 +643,21 @@ export class StreamClipFinderService {
       await this.generateSampleStreamVideo(tempRawPath, moment, streamerName);
     }
 
-    // Step 2: Generate high-retention 3-4 word viral captions at 3/4 height mark
-    console.log(`[streamClipper] Generating 3/4 viral captions for moment #${moment.rank}...`);
+    // Step 2: Calculate split divider Y and generate Center Hook + Spoken captions
+    let dividerY = 768;
+    if (cropMode === 'split_50_50') dividerY = 960;
+    else if (cropMode === 'split_30_70') dividerY = 576;
+    else if (cropMode === 'split_70_30') dividerY = 1344;
+    else dividerY = 960;
+
+    console.log(`[streamClipper] Generating viral captions (style: ${captionStyle}, divider: ${dividerY}px) for moment #${moment.rank}...`);
     const tempAssPath = path.join(process.cwd(), 'storage', 'stream_clips', `captions_${clipId}.ass`);
     const tempJsonPath = path.join(process.cwd(), 'storage', 'stream_clips', `captions_${clipId}.json`);
-    const captionResult = await this.generateClipCaptions(tempRawPath, tempAssPath, tempJsonPath, streamerName, moment);
+    const captionResult = await this.generateClipCaptions(tempRawPath, tempAssPath, tempJsonPath, streamerName, moment, captionStyle, dividerY);
 
-    // Step 3: FFmpeg crop with Gaussian blur / Smart Zoom / Center crop & 3/4 ASS captions
-    console.log(`[streamClipper] Cropping and formatting ${cropMode} video (blur: ${blurIntensity}) with burned captions...`);
-    await this.processVerticalCrop(tempRawPath, finalClipPath, moment, streamerName, cropMode, tempAssPath, blurIntensity);
+    // Step 3: FFmpeg Dual Split / Gaussian blur / Smart Zoom with burned Center Hook captions
+    console.log(`[streamClipper] Cropping and formatting ${cropMode} video (cam: ${camPosition}, blur: ${blurIntensity}) with burned captions...`);
+    await this.processVerticalCrop(tempRawPath, finalClipPath, moment, streamerName, cropMode, tempAssPath, blurIntensity, camPosition);
 
     // Clean up temporary raw and caption files
     try {
@@ -670,7 +687,9 @@ export class StreamClipFinderService {
     outputAssPath: string,
     outputJsonPath: string,
     streamerName: string,
-    moment: StreamMoment
+    moment: StreamMoment,
+    captionStyle: string = 'speed_center',
+    dividerY: number = 768
   ): Promise<{ cues: any[]; hasSpeech: boolean }> {
     const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
     const scriptPath = path.join(process.cwd(), 'scripts', 'generate_clip_captions.py');
@@ -682,6 +701,9 @@ export class StreamClipFinderService {
       '--output_json', outputJsonPath,
       '--streamer', streamerName || 'Creator',
       '--hook', moment.headline_hook || 'UNREAL MOMENT',
+      '--center_hook', moment.headline_hook || 'UNREAL MOMENT',
+      '--caption_style', captionStyle || 'speed_center',
+      '--divider_y', String(dividerY || 768),
       '--duration', String(moment.duration || 30),
       '--model', 'tiny'
     ];
@@ -727,9 +749,10 @@ export class StreamClipFinderService {
     outputPath: string,
     moment: StreamMoment,
     streamerName: string,
-    mode: 'blur_pad' | 'center_crop' | 'smart_zoom' | 'source_16_9' | 'square_1_1' = 'blur_pad',
+    mode: string = 'split_speed_60_40',
     assPath?: string,
-    blurLevel: 'subtle' | 'medium' | 'heavy' = 'medium'
+    blurLevel: 'subtle' | 'medium' | 'heavy' = 'medium',
+    camPosition: 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right' | 'auto_center' = 'top_left'
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       let filterComplex = '';
@@ -741,7 +764,44 @@ export class StreamClipFinderService {
       if (blurLevel === 'subtle') blurParams = 'boxblur=10:3';
       else if (blurLevel === 'heavy') blurParams = 'boxblur=45:12';
 
-      if (mode === 'center_crop') {
+      // Streamer camera crop region based on user choice or streamer layout
+      let camCrop = 'crop=iw*0.42:ih*0.52:0:0'; // top_left (Speed / CarryisLive / Kai standard)
+      if (camPosition === 'top_right') {
+        camCrop = 'crop=iw*0.42:ih*0.52:iw*0.58:0';
+      } else if (camPosition === 'bottom_left') {
+        camCrop = 'crop=iw*0.42:ih*0.52:0:ih*0.48';
+      } else if (camPosition === 'bottom_right') {
+        camCrop = 'crop=iw*0.42:ih*0.52:iw*0.58:ih*0.48';
+      } else if (camPosition === 'auto_center') {
+        camCrop = 'crop=iw*0.48:ih*0.60:(iw-iw*0.48)/2:0';
+      }
+
+      if (mode.startsWith('split_')) {
+        let camH = 768; // Speed 60/40 style (40% Cam Top = 768px, 60% Game Bottom = 1152px)
+        let gameH = 1152;
+        if (mode === 'split_50_50') {
+          camH = 960;
+          gameH = 960;
+        } else if (mode === 'split_30_70') {
+          camH = 576;
+          gameH = 1344;
+        } else if (mode === 'split_70_30') {
+          camH = 1344;
+          gameH = 576;
+        }
+
+        const stackFilter =
+          `[0:v]split=2[in_cam][in_game];` +
+          `[in_cam]${camCrop},scale=1080:${camH}:force_original_aspect_ratio=increase,crop=1080:${camH}[cam];` +
+          `[in_game]crop=iw*0.72:ih:iw*0.14:0,scale=1080:${gameH}:force_original_aspect_ratio=increase,crop=1080:${gameH}[game];` +
+          `[cam][game]vstack=inputs=2[v_stacked]`;
+
+        if (hasAss) {
+          filterComplex = `${stackFilter};[v_stacked]subtitles='${escapedAss}'[v]`;
+        } else {
+          filterComplex = `${stackFilter};[v_stacked]null[v]`;
+        }
+      } else if (mode === 'center_crop') {
         // Direct punch-in 9:16 vertical crop
         if (hasAss) {
           filterComplex = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v0];[v0]subtitles='${escapedAss}'[v]`;
