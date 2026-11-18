@@ -859,22 +859,22 @@ export class StreamClipFinderService {
       else if (blurLevel === 'heavy') blurParams = 'boxblur=45:12';
 
       // Streamer camera crop region based on AI detection or user manual choice
-      let camCrop = customCamCrop || 'crop=iw*0.42:ih*0.52:0:ih*0.28'; // center-left safe fallback
+      let camCrop = customCamCrop || 'crop=iw*0.24:ih*0.30:0:ih*0.38'; // tight center-left safe fallback
       if (!customCamCrop) {
         if (camPosition === 'top_left') {
-          camCrop = 'crop=iw*0.42:ih*0.52:0:0';
+          camCrop = 'crop=iw*0.24:ih*0.30:0:0';
         } else if (camPosition === 'center_left') {
-          camCrop = 'crop=iw*0.42:ih*0.52:0:ih*0.28';
+          camCrop = 'crop=iw*0.24:ih*0.30:0:ih*0.38';
         } else if (camPosition === 'bottom_left') {
-          camCrop = 'crop=iw*0.42:ih*0.52:0:ih*0.48';
+          camCrop = 'crop=iw*0.24:ih*0.30:0:ih*0.70';
         } else if (camPosition === 'top_right') {
-          camCrop = 'crop=iw*0.42:ih*0.52:iw*0.58:0';
+          camCrop = 'crop=iw*0.24:ih*0.30:iw*0.76:0';
         } else if (camPosition === 'center_right') {
-          camCrop = 'crop=iw*0.42:ih*0.52:iw*0.58:ih*0.28';
+          camCrop = 'crop=iw*0.24:ih*0.30:iw*0.76:ih*0.38';
         } else if (camPosition === 'bottom_right') {
-          camCrop = 'crop=iw*0.42:ih*0.52:iw*0.58:ih*0.48';
+          camCrop = 'crop=iw*0.24:ih*0.30:iw*0.76:ih*0.70';
         } else if (camPosition === 'auto_center') {
-          camCrop = 'crop=iw*0.48:ih*0.60:(iw-iw*0.48)/2:0';
+          camCrop = 'crop=iw*0.28:ih*0.36:(iw-iw*0.28)/2:ih*0.12';
         }
       }
 
@@ -894,7 +894,7 @@ export class StreamClipFinderService {
 
         const stackFilter =
           `[0:v]split=2[in_cam][in_game];` +
-          `[in_cam]${camCrop},scale=1080:${camH}:force_original_aspect_ratio=increase,crop=1080:${camH}[cam];` +
+          `[in_cam]${camCrop},scale=1080:${camH}:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:${camH}[cam];` +
           `[in_game]crop=iw*0.72:ih:iw*0.14:0,scale=1080:${gameH}:force_original_aspect_ratio=increase,crop=1080:${gameH}[game];` +
           `[cam][game]vstack=inputs=2[v_stacked]`;
 

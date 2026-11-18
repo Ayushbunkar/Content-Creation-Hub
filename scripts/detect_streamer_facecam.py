@@ -172,11 +172,11 @@ def detect_facecam(video_path: str, target_cam_h: int = 768, target_cam_w: int =
     else:
         position_label = f"{pos_y}_{pos_x}"
 
-    # Calculate optimal camera crop window centered on the detected face
+    # Calculate optimal camera crop window tightly zoomed on the streamer's face
     desired_ratio = 1080.0 / float(target_cam_h)  # e.g. 1080/768 = 1.406
 
-    # Crop width: comfortable bust shot (face + headphones + room)
-    crop_w = int(max(fw * 3.6, video_w * 0.38))
+    # Tight punch-in zoom: 2.25x face width so streamer's face, expressions & chest fill the top reel frame
+    crop_w = int(max(fw * 2.25, 160))
     crop_h = int(crop_w / desired_ratio)
 
     # Ensure crop doesn't exceed video dimensions
@@ -187,9 +187,9 @@ def detect_facecam(video_path: str, target_cam_h: int = 768, target_cam_w: int =
         crop_h = video_h
         crop_w = int(crop_h * desired_ratio)
 
-    # Center crop on face center (fc_x, fc_y) with 40% headroom above face
+    # Center crop on face center (fc_x, fc_y) with 45% headroom above face so head & hair are never cut
     crop_x = int(fc_x - (crop_w // 2))
-    crop_y = int(fc_y - int(crop_h * 0.40))
+    crop_y = int(fc_y - int(crop_h * 0.45))
 
     # Clamp bounds inside frame
     crop_x = max(0, min(video_w - crop_w, crop_x))
