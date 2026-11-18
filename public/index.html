@@ -1665,6 +1665,7 @@
             setIsClipperBusy(true);
             setClipperStage(data.status);
             setClipperProgress(data.progress || 20);
+            setClipperError(null);
           }
         } catch (e) { console.error('Error loading clipper project:', e); }
       };

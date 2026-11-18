@@ -192,6 +192,10 @@ def parse_live_chat_file(file_path, max_messages=50000):
 
     return messages
 
+import shutil
+NODE_EXE = shutil.which('node')
+NODE_RUNTIME_ARG = f'node:{NODE_EXE}' if NODE_EXE else 'node'
+
 def resolve_youtube_video_id(url):
     """Robustly extracts or resolves an 11-char YouTube video ID from any format (watch, live, shorts, channel)"""
     # 1. Match watch?v=...
@@ -211,7 +215,7 @@ def resolve_youtube_video_id(url):
             venv_ytdlp = os.path.join(os.getcwd(), '.venv-tts', 'Scripts', 'yt-dlp.exe')
             ytdlp_exe = venv_ytdlp if os.path.exists(venv_ytdlp) else 'yt-dlp'
             proc = subprocess.run([
-                ytdlp_exe, '--js-runtimes', 'node', '--print', 'id', '--flat-playlist', '--playlist-items', '1', url
+                ytdlp_exe, '--js-runtimes', NODE_RUNTIME_ARG, '--print', 'id', '--flat-playlist', '--playlist-items', '1', url
             ], capture_output=True, text=True, timeout=8)
             resolved = proc.stdout.strip()
             if resolved and len(resolved) == 11:
@@ -230,7 +234,7 @@ def fetch_youtube_comments(url, max_comments=60):
         ytdlp_exe = venv_ytdlp if os.path.exists(venv_ytdlp) else 'yt-dlp'
         cmd = [
             ytdlp_exe,
-            '--js-runtimes', 'node',
+            '--js-runtimes', NODE_RUNTIME_ARG,
             '--skip-download',
             '--write-comments',
             '--extractor-args', f'youtube:max_comments={max_comments}',
@@ -351,7 +355,7 @@ def fetch_youtube_live_chat(url, max_messages=50000, timeout_sec=28):
 
     cmd = [
         ytdlp_exe,
-        '--js-runtimes', 'node',
+        '--js-runtimes', NODE_RUNTIME_ARG,
         '--skip-download',
         '--write-subs',
         '--sub-langs', 'live_chat',
@@ -687,7 +691,7 @@ def main():
             try:
                 venv_ytdlp = os.path.join(os.getcwd(), '.venv-tts', 'Scripts', 'yt-dlp.exe')
                 ytdlp_exe = venv_ytdlp if os.path.exists(venv_ytdlp) else 'yt-dlp'
-                dur_proc = subprocess.run([ytdlp_exe, '--js-runtimes', 'node', '--print', 'duration', '--no-playlist', args.url], capture_output=True, text=True, timeout=8)
+                dur_proc = subprocess.run([ytdlp_exe, '--js-runtimes', NODE_RUNTIME_ARG, '--print', 'duration', '--no-playlist', args.url], capture_output=True, text=True, timeout=8)
                 parsed_d = float(dur_proc.stdout.strip())
                 if parsed_d > 60:
                     stream_dur = parsed_d

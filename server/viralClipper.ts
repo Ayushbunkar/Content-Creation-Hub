@@ -99,7 +99,8 @@ export class ViralClipperService {
     return new Promise((resolve, reject) => {
       const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
       const pythonExe = fs.existsSync(venvPy) ? venvPy : 'python';
-      const args = ['-m', 'yt_dlp', '--js-runtimes', 'node', '--dump-json', '--no-playlist', url];
+      const nodeRuntime = process.execPath ? `node:${process.execPath}` : 'node';
+      const args = ['-m', 'yt_dlp', '--js-runtimes', nodeRuntime, '--dump-json', '--no-playlist', url];
       const p = spawn(pythonExe, args);
       let stdout = '';
       let stderr = '';
@@ -194,10 +195,11 @@ export class ViralClipperService {
    */
   static async downloadSourceVideo(url: string, outputTemplate: string, onProgress?: (pct: number) => void): Promise<string> {
     return new Promise((resolve, reject) => {
+      const nodeRuntime = process.execPath ? `node:${process.execPath}` : 'node';
       // Prefer standard 1080p/720p mp4 for smooth Remotion/FFmpeg processing
       const args = [
         '-m', 'yt_dlp',
-        '--js-runtimes', 'node',
+        '--js-runtimes', nodeRuntime,
         '--no-playlist',
         '-f', 'bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         '--merge-output-format', 'mp4',
@@ -235,12 +237,12 @@ export class ViralClipperService {
         if (code === 0) {
           resolve(outputTemplate.replace('.%(ext)s', '.mp4'));
         } else {
-          const cleanErr = (stderr || stdout || 'Unknown error')
+          const cleanErr = (stderr || stdout || '')
             .split('\n')
-            .filter(l => !l.trim().startsWith('WARNING:'))
+            .filter(l => !l.trim().startsWith('WARNING:') && !l.trim().startsWith('[youtube]') && l.trim().length > 0)
             .join('\n')
             .trim();
-          reject(new Error(`Download failed: ${cleanErr || stderr || 'Unknown error'}`));
+          reject(new Error(`Download failed: ${cleanErr || 'Video download exited unexpectedly. Please retry or upload a clip directly.'}`));
         }
       });
       p.on('error', reject);
@@ -819,13 +821,14 @@ print(json.dumps(results))
       const pythonExe = fs.existsSync(venvPy) ? venvPy : 'python';
       const outputPrefix = path.join(captionsDir, `ytsub_${projectId}`);
 
+      const nodeRuntime = process.execPath ? `node:${process.execPath}` : 'node';
       const subLangs = requestedLanguage === 'hi'
-        ? 'hi,en,hi-Latn,en-orig'
-        : 'en,en-orig,en-US,en-GB,hi,hi-Latn';
+        ? 'hi,hi-orig,en,en-orig,hi-Latn,all'
+        : 'en,en-orig,en-US,en-GB,hi,hi-orig,hi-Latn,all';
 
       const args = [
         '-m', 'yt_dlp',
-        '--js-runtimes', 'node',
+        '--js-runtimes', nodeRuntime,
         '--write-sub',
         '--write-auto-sub',
         '--sub-lang', subLangs,
@@ -847,13 +850,13 @@ print(json.dumps(results))
 
           let chosenFile: string | undefined;
           if (requestedLanguage === 'hi') {
-            chosenFile = files.find(f => f.includes('.hi.')) || files[0];
+            chosenFile = files.find(f => f.includes('.hi-orig.') || f.includes('.hi.')) || files[0];
           } else if (requestedLanguage === 'en') {
             chosenFile = files.find(f => f.includes('.en-orig.') || f.includes('.en.') || f.includes('.en-US.') || f.includes('.en-GB.')) ||
-                         files.find(f => !f.includes('.hi.')) ||
+                         files.find(f => f.includes('.hi-orig.') || f.includes('.hi.')) ||
                          files[0];
           } else {
-            chosenFile = files.find(f => f.includes('.en-orig.') || f.includes('.en.')) || files.find(f => f.includes('.hi.')) || files[0];
+            chosenFile = files.find(f => f.includes('.en-orig.') || f.includes('.en.') || f.includes('.hi.')) || files[0];
           }
 
           const fullPath = path.join(captionsDir, chosenFile);

@@ -167,9 +167,10 @@ export class StreamClipFinderService {
     if (!url || !url.startsWith('http')) return { channel: '', title: '' };
     try {
       const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
+      const nodeRuntime = process.execPath ? `node:${process.execPath}` : 'node';
       const proc = spawn(venvPy, [
         '-m', 'yt_dlp',
-        '--js-runtimes', 'node',
+        '--js-runtimes', nodeRuntime,
         '--print', '%(channel)s|||%(title)s',
         '--no-playlist',
         '--socket-timeout', '6',
@@ -386,10 +387,11 @@ export class StreamClipFinderService {
       console.log(`[streamClipper] Resolving direct stream URL for fast cut (${moment.clip_start_formatted} - ${moment.clip_end_formatted})...`);
       
       let streamUrls: string[] = [];
+      const nodeRuntime = process.execPath ? `node:${process.execPath}` : 'node';
       try {
         const getUrlProc = spawn(venvPy, [
           '-m', 'yt_dlp',
-          '--js-runtimes', 'node',
+          '--js-runtimes', nodeRuntime,
           '-g',
           '-f', '231+234/230+234/311+234/bestvideo[height<=720]+bestaudio/best[height<=720]/best',
           '--no-playlist',
@@ -409,7 +411,7 @@ export class StreamClipFinderService {
         if (streamUrls.length === 1) {
           const getAudioProc = spawn(venvPy, [
             '-m', 'yt_dlp',
-            '--js-runtimes', 'node',
+            '--js-runtimes', nodeRuntime,
             '-g',
             '-f', '234/bestaudio/bestaudio[ext=m4a]',
             '--no-playlist',
@@ -498,9 +500,10 @@ export class StreamClipFinderService {
         }
 
         await new Promise<void>((resolve) => {
+          const nodeRuntime = process.execPath ? `node:${process.execPath}` : 'node';
           const ytdlp = spawn(venvPy, [
             '-m', 'yt_dlp',
-            '--js-runtimes', 'node',
+            '--js-runtimes', nodeRuntime,
             '--download-sections', timeSpec,
             '--force-keyframes-at-cuts',
             '--no-playlist',
