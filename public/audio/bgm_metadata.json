@@ -1,0 +1,7 @@
+[
+  { "id": "epic_geopolitics", "title": "Epic Geopolitics & Sovereign Power", "filename": "epic_geopolitics.wav", "genre": "Cinematic Orchestral", "license": "Royalty-Free Commercial", "commercial_allowed": true, "copyright_risk": "zero" },
+  { "id": "tech_cyber", "title": "Silicon Frontier & Compute Core", "filename": "tech_cyber.wav", "genre": "Electronic Ambient", "license": "Royalty-Free Commercial", "commercial_allowed": true, "copyright_risk": "zero" },
+  { "id": "ambient_documentary", "title": "Historical Inquiry & Archive", "filename": "ambient_documentary.wav", "genre": "Minimal Acoustic", "license": "Royalty-Free Commercial", "commercial_allowed": true, "copyright_risk": "zero" },
+  { "id": "mystery_investigation", "title": "Corporate Whistleblower Dossier", "filename": "mystery_investigation.wav", "genre": "Dark Drone", "license": "Royalty-Free Commercial", "commercial_allowed": true, "copyright_risk": "zero" },
+  { "id": "corporate_tech", "title": "Strategic Capital & Valuation", "filename": "corporate_tech_generated.wav", "genre": "Corporate Minimal", "license": "Royalty-Free Commercial", "commercial_allowed": true, "copyright_risk": "zero" }
+]

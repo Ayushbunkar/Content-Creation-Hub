@@ -60,7 +60,10 @@ export function initDatabase(): Promise<void> {
           `ALTER TABLE projects ADD COLUMN audio_police_report TEXT`,
           `ALTER TABLE projects ADD COLUMN audio_gate_status TEXT DEFAULT 'PENDING'`,
           `ALTER TABLE projects ADD COLUMN color_profile TEXT DEFAULT 'cinematic_documentary'`,
-          `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`
+          `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`,
+          `ALTER TABLE projects ADD COLUMN preview_output TEXT`,
+          `ALTER TABLE projects ADD COLUMN qc_approved_bypass INTEGER DEFAULT 0`,
+          `ALTER TABLE projects ADD COLUMN research_notes TEXT`
         ];
         docColumns.forEach(sql => db.run(sql, () => {}));
       });
@@ -96,7 +99,10 @@ export function initDatabase(): Promise<void> {
           `ALTER TABLE projects ADD COLUMN audio_police_report TEXT`,
           `ALTER TABLE projects ADD COLUMN audio_gate_status TEXT DEFAULT 'PENDING'`,
           `ALTER TABLE projects ADD COLUMN color_profile TEXT DEFAULT 'cinematic_documentary'`,
-          `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`
+          `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`,
+          `ALTER TABLE projects ADD COLUMN preview_output TEXT`,
+          `ALTER TABLE projects ADD COLUMN qc_approved_bypass INTEGER DEFAULT 0`,
+          `ALTER TABLE projects ADD COLUMN research_notes TEXT`
         ];
         docColumns.forEach(sql => db.run(sql, () => {}));
       });
@@ -140,7 +146,10 @@ export function initDatabase(): Promise<void> {
           `ALTER TABLE projects ADD COLUMN audio_police_report TEXT`,
           `ALTER TABLE projects ADD COLUMN audio_gate_status TEXT DEFAULT 'PENDING'`,
           `ALTER TABLE projects ADD COLUMN color_profile TEXT DEFAULT 'cinematic_documentary'`,
-          `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`
+          `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`,
+          `ALTER TABLE projects ADD COLUMN preview_output TEXT`,
+          `ALTER TABLE projects ADD COLUMN qc_approved_bypass INTEGER DEFAULT 0`,
+          `ALTER TABLE projects ADD COLUMN research_notes TEXT`
         ];
         docColumns.forEach(sql => db.run(sql, () => {}));
       });
@@ -186,7 +195,10 @@ export function initDatabase(): Promise<void> {
           `ALTER TABLE projects ADD COLUMN audio_police_report TEXT`,
           `ALTER TABLE projects ADD COLUMN audio_gate_status TEXT DEFAULT 'PENDING'`,
           `ALTER TABLE projects ADD COLUMN color_profile TEXT DEFAULT 'cinematic_documentary'`,
-          `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`
+          `ALTER TABLE projects ADD COLUMN render_preset TEXT DEFAULT 'balanced'`,
+          `ALTER TABLE projects ADD COLUMN preview_output TEXT`,
+          `ALTER TABLE projects ADD COLUMN qc_approved_bypass INTEGER DEFAULT 0`,
+          `ALTER TABLE projects ADD COLUMN research_notes TEXT`
         ];
         docColumns.forEach(sql => db.run(sql, () => {}));
       });

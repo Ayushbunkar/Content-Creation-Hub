@@ -5,6 +5,8 @@ import { runQuery, getQuery, allQuery } from './db';
 import { CaptionStudioService, TranscriptSegment, MediaProbeInfo } from './captionStudio';
 import { CopyrightLicenseManager } from './copyrightService';
 import { AudioPoliceService } from './audioPolice';
+import { romanizeSegments, romanizeText } from './hinglishRomanizer';
+import { injectViralEmojisIntoSegments, injectViralEmojisIntoText } from './viralEmojiInjector';
 
 export interface ClipperProject {
   id: string;
@@ -97,7 +99,7 @@ export class ViralClipperService {
     return new Promise((resolve, reject) => {
       const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
       const pythonExe = fs.existsSync(venvPy) ? venvPy : 'python';
-      const args = ['-m', 'yt_dlp', '--dump-json', '--no-playlist', url];
+      const args = ['-m', 'yt_dlp', '--js-runtimes', 'node', '--dump-json', '--no-playlist', url];
       const p = spawn(pythonExe, args);
       let stdout = '';
       let stderr = '';
@@ -108,29 +110,67 @@ export class ViralClipperService {
       p.on('close', (code) => {
         if (code === 0 && stdout.trim()) {
           try {
-            // Robust parsing: extract valid JSON line even if yt-dlp outputs multiple lines or trailing data
+            // Robust parsing: extract valid JSON object even if yt-dlp outputs multiple lines, trailing logs, or multiple JSON objects
             let data: any = null;
             const lines = stdout.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
             for (const line of lines) {
               if (line.startsWith('{')) {
                 try {
                   const candidate = JSON.parse(line);
-                  if (candidate && (candidate.title || candidate.id)) {
-                    data = candidate;
-                    break;
+                  if (candidate && typeof candidate === 'object') {
+                    if (candidate.title || candidate.id || candidate.url) {
+                      data = candidate;
+                      break;
+                    }
                   }
                 } catch {}
               }
             }
 
             if (!data) {
-              data = JSON.parse(stdout.trim());
+              // Try parsing entire stdout
+              try {
+                data = JSON.parse(stdout.trim());
+              } catch {
+                // If stdout contains multiple JSON objects separated by newlines (e.g. at line 2 col 1),
+                // extract the first complete balanced JSON block
+                const firstBrace = stdout.indexOf('{');
+                if (firstBrace !== -1) {
+                  let depth = 0;
+                  let inString = false;
+                  let escape = false;
+                  let endIdx = -1;
+                  for (let i = firstBrace; i < stdout.length; i++) {
+                    const c = stdout[i];
+                    if (escape) { escape = false; continue; }
+                    if (c === '\\') { escape = true; continue; }
+                    if (c === '"') { inString = !inString; continue; }
+                    if (!inString) {
+                      if (c === '{') depth++;
+                      else if (c === '}') {
+                        depth--;
+                        if (depth === 0) {
+                          endIdx = i;
+                          break;
+                        }
+                      }
+                    }
+                  }
+                  if (endIdx !== -1) {
+                    data = JSON.parse(stdout.slice(firstBrace, endIdx + 1));
+                  }
+                }
+              }
+            }
+
+            if (!data) {
+              throw new Error('No valid JSON metadata found in video stream output');
             }
 
             resolve({
-              title: data.title || 'Online Video',
+              title: data.title || data.fulltitle || 'Online Video',
               duration: parseFloat(data.duration || '0'),
-              thumbnail: data.thumbnail || '',
+              thumbnail: data.thumbnail || (data.thumbnails && data.thumbnails.length ? data.thumbnails[0].url : ''),
               id: data.id || ('yt_' + Date.now())
             });
           } catch (e: any) {
@@ -157,6 +197,7 @@ export class ViralClipperService {
       // Prefer standard 1080p/720p mp4 for smooth Remotion/FFmpeg processing
       const args = [
         '-m', 'yt_dlp',
+        '--js-runtimes', 'node',
         '--no-playlist',
         '-f', 'bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         '--merge-output-format', 'mp4',
@@ -164,7 +205,9 @@ export class ViralClipperService {
         url
       ];
 
-      const p = spawn('python', args);
+      const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
+      const pythonExe = fs.existsSync(venvPy) ? venvPy : 'python';
+      const p = spawn(pythonExe, args);
       let stdout = '';
       let stderr = '';
 
@@ -179,19 +222,25 @@ export class ViralClipperService {
       p.stderr.on('data', (d) => { stderr += d.toString(); });
 
       p.on('close', (code) => {
+        // Find actual written file
+        const dir = path.dirname(outputTemplate);
+        const base = path.basename(outputTemplate).replace(/\.%\(ext\)s$/, '');
+        const files = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+        const found = files.find(f => f.startsWith(base) && /\.(mp4|mkv|webm)$/i.test(f));
+
+        if (found) {
+          return resolve(path.join(dir, found));
+        }
+
         if (code === 0) {
-          // Find actual written file
-          const dir = path.dirname(outputTemplate);
-          const base = path.basename(outputTemplate).replace(/\.%\(ext\)s$/, '');
-          const files = fs.readdirSync(dir);
-          const found = files.find(f => f.startsWith(base) && /\.(mp4|mkv|webm)$/i.test(f));
-          if (found) {
-            resolve(path.join(dir, found));
-          } else {
-            resolve(outputTemplate.replace('.%(ext)s', '.mp4'));
-          }
+          resolve(outputTemplate.replace('.%(ext)s', '.mp4'));
         } else {
-          reject(new Error(`Download failed: ${stderr || stdout || 'Unknown error'}`));
+          const cleanErr = (stderr || stdout || 'Unknown error')
+            .split('\n')
+            .filter(l => !l.trim().startsWith('WARNING:'))
+            .join('\n')
+            .trim();
+          reject(new Error(`Download failed: ${cleanErr || stderr || 'Unknown error'}`));
         }
       });
       p.on('error', reject);
@@ -666,6 +715,97 @@ print(json.dumps(results))
   }
 
   /**
+   * Re-align or refine a clip's captions with Whisper word timestamps for 100% exact audio sync
+   */
+  public static async alignClipWithWhisper(clipId: string): Promise<any> {
+    const clip = await getQuery<any>('SELECT * FROM clipper_clips WHERE id = ?', [clipId]);
+    if (!clip) throw new Error('Clip not found');
+    const project = await getQuery<any>('SELECT * FROM clipper_projects WHERE id = ?', [clip.project_id]);
+    if (!project) throw new Error('Parent project not found');
+
+    const videoPath = path.isAbsolute(project.video_path)
+      ? project.video_path
+      : path.join(process.cwd(), project.video_path);
+
+    if (!fs.existsSync(videoPath)) {
+      throw new Error(`Source video not found at ${videoPath}`);
+    }
+
+    const duration = Math.max(1, clip.end_time - clip.start_time);
+    const audioDir = path.join(process.cwd(), 'storage', 'audio');
+    if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
+    const sliceAudioPath = path.join(audioDir, `slice_${clipId}.wav`);
+    const captionsDir = path.join(process.cwd(), 'storage', 'captions');
+    if (!fs.existsSync(captionsDir)) fs.mkdirSync(captionsDir, { recursive: true });
+    const sliceJsonPath = path.join(captionsDir, `slice_${clipId}_transcript.json`);
+
+    // 1. Extract audio slice using FFmpeg
+    await new Promise<void>((resolve, reject) => {
+      const p = spawn('ffmpeg', [
+        '-y',
+        '-ss', clip.start_time.toString(),
+        '-i', videoPath,
+        '-t', duration.toString(),
+        '-vn',
+        '-acodec', 'pcm_s16le',
+        '-ar', '16000',
+        '-ac', '1',
+        sliceAudioPath
+      ]);
+      p.on('close', code => code === 0 ? resolve() : reject(new Error(`FFmpeg audio slice failed with code ${code}`)));
+      p.on('error', reject);
+    });
+
+    // 2. Transcribe audio slice using Whisper with word_timestamps
+    const transcript = await this.executeWhisper(
+      sliceAudioPath,
+      sliceJsonPath,
+      clip.caption_language || project.language || 'auto',
+      duration
+    );
+
+    // 3. Offset slice segments back to absolute project timestamps
+    const rawSegments = transcript.segments || [];
+    const absoluteSegments: TranscriptSegment[] = rawSegments.map((s: any, idx: number) => ({
+      id: idx + 1,
+      start: +(clip.start_time + s.start).toFixed(3),
+      end: +(clip.start_time + s.end).toFixed(3),
+      text: s.text.trim(),
+      words: (s.words || []).map((w: any) => ({
+        word: w.word.trim(),
+        start: +(clip.start_time + w.start).toFixed(3),
+        end: +(clip.start_time + w.end).toFixed(3),
+        probability: w.probability || 0.98
+      }))
+    }));
+
+    // Update clip in DB
+    const newHook = absoluteSegments.length > 0 ? absoluteSegments[0].text : clip.hook;
+    await runQuery(`
+      UPDATE clipper_clips SET
+        hook = ?,
+        transcript_segments = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [
+      newHook,
+      JSON.stringify(absoluteSegments),
+      clipId
+    ]);
+
+    // Cleanup slice audio file
+    try { if (fs.existsSync(sliceAudioPath)) fs.unlinkSync(sliceAudioPath); } catch {}
+
+    const updated = await getQuery<any>('SELECT * FROM clipper_clips WHERE id = ?', [clipId]);
+    return {
+      ...updated,
+      transcript_segments: JSON.parse(updated.transcript_segments || '[]'),
+      custom_style: JSON.parse(updated.custom_style || '{}'),
+      virality_metrics: JSON.parse(updated.virality_metrics || '{}')
+    };
+  }
+
+  /**
    * Fast-path: Download YouTube subtitles directly via yt-dlp if available
    */
   private static async extractYouTubeSubtitles(
@@ -685,6 +825,7 @@ print(json.dumps(results))
 
       const args = [
         '-m', 'yt_dlp',
+        '--js-runtimes', 'node',
         '--write-sub',
         '--write-auto-sub',
         '--sub-lang', subLangs,
@@ -1119,47 +1260,110 @@ print(json.dumps(results))
    * Render vertical 9:16 clip using FFmpeg with smart reframing and burned animated captions
    */
   /**
-   * Build smart camera tracking and zoom filter expression
+   * Automatically detect the peak "hype" or climax window from transcript cues
    */
-  static buildCameraZoomFilter(preset: string, intensity: number = 1.15, fps: number = 30): string {
+  static detectHypeWindow(segments: TranscriptSegment[], clipDuration: number): { start: number; end: number; reason: string } {
+    const hypeKeywords = [
+      'dollar', 'lakh', 'million', 'billion', 'thousand', 'hundred', 'bet', 'win', 'won', 'lost',
+      'crazy', 'insane', 'unbelievable', 'shocking', 'died', 'survived', 'record', 'impossible',
+      'huge', 'never', 'secret', 'truth', 'warning', 'danger', 'alert', '100', '1', '10', '50'
+    ];
+
+    let bestSegment: TranscriptSegment | null = null;
+    let highestScore = -1;
+
+    for (const seg of segments) {
+      const text = seg.text.toLowerCase();
+      let score = 0;
+      if (text.includes('!')) score += 3;
+      if (text.includes('?')) score += 1;
+      if (/\d+/.test(text)) score += 4;
+      for (const kw of hypeKeywords) {
+        if (text.includes(kw)) score += 3;
+      }
+      if (score > highestScore) {
+        highestScore = score;
+        bestSegment = seg;
+      }
+    }
+
+    if (bestSegment && highestScore > 0) {
+      const segDur = Math.max(2.5, bestSegment.end - bestSegment.start);
+      return {
+        start: Math.max(0, bestSegment.start),
+        end: Math.min(clipDuration, bestSegment.start + Math.min(4.0, segDur)),
+        reason: `Hype peak: "${bestSegment.text.slice(0, 30)}..."`
+      };
+    }
+
+    // Default to the dramatic climax around 65% of the clip duration
+    const defaultStart = Math.max(1, clipDuration * 0.62);
+    return {
+      start: defaultStart,
+      end: Math.min(clipDuration, defaultStart + 3.0),
+      reason: 'Climax moment'
+    };
+  }
+
+  /**
+   * Fast face/person detector: checks whether a clip contains a single person or multiple people/crowd
+   */
+  static async checkIsSinglePerson(videoPath: string, startTime: number, duration: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const pythonExe = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
+      const scriptPath = path.join(process.cwd(), 'scripts', 'detect_faces_in_clip.py');
+
+      if (!fs.existsSync(pythonExe) || !fs.existsSync(scriptPath)) {
+        return resolve(false); // Default to no-zoom if detector script is missing
+      }
+
+      const p = spawn(pythonExe, [scriptPath, videoPath, startTime.toString(), duration.toString()]);
+      let out = '';
+      p.stdout.on('data', (d) => { out += d.toString(); });
+      p.on('close', () => {
+        try {
+          const res = JSON.parse(out);
+          console.log(`[ViralClipper] Face count analysis for [${startTime}-${startTime + duration}s]: is_single=${res.is_single_person}, max_faces=${res.max_faces}, samples=${JSON.stringify(res.samples)}`);
+          resolve(!!res.is_single_person);
+        } catch {
+          resolve(false);
+        }
+      });
+      p.on('error', () => resolve(false));
+    });
+  }
+
+  /**
+   * Build smart camera tracking and zoom filter expression.
+   * Strict rule: ONLY zooms during the specific hype moment IF and ONLY IF a single person is in frame.
+   * Never loops or continuously zooms over crowd/multiple people.
+   */
+  static buildCameraZoomFilter(
+    preset: string,
+    intensity: number = 1.15,
+    fps: number = 30,
+    options: {
+      isSinglePerson?: boolean;
+      hypeStart?: number;
+      hypeEnd?: number;
+    } = {}
+  ): string {
+    // If not a single person (e.g. group, crowd, team), DO NOT ZOOM! Keep original wide framing.
+    if (options.isSinglePerson === false) {
+      console.log(`[ViralClipper] Multiple people / crowd detected in frame. Bypassing zoom to preserve full wide composition.`);
+      return '';
+    }
+
     if (!preset || preset === 'static_professional_frame' || preset === 'none') {
       return '';
     }
-    const safeIntensity = Math.min(1.5, Math.max(1.02, intensity));
-    const step = (safeIntensity - 1.0) / (fps * 2.5); // 2.5 second ramp
 
-    switch (preset) {
-      case 'cinematic_slow_zoom_in':
-        return `zoompan=z='min(zoom+${step.toFixed(5)},${safeIntensity.toFixed(3)})':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.36)-(ih/zoom*0.36)':s=1920x1080:fps=${fps}`;
-      case 'cinematic_slow_zoom_out':
-        return `zoompan=z='if(eq(on,1),${safeIntensity.toFixed(3)},max(zoom-${step.toFixed(5)},1.0))':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.36)-(ih/zoom*0.36)':s=1920x1080:fps=${fps}`;
-      case 'smooth_face_tracking':
-        return `zoompan=z='min(zoom+${(step * 0.6).toFixed(5)},${safeIntensity.toFixed(3)})':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.34)-(ih/zoom*0.34)':s=1920x1080:fps=${fps}`;
-      case 'dynamic_speaker_zoom':
-        const amp = ((safeIntensity - 1.0) * 0.5).toFixed(4);
-        const base = (1.0 + (safeIntensity - 1.0) * 0.5).toFixed(4);
-        return `zoompan=z='${base}+${amp}*sin(on*0.035)':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.38)-(ih/zoom*0.38)':s=1920x1080:fps=${fps}`;
-      case 'podcast_focus_zoom':
-        return `zoompan=z='if(lt(on,24),1.0+(${((safeIntensity - 1.0) / 24).toFixed(5)}*on),${safeIntensity.toFixed(3)})':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.35)-(ih/zoom*0.35)':s=1920x1080:fps=${fps}`;
-      case 'punch_in_zoom':
-        return `zoompan=z='if(lt(on,14),1.0+(${((safeIntensity - 1.0) / 14).toFixed(5)}*on),${safeIntensity.toFixed(3)})':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.36)-(ih/zoom*0.36)':s=1920x1080:fps=${fps}`;
-      case 'subtle_camera_push':
-        const subtleInt = Math.min(1.08, safeIntensity);
-        const subtleStep = (subtleInt - 1.0) / (fps * 3.5);
-        return `zoompan=z='min(zoom+${subtleStep.toFixed(5)},${subtleInt.toFixed(3)})':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.38)-(ih/zoom*0.38)':s=1920x1080:fps=${fps}`;
-      case 'automatic_smart_zoom':
-        const smartAmp = (safeIntensity - 1.0).toFixed(4);
-        return `zoompan=z='1.0+${smartAmp}*(0.5-0.5*cos(on*0.03))':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.38)-(ih/zoom*0.38)':s=1920x1080:fps=${fps}`;
-      case 'wide_to_close_transition':
-        return `zoompan=z='min(zoom+${(step * 1.8).toFixed(5)},${safeIntensity.toFixed(3)})':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.34)-(ih/zoom*0.34)':s=1920x1080:fps=${fps}`;
-      case 'documentary_camera_movement':
-        return `zoompan=z='min(zoom+${(step * 0.7).toFixed(5)},${safeIntensity.toFixed(3)})':d=1:x='(iw*0.48)-(iw/zoom*0.48)+10*sin(on*0.025)':y='(ih*0.37)-(ih/zoom*0.37)':s=1920x1080:fps=${fps}`;
-      case 'reaction_shot_focus':
-        return `zoompan=z='if(lt(on,45),1.02,min(zoom+0.003,${safeIntensity.toFixed(3)}))':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.35)-(ih/zoom*0.35)':s=1920x1080:fps=${fps}`;
-      case 'static_professional_frame':
-      default:
-        return '';
-    }
+    const safeIntensity = Math.min(1.20, Math.max(1.06, intensity));
+    const hypeS = options.hypeStart !== undefined ? options.hypeStart : 10.0;
+    const hypeE = options.hypeEnd !== undefined ? options.hypeEnd : 13.5;
+
+    // Smooth hype punch-in: 1.0x normal frame throughout, smoothly zooms in ONLY during the hype window for a single speaker
+    return `zoompan=z='if(between(it,${hypeS.toFixed(2)},${hypeE.toFixed(2)}),min(zoom+0.015,${safeIntensity.toFixed(3)}),max(zoom-0.015,1.0))':d=1:x='iw/2-(iw/zoom/2)':y='(ih*0.38)-(ih/zoom*0.38)':s=1920x1080:fps=${fps}`;
   }
 
   static async renderClip(clipId: string): Promise<string> {
@@ -1261,11 +1465,18 @@ print(json.dumps(results))
       targetHeight = 1080;
     }
 
+    // Enrich custom style with hook title banner and watermark
+    const enrichedCustomStyle = {
+      ...customStyle,
+      hookTitle: customStyle.showHookTitle !== false ? (customStyle.hookTitle || clip.hook) : null,
+      watermarkText: customStyle.watermarkText || null
+    };
+
     // Target dimensions for subtitles
     CaptionStudioService.generateAss(
       relativeSegments,
       clip.caption_template || 'word-pop',
-      customStyle,
+      enrichedCustomStyle,
       targetWidth,
       targetHeight,
       assPath
@@ -1274,15 +1485,27 @@ print(json.dumps(results))
     const relAss = path.relative(process.cwd(), assPath).replace(/\\/g, '/');
     const escapedAss = relAss.replace(/:/g, '\\\\:');
 
-    // Smart Camera Zoom & Movement preset configuration
+    const duration = Math.max(1, clip.end_time - clip.start_time);
+
+    // 1. Detect hype moment window from transcript keywords & punctuation
+    const hypeWindow = ViralClipperService.detectHypeWindow(relativeSegments, duration);
+
+    // 2. Run real-time computer vision face count check (Single Person vs Crowd/Multiple People)
+    const isSinglePerson = await ViralClipperService.checkIsSinglePerson(inputVideoPath, clip.start_time, duration);
+
+    // 3. Smart Camera Zoom: Zooms ONLY at the hype moment IF and ONLY IF a single person is in frame
     const cameraPreset = customStyle.cameraPreset || 'automatic_smart_zoom';
-    const zoomIntensity = parseFloat(customStyle.zoomIntensity || '1.15');
-    const cameraZoomFilter = ViralClipperService.buildCameraZoomFilter(cameraPreset, zoomIntensity, 30);
+    const zoomIntensity = parseFloat(customStyle.zoomIntensity || '1.14');
+    const cameraZoomFilter = ViralClipperService.buildCameraZoomFilter(cameraPreset, zoomIntensity, 30, {
+      isSinglePerson,
+      hypeStart: hypeWindow.start,
+      hypeEnd: hypeWindow.end
+    });
 
     // Build smart reframing filter graph
     let filterGraph = '';
     const mode = clip.reframing_mode || 'blur_background';
-    const isComplex = mode === 'blur_background' || (aspect === '9:16' && mode === 'split_screen') || !!cameraZoomFilter;
+    const isComplex = true;
 
     if (aspect === '16:9') {
       const zoom169 = cameraZoomFilter ? `${cameraZoomFilter},` : '';
@@ -1293,23 +1516,25 @@ print(json.dumps(results))
         filterGraph = `[0:v]${cropZoom},crop=1080:1080:(iw-1080)/2:0,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'[outv]`;
       } else {
         const fgZoom = cameraZoomFilter ? `${cameraZoomFilter},scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg]` : 'scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg]';
-        filterGraph = `[0:v]scale=1080:1080:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1080,gblur=sigma=26:steps=2,eq=brightness=-0.10:contrast=1.06[bg];[0:v]${fgZoom};[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${escapedAss}'[outv]`;
+        filterGraph = `[0:v]scale=1080:1080:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1080,gblur=sigma=28:steps=2,eq=brightness=-0.14:contrast=1.06[bg];[0:v]${fgZoom};[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${escapedAss}'[outv]`;
       }
     } else {
-      // 9:16 Vertical Reel
-      if (mode === 'center_crop') {
+      // 9:16 Vertical Reel Formats
+      if (mode === 'split_facecam') {
+        // Gaming Facecam Layout: Gameplay 1140px on top, Webcam 780px on bottom with blurred backdrop
+        filterGraph = `[0:v]scale=1080:1140:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1140:(iw-1080)/2:0[top];[0:v]scale=1080:780:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:780,gblur=sigma=24:steps=2,eq=brightness=-0.16[botbg];[0:v]scale=1080:780:force_original_aspect_ratio=decrease:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[cam];[botbg][cam]overlay=(W-w)/2:(H-h)/2[bot];[top][bot]vstack=inputs=2[stacked];[stacked]subtitles='${escapedAss}'[outv]`;
+      } else if (mode === 'split_screen') {
+        // Two-Person Podcast Layout: 50% Top Speaker (960px), 50% Bottom Speaker (960px)
+        filterGraph = `[0:v]crop=iw/2:ih:0:0,scale=1080:960:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:960[spk1];[0:v]crop=iw/2:ih:iw/2:0,scale=1080:960:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:960[spk2];[spk1][spk2]vstack=inputs=2[stacked];[stacked]subtitles='${escapedAss}'[outv]`;
+      } else if (mode === 'center_crop') {
         const cropZoom = cameraZoomFilter ? `${cameraZoomFilter},scale=-1:1920:flags=lanczos` : 'scale=-1:1920:flags=lanczos';
         filterGraph = `[0:v]${cropZoom},crop=1080:1920:(iw-1080)/2:0,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'[outv]`;
-      } else if (mode === 'split_screen') {
-        filterGraph = `[0:v]split=2[top][bottom];[top]crop=iw/2:ih:0:0,scale=1080:960:flags=lanczos[t_sc];[bottom]crop=iw/2:ih:iw/2:0,scale=1080:960:flags=lanczos[b_sc];[t_sc][b_sc]vstack=inputs=2,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'[outv]`;
       } else {
-        // Gold standard Podcast blurred background framing + Smart Camera Zoom
+        // High quality single frame with Gaussian blurred background
         const fgZoom = cameraZoomFilter ? `${cameraZoomFilter},scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg]` : 'scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg]';
-        filterGraph = `[0:v]scale=360:640:force_original_aspect_ratio=increase:flags=fast_bilinear,crop=360:640,boxblur=luma_radius=16:luma_power=3,scale=1080:1920:flags=lanczos,eq=brightness=-0.12:contrast=1.08[bg];[0:v]${fgZoom};[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${escapedAss}'[outv]`;
+        filterGraph = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,gblur=sigma=28:steps=2,eq=brightness=-0.14:contrast=1.06[bg];[0:v]${fgZoom};[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${escapedAss}'[outv]`;
       }
     }
-
-    const duration = Math.max(1, clip.end_time - clip.start_time);
 
     return new Promise((resolve, reject) => {
       const args = [
@@ -1329,6 +1554,7 @@ print(json.dumps(results))
         '-colorspace', 'bt709',
         '-c:a', 'aac',
         '-b:a', '320k',
+        '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11,alimiter=limit=0.95',
         '-movflags', '+faststart',
         outputPath
       ];
@@ -1416,5 +1642,45 @@ print("ZIP_SUCCESS")
       });
       p.on('error', reject);
     });
+  }
+
+  /**
+   * 1-Click Romanize Clip to creator-style Roman Hinglish
+   */
+  static async romanizeClip(clipId: string): Promise<any> {
+    const clip = await getQuery<any>('SELECT * FROM clipper_clips WHERE id = ?', [clipId]);
+    if (!clip) throw new Error('Clip not found');
+    let segs = clip.transcript_segments;
+    if (typeof segs === 'string') {
+      try { segs = JSON.parse(segs); } catch (e) { segs = []; }
+    }
+    const romanized = romanizeSegments(segs);
+    const romanHook = romanizeText(clip.hook || '');
+    const romanTitle = romanizeText(clip.title || '');
+    await runQuery(
+      'UPDATE clipper_clips SET transcript_segments = ?, hook = ?, title = ?, caption_language = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [JSON.stringify(romanized), romanHook, romanTitle, 'hi_roman', clipId]
+    );
+    this.broadcast({ clipId, status: 'updated', message: 'Converted to Roman Hinglish!' });
+    return { success: true, segments: romanized, hook: romanHook, title: romanTitle };
+  }
+
+  /**
+   * 1-Click Inject Viral Retention Emojis into Subtitles
+   */
+  static async injectEmojis(clipId: string): Promise<any> {
+    const clip = await getQuery<any>('SELECT * FROM clipper_clips WHERE id = ?', [clipId]);
+    if (!clip) throw new Error('Clip not found');
+    let segs = clip.transcript_segments;
+    if (typeof segs === 'string') {
+      try { segs = JSON.parse(segs); } catch (e) { segs = []; }
+    }
+    const injected = injectViralEmojisIntoSegments(segs);
+    await runQuery(
+      'UPDATE clipper_clips SET transcript_segments = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [JSON.stringify(injected), clipId]
+    );
+    this.broadcast({ clipId, status: 'updated', message: 'Injected viral emojis!' });
+    return { success: true, segments: injected };
   }
 }

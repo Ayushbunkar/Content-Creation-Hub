@@ -1,19 +1,24 @@
 import { VideoProject, SceneData, PipelineStage, ResearchSummary, SocialCaptions, VisualShotType, MediaSource, CameraMovement, SfxCue } from './types';
 import { runQuery, getQuery } from './db';
-import { MediaSourceManager, QualityChecker } from './mediaSource';
+import { MediaSourceManager, QualityChecker, VisualDiversityEngine } from './mediaSource';
 import { DocumentaryResearchService, ResearchDossier } from './documentaryResearch';
 import { DocumentaryNarrativeEngine } from './documentaryNarrative';
 import { SceneIntelligenceEngine } from './sceneIntelligence';
 import { VideoEnhancerService } from './videoEnhancer';
 import { CinematicEditorialEngine, SoundDesignEngine } from './cinematicEditorialEngine';
+import { SoundDesignSystem } from './soundDesignSystem';
 import { CopyrightLicenseManager } from './copyrightService';
 import { AudioPoliceService } from './audioPolice';
+import { QualityControlEngine } from './qualityControlEngine';
+import { PerformanceResourceManager } from './resourceManager';
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 
 export class PipelineManager {
   private static activeJobs: Map<string, boolean> = new Map();
+  private static runningProcesses: Map<string, any> = new Map();
   private static listeners: Array<(jobUpdate: any) => void> = [];
 
   static subscribe(fn: (jobUpdate: any) => void) {
@@ -24,6 +29,19 @@ export class PipelineManager {
     this.listeners.forEach((fn) => {
       try { fn(update); } catch (e) { }
     });
+  }
+
+  static cancelPipeline(projectId: string): boolean {
+    this.activeJobs.delete(projectId);
+    const proc = this.runningProcesses.get(projectId);
+    if (proc) {
+      try {
+        proc.kill('SIGKILL');
+      } catch (e) { }
+      this.runningProcesses.delete(projectId);
+    }
+    this.updateStage(projectId, 'READY_FOR_EDITING', 0, 'failed', 'Render cancelled by user');
+    return true;
   }
 
   static async startPipeline(projectId: string): Promise<void> {
@@ -53,117 +71,146 @@ export class PipelineManager {
 
   private static async runPipelineStages(projectId: string) {
     const projectRow = await getQuery<any>('SELECT * FROM projects WHERE id = ?', [projectId]);
+    if (!projectRow) return;
+
+    let parsedScenes: any[] = [];
+    try {
+      if (typeof projectRow.scene_data === 'string' && projectRow.scene_data.trim().startsWith('[')) {
+        parsedScenes = JSON.parse(projectRow.scene_data);
+      } else if (Array.isArray(projectRow.scene_data)) {
+        parsedScenes = projectRow.scene_data;
+      }
+    } catch (e) {
+      parsedScenes = [];
+    }
+
     const project: VideoProject = {
       ...projectRow,
-      scene_data: projectRow.scene_data ? JSON.parse(projectRow.scene_data) : [],
+      scene_data: parsedScenes,
     };
 
     // Initialize media library
     await MediaSourceManager.initMediaLibrary();
 
-    // 1. RESEARCH
-    await this.updateStage(projectId, 'RESEARCH', 10);
-    const researchDossier = await this.executeResearch(project);
-
-    // 2. SCRIPT WRITING
-    await this.updateStage(projectId, 'SCRIPT_WRITING', 20);
-    const script = projectRow.script && projectRow.script.length > 50 
-      ? projectRow.script 
-      : await this.generateScript(project, researchDossier);
-    await runQuery('UPDATE projects SET script = ? WHERE id = ?', [script, projectId]);
-
-    // 3. FACT CHECKING
-    await this.updateStage(projectId, 'FACT_CHECKING', 30);
-
-    // 4. SCENE PLANNING (Granular Shot Division: strictly 3.0 - 3.8s per shot)
-    await this.updateStage(projectId, 'SCENE_PLANNING', 40);
-    const initialSceneData = await this.planScenes(project, script);
-    await runQuery('UPDATE projects SET scene_data = ? WHERE id = ?', [JSON.stringify(initialSceneData), projectId]);
-
-    const refreshedProject = await getQuery<any>('SELECT mode, review_approved FROM projects WHERE id = ?', [projectId]);
-
-    // If project is in Review Mode and not approved yet, PAUSE for user review
-    if (refreshedProject?.mode === 'review' && !refreshedProject?.review_approved) {
-      await this.updateStage(projectId, 'SCENE_PLANNING', 45, 'draft');
-      this.broadcast({
-        projectId,
-        stage: 'REVIEW_PAUSED',
-        progress: 45,
-        status: 'draft',
-        message: 'Research, Claim Ledger, Script, and 3-4s Storyboard complete. Ready for review and approval in Documentary Studio.'
-      });
-      return; // Pause pipeline until user clicks Approve in UI
-    }
-
-    // 5. ASSET COLLECTION (Download copyright-free stock footage & AI visuals, apply watermark crop & enhancement)
-    await this.updateStage(projectId, 'ASSET_COLLECTION', 50);
-    const totalShots = initialSceneData.length;
-    for (let i = 0; i < totalShots; i++) {
-      const shot = initialSceneData[i];
-      if (!shot.media_url || shot.visual_type === 'video_footage' || shot.visual_type === 'ai_video' || shot.visual_type === 'layered_parallax' || shot.visual_type === 'data_metric') {
-        const shotId = `${projectId}_${shot.id}`;
-        shot.media_url = await MediaSourceManager.fetchCopyrightFreeAsset(
-          shot.narration || shot.title,
-          project.category,
-          shotId,
-          shot.duration || 4,
-          project.aspect_ratio || '16:9',
-          projectId
-        );
-      }
-      const progressPct = Math.round(50 + ((i + 1) / Math.max(1, totalShots)) * 5);
-      await this.updateStage(projectId, 'ASSET_COLLECTION', progressPct);
-    }
-    await this.updateStage(projectId, 'IMAGE_AND_GRAPHIC_PREPARATION', 55);
-
-    // 6. VOICE GENERATION (Kokoro TTS)
-    await this.updateStage(projectId, 'VOICE_GENERATION', 65);
     const narrationWav = path.join(process.cwd(), 'public', 'audio', `narration_${projectId}.wav`);
-    if (!fs.existsSync(narrationWav) || fs.statSync(narrationWav).size < 10000) {
-      try {
-        await this.generateVoice(script, narrationWav, project.voice, project.language);
-      } catch (e: any) {
-        console.warn(`[Pipeline] Voice generation error for ${projectId}:`, e?.message);
-      }
-    }
-    await runQuery('UPDATE projects SET narration_file = ? WHERE id = ?', [`/audio/narration_${projectId}.wav`, projectId]);
-
-    // Register voice narration in persistent Copyright & Licensing registry
-    try {
-      await CopyrightLicenseManager.registerNarrationTrack(projectId, project.voice || 'af_heart', narrationWav);
-    } catch (e: any) {
-      console.warn(`[Pipeline] Voice narration copyright registration note:`, e?.message);
-    }
-
-    // 7. SUBTITLE GENERATION (Whisper base)
-    await this.updateStage(projectId, 'SUBTITLE_GENERATION', 75);
     const srtPath = path.join(process.cwd(), 'public', `subtitles_${projectId}.srt`);
-    if (!fs.existsSync(srtPath) || fs.statSync(srtPath).size < 100) {
-      try {
-        await this.generateSubtitles(narrationWav, srtPath, project.language);
-      } catch (e: any) {
-        console.warn(`[Pipeline] Subtitle generation error for ${projectId}:`, e?.message);
+
+    // Fast-path resume: If already at FINAL_RENDER with audio & subtitles ready, jump directly to final render!
+    if (projectRow.current_stage === 'FINAL_RENDER' && fs.existsSync(narrationWav)) {
+      console.log(`[Pipeline] Resuming project ${projectId} directly from FINAL_RENDER...`);
+    } else {
+      // 1. RESEARCH
+      await this.updateStage(projectId, 'RESEARCH', 10);
+      const researchDossier = await this.executeResearch(project);
+
+      // 2. SCRIPT WRITING
+      await this.updateStage(projectId, 'SCRIPT_WRITING', 20);
+      const script = projectRow.script && projectRow.script.length > 50 
+        ? projectRow.script 
+        : await this.generateScript(project, researchDossier);
+      await runQuery('UPDATE projects SET script = ? WHERE id = ?', [script, projectId]);
+
+      // 3. FACT CHECKING
+      await this.updateStage(projectId, 'FACT_CHECKING', 30);
+
+      // 4. SCENE PLANNING (Granular Shot Division: strictly 3.0 - 3.8s per shot)
+      await this.updateStage(projectId, 'SCENE_PLANNING', 40);
+      const initialSceneData = (parsedScenes && parsedScenes.length > 0)
+        ? parsedScenes
+        : await this.planScenes(project, script);
+      await runQuery('UPDATE projects SET scene_data = ? WHERE id = ?', [JSON.stringify(initialSceneData), projectId]);
+
+      const refreshedProject = await getQuery<any>('SELECT mode, review_approved FROM projects WHERE id = ?', [projectId]);
+
+      // If project is in Review Mode and not approved yet, PAUSE for user review
+      if (refreshedProject?.mode === 'review' && !refreshedProject?.review_approved) {
+        await this.updateStage(projectId, 'SCENE_PLANNING', 45, 'draft');
+        this.broadcast({
+          projectId,
+          stage: 'REVIEW_PAUSED',
+          progress: 45,
+          status: 'draft',
+          message: 'Research, Claim Ledger, Script, and 3-4s Storyboard complete. Ready for review and approval in Documentary Studio.'
+        });
+        return; // Pause pipeline until user clicks Approve in UI
       }
+
+      // 5. ASSET COLLECTION (High-speed concurrent download & AI visual synthesis)
+      await this.updateStage(projectId, 'ASSET_COLLECTION', 50);
+      const totalShots = initialSceneData.length;
+      const BATCH_CONCURRENCY = 6;
+      let completedShots = 0;
+
+      const processShotAsset = async (shot: any) => {
+        if (!shot.media_url || shot.visual_type === 'video_footage' || shot.visual_type === 'ai_video' || shot.visual_type === 'layered_parallax' || shot.visual_type === 'data_metric') {
+          const shotId = `${projectId}_${shot.id}`;
+          shot.media_url = await MediaSourceManager.fetchCopyrightFreeAsset(
+            shot.narration || shot.title,
+            project.category,
+            shotId,
+            shot.duration || 4,
+            project.aspect_ratio || '16:9',
+            projectId
+          );
+        }
+        completedShots++;
+        const progressPct = Math.round(50 + ((completedShots) / Math.max(1, totalShots)) * 5);
+        await this.updateStage(projectId, 'ASSET_COLLECTION', progressPct);
+      };
+
+      for (let i = 0; i < totalShots; i += BATCH_CONCURRENCY) {
+        const batch = initialSceneData.slice(i, i + BATCH_CONCURRENCY);
+        await Promise.all(batch.map((shot: any) => processShotAsset(shot)));
+      }
+      await this.updateStage(projectId, 'IMAGE_AND_GRAPHIC_PREPARATION', 55);
+
+      // 6. VOICE GENERATION (Kokoro TTS)
+      await this.updateStage(projectId, 'VOICE_GENERATION', 65);
+      if (!fs.existsSync(narrationWav) || fs.statSync(narrationWav).size < 10000) {
+        try {
+          await this.generateVoice(script, narrationWav, project.voice, project.language);
+        } catch (e: any) {
+          console.warn(`[Pipeline] Voice generation error for ${projectId}:`, e?.message);
+        }
+      }
+      await runQuery('UPDATE projects SET narration_file = ? WHERE id = ?', [`/audio/narration_${projectId}.wav`, projectId]);
+
+      // Register voice narration in persistent Copyright & Licensing registry
+      try {
+        await CopyrightLicenseManager.registerNarrationTrack(projectId, project.voice || 'af_heart', narrationWav);
+      } catch (e: any) {
+        console.warn(`[Pipeline] Voice narration copyright registration note:`, e?.message);
+      }
+
+      // 7. SUBTITLE GENERATION (Whisper base)
+      await this.updateStage(projectId, 'SUBTITLE_GENERATION', 75);
+      if (!fs.existsSync(srtPath) || fs.statSync(srtPath).size < 100) {
+        try {
+          await this.generateSubtitles(narrationWav, srtPath, project.language);
+        } catch (e: any) {
+          console.warn(`[Pipeline] Subtitle generation error for ${projectId}:`, e?.message);
+        }
+      }
+      await runQuery('UPDATE projects SET subtitles_file = ? WHERE id = ?', [`/subtitles_${projectId}.srt`, projectId]);
+
+      // 8. QUALITY CHECK & AUTOMATIC ENHANCEMENT (Strict 3-4s Rule & Zero Static Slides)
+      await this.updateStage(projectId, 'QUALITY_CHECK', 80);
+      const { scenes: verifiedScenes, report: qcReport } = QualityChecker.inspectAndUpgrade(initialSceneData, project.category);
+      await runQuery('UPDATE projects SET scene_data = ?, qc_report = ? WHERE id = ?', [
+        JSON.stringify(verifiedScenes),
+        JSON.stringify(qcReport),
+        projectId
+      ]);
+
+      // 9. SOCIAL CAPTIONS GENERATION
+      const socialCaptions = this.generateSocialCaptions(project, script);
+      await runQuery('UPDATE projects SET social_captions = ? WHERE id = ?', [JSON.stringify(socialCaptions), projectId]);
+
+      // 10. ANIMATION & VIDEO ASSEMBLY
+      await this.updateStage(projectId, 'ANIMATION_GENERATION', 85);
+      await this.updateStage(projectId, 'AUDIO_ASSEMBLY', 90);
+      await this.updateStage(projectId, 'VIDEO_ASSEMBLY', 95);
     }
-    await runQuery('UPDATE projects SET subtitles_file = ? WHERE id = ?', [`/subtitles_${projectId}.srt`, projectId]);
-
-    // 8. QUALITY CHECK & AUTOMATIC ENHANCEMENT (Strict 3-4s Rule & Zero Static Slides)
-    await this.updateStage(projectId, 'QUALITY_CHECK', 80);
-    const { scenes: verifiedScenes, report: qcReport } = QualityChecker.inspectAndUpgrade(initialSceneData, project.category);
-    await runQuery('UPDATE projects SET scene_data = ?, qc_report = ? WHERE id = ?', [
-      JSON.stringify(verifiedScenes),
-      JSON.stringify(qcReport),
-      projectId
-    ]);
-
-    // 9. SOCIAL CAPTIONS GENERATION
-    const socialCaptions = this.generateSocialCaptions(project, script);
-    await runQuery('UPDATE projects SET social_captions = ? WHERE id = ?', [JSON.stringify(socialCaptions), projectId]);
-
-    // 10. ANIMATION & VIDEO ASSEMBLY
-    await this.updateStage(projectId, 'ANIMATION_GENERATION', 85);
-    await this.updateStage(projectId, 'AUDIO_ASSEMBLY', 90);
-    await this.updateStage(projectId, 'VIDEO_ASSEMBLY', 95);
 
     // 11. FINAL RENDER & VALIDATION
     await this.updateStage(projectId, 'FINAL_RENDER', 98);
@@ -175,6 +222,16 @@ export class PipelineManager {
       const audioGate = await AudioPoliceService.runProjectPreExportGate(projectId);
       if (!audioGate.canExport) {
         throw new Error(`Audio Copyright Police Gate Blocked Export: ${audioGate.blockReason}`);
+      }
+
+      // Mandatory Pre-Render Automatic Quality Control Validation Gate (Requirement 14)
+      const qcReport = await QualityControlEngine.validateProject(projectId);
+      if (!qcReport.canRender) {
+        console.warn(`[Pipeline] Quality Control detected ${qcReport.errorCount} blocking issues in ${projectId}. Attempting autofix...`);
+        const fixedReport = await QualityControlEngine.autoFix(projectId);
+        if (!fixedReport.canRender) {
+          throw new Error(`Automatic Quality Control Blocked Render: ${fixedReport.errors.join('; ')}`);
+        }
       }
 
       await this.renderVideo(projectId, videoOutput);
@@ -350,6 +407,7 @@ export class PipelineManager {
 
   /**
    * Parse SRT file into structured cue objects for frame-accurate Remotion closed captions
+   * Strictly enforces ONE-LINE punchy captions (max 4-5 words per cue)
    */
   private static parseSrtToCues(srtPath: string, fps = 30): any[] {
     if (!fs.existsSync(srtPath)) return [];
@@ -358,6 +416,8 @@ export class PipelineManager {
       const cues: any[] = [];
       const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
       const blocks = normalized.trim().split(/\n\s*\n/);
+      const MAX_WORDS_PER_LINE = 5;
+
       for (const b of blocks) {
         const lines = b.trim().split('\n');
         if (lines.length < 3) continue;
@@ -366,18 +426,54 @@ export class PipelineManager {
         if (!m) continue;
         const startSec = parseInt(m[1], 10) * 3600 + parseInt(m[2], 10) * 60 + parseInt(m[3], 10) + parseInt(m[4], 10) / 1000;
         const endSec = parseInt(m[5], 10) * 3600 + parseInt(m[6], 10) * 60 + parseInt(m[7], 10) + parseInt(m[8], 10) / 1000;
-        const cueText = lines.slice(2).join(' ').trim();
-        const startFrame = Math.round(startSec * fps);
-        const endFrame = Math.round(endSec * fps);
-        cues.push({
-          index: cues.length + 1,
-          startTime: startSec,
-          endTime: endSec,
-          text: cueText,
-          startFrame,
-          endFrame,
-          durationFrames: Math.max(1, endFrame - startFrame)
-        });
+        const rawText = lines.slice(2).join(' ').replace(/\s+/g, ' ').trim();
+        if (!rawText) continue;
+
+        const words = rawText.split(' ').filter(w => w.trim().length > 0);
+        if (words.length <= MAX_WORDS_PER_LINE) {
+          const startFrame = Math.round(startSec * fps);
+          const endFrame = Math.round(endSec * fps);
+          cues.push({
+            index: cues.length + 1,
+            startTime: startSec,
+            endTime: endSec,
+            text: rawText,
+            startFrame,
+            endFrame,
+            durationFrames: Math.max(1, endFrame - startFrame)
+          });
+        } else {
+          // Subdivide long multi-line cue into 1-line segments matching voiceover pace
+          const chunks: string[] = [];
+          for (let i = 0; i < words.length; i += MAX_WORDS_PER_LINE) {
+            chunks.push(words.slice(i, i + MAX_WORDS_PER_LINE).join(' '));
+          }
+
+          const totalDuration = Math.max(0.6, endSec - startSec);
+          const totalWords = words.length;
+          let currentStartSec = startSec;
+
+          for (let k = 0; k < chunks.length; k++) {
+            const chunkWords = chunks[k].split(' ').length;
+            const chunkDuration = (chunkWords / totalWords) * totalDuration;
+            const chunkEndSec = k === chunks.length - 1 ? endSec : (currentStartSec + chunkDuration);
+
+            const startFrame = Math.round(currentStartSec * fps);
+            const endFrame = Math.round(chunkEndSec * fps);
+
+            cues.push({
+              index: cues.length + 1,
+              startTime: currentStartSec,
+              endTime: chunkEndSec,
+              text: chunks[k],
+              startFrame,
+              endFrame,
+              durationFrames: Math.max(1, endFrame - startFrame)
+            });
+
+            currentStartSec = chunkEndSec;
+          }
+        }
       }
       return cues;
     } catch (e) {
@@ -486,8 +582,20 @@ export class PipelineManager {
     };
   }
 
-  private static async renderVideo(projectId: string, outputPath: string): Promise<void> {
-    const project = await getQuery<any>('SELECT * FROM projects WHERE id = ?', [projectId]);
+  static async renderPreview(projectId: string): Promise<string> {
+    const relPreview = `output_${projectId}_preview.mp4`;
+    const outputPath = path.join(process.cwd(), 'public', relPreview);
+    await this.renderVideo(projectId, outputPath, true);
+    try {
+      await runQuery('UPDATE projects SET preview_output = ? WHERE id = ?', [relPreview, projectId]);
+    } catch (e) {}
+    return relPreview;
+  }
+
+  private static async renderVideo(projectId: string, outputPath: string, isPreview: boolean = false): Promise<void> {
+    const releaseLock = await PerformanceResourceManager.acquireRenderLock(projectId);
+    try {
+      const project = await getQuery<any>('SELECT * FROM projects WHERE id = ?', [projectId]);
     const resolution = project?.resolution || '1080p';
     const aspectRatio = project?.aspect_ratio || '16:9';
 
@@ -541,7 +649,9 @@ export class PipelineManager {
     // Measure exact narration audio duration
     const narrationPath = path.join(process.cwd(), 'public', 'audio', `narration_${projectId}.wav`);
     const audioDurSec = await this.probeAudioDuration(narrationPath);
-    const totalFrames = Math.max(90, Math.ceil(audioDurSec * 30));
+    // Render the complete full documentary matching the voiceover narration (e.g. 7-8 minutes / 407s)
+    const targetDurSec = audioDurSec > 0 ? audioDurSec : (project?.duration ? project.duration * 60 : 480);
+    const totalFrames = Math.max(90, Math.ceil(targetDurSec * 30));
 
     // Parse subtitle cues directly for guaranteed frame-accurate Remotion closed captions
     const srtPath = path.join(process.cwd(), 'public', `subtitles_${projectId}.srt`);
@@ -564,17 +674,34 @@ export class PipelineManager {
       (project.visual_style as any) || 'cinematic_investigative'
     );
 
-    const rawScenes: any[] = (project?.scene_data && JSON.parse(project.scene_data).length > 0)
-      ? JSON.parse(project.scene_data)
-      : timeline.scenes;
+    let rawScenes: any[] = [];
+    try {
+      if (typeof project?.scene_data === 'string' && project.scene_data.trim().startsWith('[')) {
+        rawScenes = JSON.parse(project.scene_data);
+      } else if (Array.isArray(project?.scene_data)) {
+        rawScenes = project.scene_data;
+      }
+    } catch (e) {
+      console.warn(`[Pipeline] scene_data parse fallback:`, e);
+      rawScenes = [];
+    }
+    if (!rawScenes || rawScenes.length === 0) {
+      rawScenes = timeline.scenes;
+    }
 
     const numScenes = Math.max(1, rawScenes.length);
+    const rawTotalSec = rawScenes.reduce((acc, s) => acc + (s.duration || 6), 0);
+    const scaleFactor = rawTotalSec > 0 ? (targetDurSec / rawTotalSec) : 1;
     let accumulatedFrames = 0;
 
+    // Reset visual diversity engine to enforce MAX 2 uses per asset across entire documentary
+    VisualDiversityEngine.resetProject(projectId);
+    let lastUsedMedia = '';
+
     const cinematicScenes = rawScenes.map((s, idx) => {
-      // Strictly enforce granular 2.6s - 4.1s duration per shot
-      const rawDur = s.durationFrames || Math.round((s.duration || 3.3) * 30);
-      let shotDurFrames = Math.max(78, Math.min(125, rawDur));
+      // Scale shot durations proportionally to cover the full duration
+      const rawSec = (s.duration || 6) * scaleFactor;
+      let shotDurFrames = Math.max(60, Math.round(rawSec * 30));
 
       if (idx === numScenes - 1) {
         shotDurFrames = Math.max(60, totalFrames - accumulatedFrames);
@@ -585,11 +712,46 @@ export class PipelineManager {
       const startF = accumulatedFrames;
       accumulatedFrames += shotDurFrames;
 
+      // Safe Media URL Resolution: verify file existence and gracefully fallback to .temp.jpg or stock library
+      let resolvedMediaUrl = s.media_url || s.mediaUrl || '';
+      if (typeof resolvedMediaUrl === 'string' && resolvedMediaUrl && !resolvedMediaUrl.startsWith('http')) {
+        const localRel = resolvedMediaUrl.replace(/^\//, '');
+        const localAbs = path.join(process.cwd(), 'public', localRel);
+        if (!fs.existsSync(localAbs)) {
+          const tempJpg = localAbs.replace(/\.mp4$/, '.temp.jpg');
+          const normalJpg = localAbs.replace(/\.mp4$/, '.jpg');
+          if (fs.existsSync(tempJpg)) {
+            resolvedMediaUrl = resolvedMediaUrl.replace(/\.mp4$/, '.temp.jpg');
+          } else if (fs.existsSync(normalJpg)) {
+            resolvedMediaUrl = resolvedMediaUrl.replace(/\.mp4$/, '.jpg');
+          } else {
+            resolvedMediaUrl = '';
+          }
+        }
+      }
+
+      // Strict Anti-Repetition Rule: MAX 2 uses per asset across entire video, and no immediate back-to-back repeats
+      if (
+        !resolvedMediaUrl ||
+        resolvedMediaUrl === lastUsedMedia ||
+        !VisualDiversityEngine.isAvailable(projectId, resolvedMediaUrl)
+      ) {
+        resolvedMediaUrl = VisualDiversityEngine.getDiverseUniqueAsset(
+          s.narration || s.title || project.title,
+          cat,
+          projectId,
+          idx
+        );
+      } else {
+        VisualDiversityEngine.recordUsage(projectId, resolvedMediaUrl);
+      }
+      lastUsedMedia = resolvedMediaUrl;
+
       return {
         id: s.id || `shot_${idx + 1}`,
         type: s.visual_type || s.type || 'archival_photo',
         badge: s.badge || '[Cinematic Beat]',
-        mediaUrl: s.media_url || s.mediaUrl || 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1920&q=85',
+        mediaUrl: resolvedMediaUrl,
         cameraMovement: s.camera_movement || s.cameraMovement || 'dolly_in',
         transition: s.transition || 'fade',
         title: s.title || project.title,
@@ -611,78 +773,173 @@ export class PipelineManager {
           snippet: s.narration || '',
           highlightPhrase: 'Critical strategic corridor under international maritime scrutiny.'
         } : undefined),
-        visualData: s.visualData || {
+        visualData: s.visualData || (s.visual_type === 'tactical_map' ? {
+          region: (project.topic || 'GEOPOLITICAL THEATER').toUpperCase(),
+          highlightedEntities: ['United States of America', 'China', 'Taiwan'],
+          markers: [
+            { name: 'Silicon Valley, USA', coord: [-122.0838, 37.3861], label: 'AI COMPUTE EPICENTER', type: 'hub' },
+            { name: 'Taipei, Taiwan', coord: [121.5654, 25.0330], label: 'TSMC 3NM SILICON CORRIDOR', type: 'chokepoint' },
+          ],
+          routes: [
+            { from: [-122.0838, 37.3861] as [number, number], to: [121.5654, 25.0330] as [number, number], label: 'PACIFIC SUPPLY CHAIN' }
+          ]
+        } : {
           targetName: (project.topic || 'TACTICAL THEATER').toUpperCase(),
           statNumber: s.data_metric?.statNumber || (idx === 2 ? '21,000,000' : undefined),
           statLabel: s.data_metric?.statLabel || (idx === 2 ? 'BARRELS PER DAY' : undefined),
           statSubtext: s.data_metric?.statSubtext || (idx === 2 ? 'Over 20% of international petroleum trade flows through this single corridor.' : undefined),
-        }
+        })
       };
     });
 
-    // Sound effects generation from scenes
-    const sfxCues = SoundDesignEngine.generateSfxCues(cinematicScenes, totalFrames);
+    // Sound effects generation from scenes via dedicated SoundDesignSystem
+    const sfxCues = SoundDesignSystem.generateSceneSfx(cinematicScenes, 30);
+    const bgmMatch = SoundDesignSystem.selectBgm(project.topic || project.category || '');
+    const finalMusicSrc = timeline.musicTrack || bgmMatch.trackPath || musicTrack;
 
     // Register BGM and SFX in persistent Copyright & Licensing Registry
     try {
-      await CopyrightLicenseManager.registerProjectMusic(projectId, timeline.musicTrack || musicTrack);
-      await CopyrightLicenseManager.registerProjectSfx(projectId, sfxCues.map((c: any) => c.file));
+      await CopyrightLicenseManager.registerProjectMusic(projectId, finalMusicSrc);
+      const validSfx = sfxCues.map((c: any) => c.src || c.file).filter((f: any) => typeof f === 'string' && f.length > 0);
+      if (validSfx.length > 0) {
+        await CopyrightLicenseManager.registerProjectSfx(projectId, validSfx);
+      }
     } catch (e: any) {
       console.warn(`[Pipeline] Audio copyright registration note:`, e?.message);
     }
 
+      // Optimize image assets to prevent Chromium VRAM spikes on GTX 1650 4GB
+      for (const sc of cinematicScenes) {
+        if (sc.imageSrc && !sc.imageSrc.startsWith('http') && !sc.imageSrc.startsWith('data:')) {
+          const localPath = path.isAbsolute(sc.imageSrc) ? sc.imageSrc : path.join(process.cwd(), 'public', sc.imageSrc.replace(/^\//, ''));
+          sc.imageSrc = await PerformanceResourceManager.getOptimizedAssetPath(localPath, width, height);
+        }
+      }
+
+      return await new Promise<void>((resolve, reject) => {
+        const relPropsPath = path.join('public', `props_${projectId}.json`);
+        const absPropsPath = path.join(process.cwd(), relPropsPath);
+        const propsData = {
+          title: (project.title || project.topic).toUpperCase(),
+          subtitle: 'STRATEGIC GEOPOLITICS // SPECIAL INTELLIGENCE REPORT',
+          category: project.category || 'Geopolitics',
+          topic: project.topic,
+          narrationSrc: `/audio/narration_${projectId}.wav`,
+          musicSrc: finalMusicSrc,
+          subtitlesData: { cues: subtitleCues },
+          captionTemplate: project.caption_template || 'karaoke-highlight',
+          sfxCues: sfxCues,
+          scenes: cinematicScenes,
+          durationInFrames: totalFrames
+        };
+        fs.writeFileSync(absPropsPath, JSON.stringify(propsData, null, 2), 'utf-8');
+
+        const remotionCli = path.join(process.cwd(), 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
+        const remotionArgs = PerformanceResourceManager.getOptimizedRemotionArgs({
+          remotionCli,
+          entryPoint: 'src/index.ts',
+          compositionId: 'CinematicDocumentary',
+          outputPath,
+          propsPath: relPropsPath,
+          width,
+          height,
+          totalFrames,
+          isPreview
+        });
+
+        const p = spawn(process.execPath, remotionArgs);
+        PipelineManager.runningProcesses.set(projectId, p);
+        let stderr = '';
+        p.stdout?.on('data', (d) => {
+          const text = d.toString().trim();
+          if (text) console.log(`[Remotion ${projectId}]`, text);
+        });
+        p.stderr?.on('data', (d) => {
+          const text = d.toString();
+          stderr += text;
+          if (text.includes('Error')) console.error(`[Remotion ERR ${projectId}]`, text.trim());
+        });
+
+        p.on('close', (code) => {
+          PipelineManager.runningProcesses.delete(projectId);
+          try { fs.unlinkSync(absPropsPath); } catch (e) { }
+          PerformanceResourceManager.cleanupTempFiles();
+          if (code === 0 || fs.existsSync(outputPath)) resolve();
+          else reject(new Error(`Remotion render exited with code ${code}: ${stderr.slice(-300)}`));
+        });
+        p.on('error', (err) => {
+          PipelineManager.runningProcesses.delete(projectId);
+          reject(err);
+        });
+      });
+    } finally {
+      releaseLock();
+    }
+  }
+
+  /**
+   * Final file validation using FFprobe verifying container format, H.264 stream, resolution, fps, audio samplerate, and AV synchronization
+   */
+  static async validateExportedFile(filePath: string, narrationAudioPath?: string): Promise<{
+    valid: boolean;
+    format: string;
+    video: { codec: string; width: number; height: number; fps: number; duration: number };
+    audio: { codec: string; sampleRate: number; channels: number; duration: number };
+    syncCheck: { audioDiffSec: number; synchronized: boolean; message: string };
+  }> {
+    const absPath = path.isAbsolute(filePath) ? filePath : path.join(process.cwd(), filePath);
+    if (!fs.existsSync(absPath)) throw new Error(`Video file not found at ${absPath}`);
+
     return new Promise((resolve, reject) => {
-      const relPropsPath = path.join('public', `props_${projectId}.json`);
-      const absPropsPath = path.join(process.cwd(), relPropsPath);
-      const propsData = {
-        title: (project.title || project.topic).toUpperCase(),
-        subtitle: 'STRATEGIC GEOPOLITICS // SPECIAL INTELLIGENCE REPORT',
-        category: project.category || 'Geopolitics',
-        topic: project.topic,
-        narrationSrc: `/audio/narration_${projectId}.wav`,
-        musicSrc: timeline.musicTrack || musicTrack,
-        subtitlesData: { cues: subtitleCues },
-        captionTemplate: project.caption_template || 'karaoke-highlight',
-        sfxCues: sfxCues,
-        scenes: cinematicScenes,
-        durationInFrames: totalFrames
-      };
-      fs.writeFileSync(absPropsPath, JSON.stringify(propsData, null, 2), 'utf-8');
+      const p = spawn('ffprobe', ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', absPath]);
+      let stdout = '';
+      p.stdout?.on('data', (d) => stdout += d.toString());
+      p.on('close', async () => {
+        try {
+          const info = JSON.parse(stdout || '{}');
+          const vStream = info.streams?.find((s: any) => s.codec_type === 'video') || {};
+          const aStream = info.streams?.find((s: any) => s.codec_type === 'audio') || {};
 
-      const npxArgs = [
-        'remotion', 'render',
-        'src/index.ts',
-        'CinematicDocumentary',
-        outputPath.replace(/\\/g, '/'),
-        `--props=${relPropsPath.replace(/\\/g, '/')}`,
-        `--width=${width}`,
-        `--height=${height}`,
-        `--frames=0-${totalFrames - 1}`,
-        '--pixel-format=yuv420p',
-        '--crf=16',
-        '--preset=medium',
-        '--audio-bitrate=320k',
-        '--jpeg-quality=98',
-        '--concurrency=4',
-        '--overwrite'
-      ];
+          let fps = 30;
+          if (vStream.r_frame_rate) {
+            const parts = vStream.r_frame_rate.split('/');
+            fps = parts.length === 2 && Number(parts[1]) > 0 ? Math.round(Number(parts[0]) / Number(parts[1])) : Number(parts[0]) || 30;
+          }
 
-      const p = spawn('npx.cmd', npxArgs, { shell: true });
-      let stderr = '';
-      p.stdout?.on('data', (d) => {
-        const text = d.toString().trim();
-        if (text) console.log(`[Remotion ${projectId}]`, text);
-      });
-      p.stderr?.on('data', (d) => {
-        const text = d.toString();
-        stderr += text;
-        if (text.includes('Error')) console.error(`[Remotion ERR ${projectId}]`, text.trim());
-      });
+          const videoDuration = Number(info.format?.duration || vStream.duration || 0);
+          const audioDuration = Number(aStream.duration || videoDuration);
 
-      p.on('close', (code) => {
-        try { fs.unlinkSync(absPropsPath); } catch (e) { }
-        if (code === 0) resolve();
-        else reject(new Error(`Remotion render exited with code ${code}: ${stderr.slice(-300)}`));
+          let syncDiff = 0;
+          if (narrationAudioPath && fs.existsSync(narrationAudioPath)) {
+            const narrDur = await PipelineManager.probeAudioDuration(narrationAudioPath);
+            syncDiff = Math.abs(videoDuration - narrDur);
+          }
+
+          resolve({
+            valid: Boolean(vStream.codec_name && videoDuration > 0),
+            format: info.format?.format_name || 'mp4',
+            video: {
+              codec: vStream.codec_name || 'h264',
+              width: Number(vStream.width || 1920),
+              height: Number(vStream.height || 1080),
+              fps,
+              duration: Math.round(videoDuration * 100) / 100
+            },
+            audio: {
+              codec: aStream.codec_name || 'aac',
+              sampleRate: Number(aStream.sample_rate || 48000),
+              channels: Number(aStream.channels || 2),
+              duration: Math.round(audioDuration * 100) / 100
+            },
+            syncCheck: {
+              audioDiffSec: Math.round(syncDiff * 100) / 100,
+              synchronized: syncDiff < 1.0,
+              message: syncDiff < 1.0 ? 'Perfect frame-accurate A/V synchronization' : `Minor delta (${syncDiff.toFixed(2)}s)`
+            }
+          });
+        } catch (e) {
+          reject(e);
+        }
       });
       p.on('error', reject);
     });

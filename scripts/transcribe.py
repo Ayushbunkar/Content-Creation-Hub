@@ -18,21 +18,53 @@ def format_time(seconds: float) -> str:
 
 
 def generate_srt(segments, output_file: str):
-    """Write segments to SRT file."""
+    """Write short, punchy 1-line segments to SRT file (max 5 words per line)."""
     output_path = Path(output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    cues = []
+    MAX_WORDS = 5
+
+    for segment in segments:
+        text = segment.get("text", "").strip()
+        words = text.split()
+        if not words:
+            continue
+        start = float(segment["start"])
+        end = float(segment["end"])
+        duration = max(0.5, end - start)
+
+        if len(words) <= MAX_WORDS:
+            cues.append({
+                "start": start,
+                "end": end,
+                "text": text
+            })
+        else:
+            chunks = []
+            for i in range(0, len(words), MAX_WORDS):
+                chunks.append(" ".join(words[i:i + MAX_WORDS]))
+
+            total_words = len(words)
+            cur_start = start
+            for i, chunk in enumerate(chunks):
+                chunk_words = len(chunk.split())
+                chunk_dur = (chunk_words / total_words) * duration
+                chunk_end = end if i == len(chunks) - 1 else (cur_start + chunk_dur)
+                cues.append({
+                    "start": cur_start,
+                    "end": chunk_end,
+                    "text": chunk
+                })
+                cur_start = chunk_end
+
     with open(output_path, "w", encoding="utf-8") as f:
-        for i, segment in enumerate(segments, 1):
-            start = format_time(segment["start"])
-            end = format_time(segment["end"])
-            text = segment["text"].strip()
-
+        for i, cue in enumerate(cues, 1):
             f.write(f"{i}\n")
-            f.write(f"{start} --> {end}\n")
-            f.write(f"{text}\n\n")
+            f.write(f"{format_time(cue['start'])} --> {format_time(cue['end'])}\n")
+            f.write(f"{cue['text']}\n\n")
 
-    print(f"SRT saved to: {output_file}")
+    print(f"SRT saved with {len(cues)} single-line cues to: {output_file}")
 
 
 def transcribe_audio(

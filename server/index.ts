@@ -17,6 +17,11 @@ import { VideoEnhancerService } from './videoEnhancer';
 import { CinematicEditorialEngine } from './cinematicEditorialEngine';
 import { CopyrightLicenseManager } from './copyrightService';
 import { AudioPoliceService } from './audioPolice';
+import { StreamClipFinderService } from './streamClipFinder';
+import { ScenePlanningEngine } from './scenePlanningEngine';
+import { SoundDesignSystem, SFX_CATALOG, BGM_CATALOG } from './soundDesignSystem';
+import { QualityControlEngine } from './qualityControlEngine';
+import { PerformanceResourceManager } from './resourceManager';
 
 const app = express();
 const server = http.createServer(app);
@@ -175,6 +180,99 @@ app.post('/api/documentary/research', async (req, res) => {
   }
 });
 
+// 1B. Mode B: Script to Documentary Analysis
+app.post('/api/documentary/mode-b/analyze', async (req, res) => {
+  try {
+    const { script, style } = req.body;
+    if (!script || !script.trim()) {
+      return res.status(400).json({ error: 'Script text is required' });
+    }
+    const analysis = await DocumentaryResearchService.analyzeCustomScript(script, style || 'investigative');
+    res.json(analysis);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 1C. Mode B: Create Documentary from Custom Script
+app.post('/api/documentary/mode-b/create', async (req, res) => {
+  try {
+    const {
+      script,
+      title,
+      language = 'English',
+      voice = 'am_adam',
+      visual_style = 'investigative',
+      caption_template = 'modern-documentary',
+      aspect_ratio = '16:9',
+      resolution = '1080p',
+      fps = 30,
+      mode = 'one_click'
+    } = req.body;
+
+    if (!script || !script.trim()) {
+      return res.status(400).json({ error: 'Narration script is required' });
+    }
+
+    const analysis = await DocumentaryResearchService.analyzeCustomScript(script, visual_style);
+    const id = `doc_b_${Date.now()}`;
+    const cleanTitle = title || script.split('\n')[0].slice(0, 70);
+
+    await runQuery(`
+      INSERT INTO projects (
+        id, title, category, topic, duration, language, voice, aspect_ratio, resolution, fps, visual_style, caption_template, status, current_stage, progress, mode, review_approved,
+        script, claim_ledger, timeline, entities, asset_manifest, documentary_chapters, scene_data
+      ) VALUES (?, ?, 'Documentary Studio', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'processing', 'RESEARCH_COMPLETED', 25, ?, 0, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      id,
+      cleanTitle,
+      cleanTitle,
+      analysis.estimatedRuntimeSeconds,
+      language,
+      voice,
+      aspect_ratio,
+      resolution,
+      Number(fps) || 30,
+      visual_style,
+      caption_template,
+      mode,
+      script,
+      JSON.stringify(analysis.claims),
+      JSON.stringify(analysis.timeline),
+      JSON.stringify(analysis.entities),
+      JSON.stringify(analysis.assets),
+      JSON.stringify([]),
+      JSON.stringify(analysis.storyboard)
+    ]);
+
+    // Launch pipeline
+    PipelineManager.startPipeline(id);
+
+    res.json({ id, message: 'Custom script documentary initialized successfully', analysis });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 1D. Fact-Checking & Source Ledger Inspection
+app.get('/api/documentary/sources/:id', async (req, res) => {
+  try {
+    const p = await getQuery('SELECT id, title, topic, claim_ledger, timeline, entities, asset_manifest FROM projects WHERE id = ?', [req.params.id]);
+    if (!p) return res.status(404).json({ error: 'Project not found' });
+    res.json({
+      id: p.id,
+      title: p.title,
+      topic: p.topic,
+      claim_ledger: p.claim_ledger ? JSON.parse(p.claim_ledger) : [],
+      timeline: p.timeline ? JSON.parse(p.timeline) : [],
+      entities: p.entities ? JSON.parse(p.entities) : [],
+      assets: p.asset_manifest ? JSON.parse(p.asset_manifest) : []
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 2. Create and start autonomous documentary production
 app.post('/api/documentary/create', async (req, res) => {
   try {
@@ -184,9 +282,11 @@ app.post('/api/documentary/create', async (req, res) => {
       language = 'English',
       voice = 'am_adam',
       visual_style = 'investigative',
+      caption_template = 'modern-documentary',
       mode = 'one_click', // 'one_click' | 'review'
       aspect_ratio = '16:9',
-      resolution = '1080p'
+      resolution = '1080p',
+      fps = 30
     } = req.body;
 
     if (!topic || !topic.trim()) {
@@ -199,8 +299,8 @@ app.post('/api/documentary/create', async (req, res) => {
     await runQuery(`
       INSERT INTO projects (
         id, title, category, topic, duration, language, voice, aspect_ratio, resolution, fps, visual_style, caption_template, status, current_stage, progress, mode, review_approved
-      ) VALUES (?, ?, 'Documentary Studio', ?, ?, ?, ?, ?, ?, 30, ?, 'cinematic-editorial', 'processing', 'JOB_CREATED', 5, ?, 0)
-    `, [id, cleanTitle, topic, duration, language, voice, aspect_ratio, resolution, visual_style, mode]);
+      ) VALUES (?, ?, 'Documentary Studio', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'processing', 'JOB_CREATED', 5, ?, 0)
+    `, [id, cleanTitle, topic, duration, language, voice, aspect_ratio, resolution, Number(fps) || 30, visual_style, caption_template, mode]);
 
     // Launch pipeline
     PipelineManager.startPipeline(id);
@@ -363,6 +463,194 @@ app.post('/api/projects/:id/render', async (req, res) => {
   }
 });
 
+// Sound design catalog & license metadata (Requirement 10)
+app.get('/api/documentary/audio-catalog', (req, res) => {
+  res.json({
+    sfx: SFX_CATALOG,
+    bgm: BGM_CATALOG,
+    totalSfx: SFX_CATALOG.length,
+    totalBgm: BGM_CATALOG.length
+  });
+});
+
+// Scene planning structured JSON engine (Requirement 11)
+app.post('/api/documentary/scene-plan', async (req, res) => {
+  try {
+    const { script, topic = 'Investigation', duration = 60 } = req.body;
+    if (!script || !script.trim()) {
+      return res.status(400).json({ error: 'Narration script is required' });
+    }
+    const plans = ScenePlanningEngine.planScenesFromScript(script, topic, duration);
+    res.json({
+      success: true,
+      topic,
+      totalScenes: plans.length,
+      scenePlans: plans
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get structured scene plan for existing project
+app.get('/api/documentary/projects/:id/scene-plan', async (req, res) => {
+  try {
+    const p = await getQuery<any>('SELECT * FROM projects WHERE id = ?', [req.params.id]);
+    if (!p) return res.status(404).json({ error: 'Project not found' });
+    const plans = ScenePlanningEngine.planScenesFromScript(p.script || p.topic, p.topic, p.duration || 60);
+    res.json({
+      projectId: p.id,
+      title: p.title,
+      totalScenes: plans.length,
+      scenePlans: plans
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Render cancellation endpoint (Requirement 12)
+app.post('/api/pipeline/cancel/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const cancelled = PipelineManager.cancelPipeline(id);
+    res.json({ success: true, message: `Pipeline job for project ${id} cancelled.`, cancelled });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Render preview endpoint (5-second draft preview) (Requirement 12)
+app.post('/api/documentary/projects/:id/render-preview', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const p = await getQuery<any>('SELECT * FROM projects WHERE id = ?', [id]);
+    if (!p) return res.status(404).json({ error: 'Project not found' });
+
+    const previewPath = await PipelineManager.renderPreview(id);
+    res.json({ success: true, message: 'Preview render complete', previewPath });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Exported video validation using FFprobe (Requirement 12)
+app.get('/api/documentary/projects/:id/validate-export', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const p = await getQuery<any>('SELECT * FROM projects WHERE id = ?', [id]);
+    if (!p) return res.status(404).json({ error: 'Project not found' });
+    if (!p.video_output) return res.status(400).json({ error: 'No exported video found for this project. Please render first.' });
+
+    const narrationPath = path.join(process.cwd(), 'public', 'audio', `narration_${id}.wav`);
+    const validation = await PipelineManager.validateExportedFile(p.video_output, narrationPath);
+    res.json({ projectId: id, ...validation });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Automatic Quality Control validation (Requirement 14)
+app.get('/api/documentary/projects/:id/quality-control', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const report = await QualityControlEngine.validateProject(id);
+    res.json(report);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Auto-fix quality control issues (Requirement 14)
+app.post('/api/documentary/projects/:id/quality-control/autofix', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const report = await QualityControlEngine.autoFix(id);
+    res.json(report);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Quality control override/bypass for warnings
+app.post('/api/documentary/projects/:id/quality-control/approve-bypass', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await runQuery('UPDATE projects SET qc_approved_bypass = 1 WHERE id = ?', [id]);
+    res.json({ success: true, message: 'Approved to render with warnings acknowledged' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Upload custom narration audio (Requirement 13)
+app.post('/api/documentary/projects/:id/upload-narration', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { audioData, fileName = 'custom_voiceover.wav' } = req.body;
+    if (!audioData) return res.status(400).json({ error: 'Audio data is required' });
+
+    const base64Data = audioData.replace(/^data:audio\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    const targetPath = path.join(process.cwd(), 'public', 'audio', `narration_${id}.wav`);
+    fs.writeFileSync(targetPath, buffer);
+
+    const dur = await PipelineManager.probeAudioDuration(targetPath);
+    await runQuery('UPDATE projects SET narration_file = ?, duration = ? WHERE id = ?', [`/audio/narration_${id}.wav`, Math.round(dur), id]);
+    res.json({ success: true, duration: dur, path: `/audio/narration_${id}.wav` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update project settings from Editor (Requirement 13)
+app.put('/api/documentary/projects/:id/settings', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, topic, script, duration, language, voice, aspect_ratio, resolution, research_notes } = req.body;
+    await runQuery(`
+      UPDATE projects SET
+        title = COALESCE(?, title),
+        topic = COALESCE(?, topic),
+        script = COALESCE(?, script),
+        duration = COALESCE(?, duration),
+        language = COALESCE(?, language),
+        voice = COALESCE(?, voice),
+        aspect_ratio = COALESCE(?, aspect_ratio),
+        resolution = COALESCE(?, resolution),
+        research_notes = COALESCE(?, research_notes),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [title, topic, script, duration, language, voice, aspect_ratio, resolution, research_notes, id]);
+
+    res.json({ success: true, message: 'Project settings updated' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update specific scene visual controls (Requirement 13)
+app.put('/api/documentary/projects/:id/scenes/:sceneIndex', async (req, res) => {
+  try {
+    const { id, sceneIndex } = req.params;
+    const sIdx = parseInt(sceneIndex, 10);
+    const updates = req.body;
+    const p = await getQuery<any>('SELECT scene_data FROM projects WHERE id = ?', [id]);
+    if (!p) return res.status(404).json({ error: 'Project not found' });
+
+    let scenes = typeof p.scene_data === 'string' ? JSON.parse(p.scene_data || '[]') : (p.scene_data || []);
+    if (sIdx >= 0 && sIdx < scenes.length) {
+      scenes[sIdx] = { ...scenes[sIdx], ...updates };
+      await runQuery('UPDATE projects SET scene_data = ? WHERE id = ?', [JSON.stringify(scenes), id]);
+      res.json({ success: true, scene: scenes[sIdx] });
+    } else {
+      res.status(400).json({ error: 'Invalid scene index' });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 
 // 5b. Get granular scenes for a project
@@ -438,6 +726,38 @@ app.post('/api/projects/:id/scenes/:sceneId/replace-media', async (req, res) => 
 
     await runQuery('UPDATE projects SET scene_data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [JSON.stringify(scenes), id]);
     res.json({ message: 'Scene media replaced successfully', scene: scenes[idx] });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5d-2. Instant Single-Shot Visual Regeneration
+app.post('/api/projects/:id/scenes/:sceneId/regenerate-visual', async (req, res) => {
+  try {
+    const { id, sceneId } = req.params;
+    const { customPrompt } = req.body || {};
+    const p = await getQuery<any>('SELECT * FROM projects WHERE id = ?', [id]);
+    if (!p) return res.status(404).json({ error: 'Project not found' });
+
+    let scenes: SceneData[] = p.scene_data ? JSON.parse(p.scene_data) : [];
+    const idx = scenes.findIndex(s => s.id === sceneId);
+    if (idx === -1) return res.status(404).json({ error: 'Scene not found' });
+
+    const shot = scenes[idx];
+    const query = customPrompt || shot.narration || shot.title || p.title;
+    const freshShotId = `${id}_${shot.id}_${Date.now()}`;
+    const newMediaUrl = await MediaSourceManager.fetchCopyrightFreeAsset(
+      query,
+      p.category || 'Technology',
+      freshShotId,
+      shot.duration || 4,
+      p.aspect_ratio || '16:9',
+      id
+    );
+
+    scenes[idx].media_url = newMediaUrl;
+    await runQuery('UPDATE projects SET scene_data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [JSON.stringify(scenes), id]);
+    res.json({ success: true, message: 'Shot visual regenerated', scene: scenes[idx], media_url: newMediaUrl });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1370,6 +1690,17 @@ app.post('/api/clipper/projects/:id/set-language', async (req, res) => {
   }
 });
 
+// 6d. Re-align and transcribe clip with exact Whisper word timestamps
+app.post('/api/clipper/clips/:clipId/align-whisper', async (req, res) => {
+  try {
+    const clipId = String(req.params.clipId);
+    const updatedClip = await ViralClipperService.alignClipWithWhisper(clipId);
+    res.json({ success: true, clip: updatedClip });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 7. Render single clip
 app.post('/api/clipper/clips/:clipId/render', async (req, res) => {
   try {
@@ -1398,6 +1729,28 @@ app.get('/api/clipper/projects/:id/export-zip', async (req, res) => {
     const projectId = String(req.params.id);
     const zipPath = await ViralClipperService.createProjectZip(projectId);
     res.download(zipPath, `clipper_${projectId}_reels.zip`);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 9b. Romanize Hindi / Devanagari to Roman Hinglish
+app.post('/api/clipper/clips/:clipId/romanize-hinglish', async (req, res) => {
+  try {
+    const clipId = String(req.params.clipId);
+    const result = await ViralClipperService.romanizeClip(clipId);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 9c. Inject Trending Viral Emojis into Subtitles
+app.post('/api/clipper/clips/:clipId/inject-emojis', async (req, res) => {
+  try {
+    const clipId = String(req.params.clipId);
+    const result = await ViralClipperService.injectEmojis(clipId);
+    res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1463,6 +1816,67 @@ app.post('/api/clipper/clips/:clipId/open-in-caption-studio', async (req, res) =
         custom_style: JSON.parse(created.custom_style),
         video_settings: JSON.parse(created.video_settings)
       }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 10b. Open clip or project video directly in Concat Video Editor desktop app
+app.post('/api/editor/open-concat', async (req, res) => {
+  try {
+    const { videoPath, clipId, projectId } = req.body;
+    let targetFile = videoPath;
+
+    if (!targetFile && clipId) {
+      const clip = await getQuery<any>('SELECT exported_video FROM clipper_clips WHERE id = ?', [clipId]);
+      if (clip?.exported_video) targetFile = clip.exported_video;
+    }
+
+    if (!targetFile && projectId) {
+      const proj = await getQuery<any>('SELECT video_output FROM projects WHERE id = ?', [projectId]);
+      if (proj?.video_output) targetFile = proj.video_output;
+    }
+
+    if (!targetFile) {
+      return res.status(400).json({ error: 'No video file specified or clip is not rendered yet' });
+    }
+
+    const cleanPath = targetFile.replace(/^\//, '');
+    const absPath = path.isAbsolute(cleanPath) ? cleanPath : path.join(process.cwd(), cleanPath);
+
+    if (!fs.existsSync(absPath)) {
+      return res.status(404).json({ error: `Video file not found at ${absPath}. Please render the clip first!` });
+    }
+
+    // Check Concat executable locations
+    const localAppData = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Local');
+    const concatInstalled = path.join(localAppData, 'Programs', 'Concat', 'concat.exe');
+    const concatRepoCmd = path.join('E:', 'concat caput', 'Concat', 'launch-concat.cmd');
+
+    let execPath = '';
+    let args: string[] = [];
+
+    if (fs.existsSync(concatInstalled)) {
+      execPath = concatInstalled;
+      args = [absPath];
+    } else if (fs.existsSync(concatRepoCmd)) {
+      execPath = 'cmd.exe';
+      args = ['/c', concatRepoCmd, absPath];
+    } else {
+      return res.status(404).json({ error: 'Concat Video Editor executable not found on this system.' });
+    }
+
+    const child = spawn(execPath, args, {
+      detached: true,
+      stdio: 'ignore'
+    });
+    child.unref();
+
+    res.json({
+      success: true,
+      message: `Opened "${path.basename(absPath)}" in Concat Video Editor successfully!`,
+      filePath: absPath
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1861,7 +2275,7 @@ app.post('/api/audio-police/generate-ai-music', async (req, res) => {
 // ==========================================
 // 7. PAPER STYLE ANIMATION STUDIO ROUTES
 // ==========================================
-import { PaperStudioService } from './paperStudio';
+import { PaperStudioService, paperRenderJobs } from './paperStudio';
 
 app.all('/api/paper-studio/ideas', async (req, res) => {
   try {
@@ -1883,6 +2297,162 @@ app.post('/api/paper-studio/plan', async (req, res) => {
       aspectRatio || '9:16'
     );
     res.json({ success: true, plan });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/paper-studio/render', async (req, res) => {
+  try {
+    const { plan, voice, musicTrack, sfxEnabled } = req.body;
+    if (!plan) return res.status(400).json({ error: 'plan object is required' });
+    const job = await PaperStudioService.renderPaperExplainerVideo(plan, {
+      voice,
+      musicTrack,
+      sfxEnabled
+    });
+    res.json({ success: true, job });
+  } catch (err: any) {
+    console.error('[PaperStudio] Render trigger error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/paper-studio/render-status/:jobId', (req, res) => {
+  const { jobId } = req.params;
+  const job = paperRenderJobs.get(jobId);
+  if (!job) {
+    return res.status(404).json({ error: 'Job not found' });
+  }
+  res.json({ success: true, job });
+});
+
+// ======================== STREAM CHAT VIRAL CLIPPER ROUTES ======================== //
+
+// 1. Get Streamer Radar Presets (Top 10 Indian & Foreign Creators with Live Status)
+app.get('/api/stream-clipper/presets', async (req, res) => {
+  try {
+    const refresh = req.query.refresh === 'true' || req.query.refresh === '1';
+    const presets = await StreamClipFinderService.getRadarStreamers(refresh);
+    res.json({ success: true, presets });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Analyze Stream Chat (YouTube / Twitch / Demo)
+app.post('/api/stream-clipper/analyze', async (req, res) => {
+  try {
+    const { url, region = 'all', top = 5, before = 20, after = 10, gap = 90, multiplier = 3.0, isDemo, streamerName } = req.body;
+    const result = await StreamClipFinderService.analyzeChat({
+      url,
+      region,
+      top: Number(top) || 5,
+      before: Number(before) || 20,
+      after: Number(after) || 10,
+      gap: Number(gap) || 90,
+      multiplier: Number(multiplier) || 3.0,
+      isDemo: Boolean(isDemo),
+      streamerName
+    });
+    res.json(result);
+  } catch (err: any) {
+    console.error('[StreamClipper] Analysis error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Render a single clip segment as 9:16 vertical video
+app.post('/api/stream-clipper/render-clip', async (req, res) => {
+  try {
+    const { url, moment, streamerName, cropMode, blurIntensity, isDemo } = req.body;
+    if (!moment) return res.status(400).json({ error: 'moment object is required' });
+
+    const result = await StreamClipFinderService.renderClip({
+      url: url || '',
+      moment,
+      streamerName: streamerName || 'Creator',
+      cropMode: cropMode || 'blur_pad',
+      blurIntensity: blurIntensity || 'medium',
+      isDemo: Boolean(isDemo)
+    });
+    res.json(result);
+  } catch (err: any) {
+    console.error('[StreamClipper] Render clip error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Render all moments in batch
+app.post('/api/stream-clipper/render-all', async (req, res) => {
+  try {
+    const { url, moments, streamerName, cropMode, blurIntensity } = req.body;
+    if (!moments || !Array.isArray(moments)) return res.status(400).json({ error: 'moments array is required' });
+
+    const renderedClips = [];
+    for (const moment of moments) {
+      try {
+        const result = await StreamClipFinderService.renderClip({
+          url: url || '',
+          moment,
+          streamerName: streamerName || 'Creator',
+          cropMode: moment.customCropMode || cropMode || 'blur_pad',
+          blurIntensity: moment.customBlurIntensity || blurIntensity || 'medium'
+        });
+        renderedClips.push({ ...result, momentRank: moment.rank });
+      } catch (clipErr: any) {
+        console.warn(`[StreamClipper] Moment #${moment.rank} failed, continuing batch:`, clipErr.message);
+        renderedClips.push({
+          success: false,
+          error: clipErr.message,
+          momentRank: moment.rank
+        });
+      }
+    }
+    res.json({ success: true, clips: renderedClips });
+  } catch (err: any) {
+    console.error('[StreamClipper] Render all error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5. Multi-Streamer Batch Auto-Clip
+app.post('/api/stream-clipper/batch-clip', async (req, res) => {
+  try {
+    const { streamers, topPerStreamer = 3, cropMode = 'blur_pad', isDemo } = req.body;
+    if (!streamers || !Array.isArray(streamers) || streamers.length === 0) {
+      return res.status(400).json({ error: 'streamers array is required' });
+    }
+
+    const batchResults = await StreamClipFinderService.batchClipStreamers({
+      streamers,
+      topPerStreamer: Number(topPerStreamer) || 3,
+      cropMode,
+      isDemo: Boolean(isDemo)
+    });
+    res.json({ success: true, count: batchResults.length, results: batchResults });
+  } catch (err: any) {
+    console.error('[StreamClipper] Batch streamers error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// System performance and hardware telemetry endpoint
+app.get('/api/system/performance', (req, res) => {
+  try {
+    const telemetry = PerformanceResourceManager.getTelemetry();
+    res.json(telemetry);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// System temporary file cleanup endpoint
+app.post('/api/system/cleanup', (req, res) => {
+  try {
+    const maxAgeMs = req.body?.maxAgeMs || 60 * 60 * 1000;
+    const result = PerformanceResourceManager.cleanupTempFiles(maxAgeMs);
+    res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

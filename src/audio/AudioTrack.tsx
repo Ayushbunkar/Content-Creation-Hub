@@ -1,5 +1,4 @@
-import { Audio } from "@remotion/media";
-import { VolumeProp, useCurrentFrame, useVideoConfig, interpolate, Easing, staticFile } from "remotion";
+import { Audio, VolumeProp, useCurrentFrame, useVideoConfig, interpolate, Easing, staticFile } from "remotion";
 import { ReactElement } from "react";
 
 export interface AudioTrackProps {

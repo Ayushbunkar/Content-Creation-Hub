@@ -240,7 +240,7 @@ export class MediaSourceManager {
         const killTimer = setTimeout(() => {
           try { p.kill(); } catch (e) { }
           resolve(); // gracefully proceed to fallback
-        }, 18000);
+        }, 8000);
 
         p.on('close', (code) => {
           clearTimeout(killTimer);
@@ -302,60 +302,14 @@ export class MediaSourceManager {
   }
 
   /**
-   * Search curated local library photo with deep semantic entity recognition
+   * Search curated local library photo with deep semantic entity recognition and strict diversity
    */
-  static searchLocalLibraryFootage(query: string, category: string): string {
-    const q = (query || '').toLowerCase();
-    const c = (category || '').toLowerCase();
+  static searchLocalLibraryFootage(query: string, category: string, projectId = 'default_project', shotIndex = 0): string {
+    return VisualDiversityEngine.getDiverseUniqueAsset(query, category, projectId, shotIndex);
+  }
 
-    // 1. Specific Tech / AI Entities (NVIDIA, Blackwell, Jensen Huang, TSMC, GPUs, Cleanrooms)
-    if (q.includes('jensen') || q.includes('huang') || q.includes('altman') || q.includes('nadella') || q.includes('musk')) {
-      return 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1920&q=85';
-    }
-    if (q.includes('nvidia') || q.includes('blackwell') || q.includes('b200') || q.includes('h100') || q.includes('superchip')) {
-      return 'https://images.unsplash.com/photo-1591488320449-011701bb6704?w=1920&q=85';
-    }
-    if (q.includes('chip') || q.includes('silicon') || q.includes('wafer') || q.includes('semiconductor') || q.includes('microchip') || q.includes('tsmc')) {
-      return 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1920&q=85';
-    }
-    if (q.includes('server') || q.includes('datacenter') || q.includes('cloud') || q.includes('cluster') || q.includes('computing')) {
-      return 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1920&q=85';
-    }
-    if (q.includes('ai') || q.includes('algorithm') || q.includes('neural') || q.includes('model') || c.includes('tech')) {
-      return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1920&q=85';
-    }
-
-    // 2. Specific Geopolitics / Maritime / Naval Entities (Hormuz, Persian Gulf, Tanker, Navy)
-    if (q.includes('hormuz') || q.includes('persian') || q.includes('tanker') || q.includes('chokepoint') || q.includes('naval') || q.includes('carrier') || q.includes('destroyer') || q.includes('strait')) {
-      return 'https://images.unsplash.com/photo-1509299349698-dd22323b5963?w=1920&q=85';
-    }
-    if (q.includes('taiwan') || q.includes('china') || q.includes('island') || q.includes('border') || q.includes('sovereign')) {
-      return 'https://images.unsplash.com/photo-1508247967583-7d982ea01526?w=1920&q=85';
-    }
-    if (q.includes('satellite') || q.includes('orbit') || q.includes('space') || q.includes('telemetry') || q.includes('reconnaissance')) {
-      return 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&q=85';
-    }
-
-    // 3. Finance & Corporate Entities (Wall Street, Valuation, Trillion, Stocks, Boardroom)
-    if (q.includes('money') || q.includes('market') || q.includes('valuation') || q.includes('stock') || q.includes('trillion') || q.includes('billion') || q.includes('finance') || q.includes('trade') || c.includes('economic')) {
-      return 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1920&q=85';
-    }
-    if (q.includes('boardroom') || q.includes('executive') || q.includes('corporate') || q.includes('headquarters') || q.includes('office')) {
-      return 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&q=85';
-    }
-
-    // 4. Evidence / Investigative / Historical Entities
-    if (q.includes('document') || q.includes('evidence') || q.includes('classified') || q.includes('dossier') || q.includes('investigation') || q.includes('secret')) {
-      return 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=1920&q=85';
-    }
-    if (q.includes('news') || q.includes('headline') || q.includes('press') || q.includes('article') || q.includes('report')) {
-      return 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1920&q=85';
-    }
-    if (q.includes('history') || q.includes('archive') || q.includes('vintage') || q.includes('war') || q.includes('treaty') || c.includes('history')) {
-      return 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=1920&q=85';
-    }
-
-    return 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1920&q=85';
+  static getDiverseUniqueAsset(query: string, category: string, projectId = 'default_project', shotIndex = 0): string {
+    return VisualDiversityEngine.getDiverseUniqueAsset(query, category, projectId, shotIndex);
   }
 
   /**
@@ -384,16 +338,171 @@ export class MediaSourceManager {
 }
 
 /**
+ * Visual Diversity & Anti-Repetition Engine
+ * Strict Rule: An asset can be used only 1 time, or 2 times max across the entire documentary video.
+ */
+export class VisualDiversityEngine {
+  private static projectUsage: Map<string, Map<string, number>> = new Map();
+  public static readonly MAX_USAGE_PER_ASSET = 2; // Strict rule: 1 or max 2 times!
+
+  public static readonly CHIP_SILICON_POOL = [
+    'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1920&q=85',
+    'https://images.unsplash.com/photo-1555680202-c86f0e12f086?w=1920&q=85',
+    'https://images.unsplash.com/photo-1563770660941-20978e870e26?w=1920&q=85',
+    'https://images.unsplash.com/photo-1517420704952-d9f39e95b43e?w=1920&q=85',
+    'https://images.unsplash.com/photo-1525547719571-a2d4ac8945e2?w=1920&q=85',
+    'https://images.unsplash.com/photo-1562774053-701939374585?w=1920&q=85',
+    'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=1920&q=85',
+    'https://images.unsplash.com/photo-1591488320449-011701bb6704?w=1920&q=85'
+  ];
+
+  public static readonly NVIDIA_BLACKWELL_POOL = [
+    'https://images.unsplash.com/photo-1591488320449-011701bb6704?w=1920&q=85',
+    'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=1920&q=85',
+    'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=1920&q=85',
+    'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1920&q=85',
+    'https://images.unsplash.com/photo-1555680202-c86f0e12f086?w=1920&q=85',
+    'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1920&q=85'
+  ];
+
+  public static readonly DATACENTER_INFRASTRUCTURE_POOL = [
+    '/videos/library/datacenter_tech.mp4',
+    'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1920&q=85',
+    'https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=1920&q=85',
+    'https://images.unsplash.com/photo-1597733336794-12d05021d510?w=1920&q=85',
+    'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1920&q=85',
+    'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=1920&q=85'
+  ];
+
+  public static readonly AI_NEURAL_POOL = [
+    'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1920&q=85',
+    'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=1920&q=85',
+    'https://images.unsplash.com/photo-1677442136019-21780efad99a?w=1920&q=85',
+    'https://images.unsplash.com/photo-1504639725590-34d0984388bd?w=1920&q=85',
+    'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1920&q=85'
+  ];
+
+  public static readonly GEOPOLITICS_MARITIME_POOL = [
+    '/videos/library/ocean_naval.mp4',
+    '/videos/library/satellite_globe.mp4',
+    'https://images.unsplash.com/photo-1509299349698-dd22323b5963?w=1920&q=85',
+    'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=1920&q=85',
+    'https://images.unsplash.com/photo-1508247967583-7d982ea01526?w=1920&q=85',
+    'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?w=1920&q=85',
+    'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&q=85'
+  ];
+
+  public static readonly FINANCE_MARKETS_POOL = [
+    '/videos/library/finance_trade.mp4',
+    'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1920&q=85',
+    'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1920&q=85',
+    'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&q=85',
+    'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1920&q=85',
+    'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1920&q=85'
+  ];
+
+  public static readonly HISTORICAL_ARCHIVAL_POOL = [
+    '/videos/library/historical_archive.mp4',
+    '/videos/library/military_surveillance.mp4',
+    'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=1920&q=85',
+    'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1920&q=85',
+    'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=1920&q=85',
+    'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1920&q=85'
+  ];
+
+  static resetProject(projectId: string) {
+    this.projectUsage.set(projectId, new Map());
+  }
+
+  static getUsageCount(projectId: string, url: string): number {
+    const projMap = this.projectUsage.get(projectId);
+    return projMap ? (projMap.get(url) || 0) : 0;
+  }
+
+  static recordUsage(projectId: string, url: string) {
+    if (!this.projectUsage.has(projectId)) {
+      this.projectUsage.set(projectId, new Map());
+    }
+    const projMap = this.projectUsage.get(projectId)!;
+    projMap.set(url, (projMap.get(url) || 0) + 1);
+  }
+
+  static isAvailable(projectId: string, url: string): boolean {
+    return this.getUsageCount(projectId, url) < this.MAX_USAGE_PER_ASSET;
+  }
+
+  static getDiverseUniqueAsset(query: string, category: string, projectId = 'default_project', shotIndex = 0): string {
+    const q = (query || '').toLowerCase();
+    const c = (category || '').toLowerCase();
+
+    let pool = this.CHIP_SILICON_POOL;
+    if (q.includes('nvidia') || q.includes('blackwell') || q.includes('b200') || q.includes('h100') || q.includes('superchip')) {
+      pool = this.NVIDIA_BLACKWELL_POOL;
+    } else if (q.includes('datacenter') || q.includes('server') || q.includes('rack') || q.includes('cloud') || q.includes('cluster')) {
+      pool = this.DATACENTER_INFRASTRUCTURE_POOL;
+    } else if (q.includes('ai') || q.includes('algorithm') || q.includes('neural') || q.includes('deep learning')) {
+      pool = this.AI_NEURAL_POOL;
+    } else if (q.includes('hormuz') || q.includes('strait') || q.includes('tanker') || q.includes('naval') || q.includes('chokepoint') || q.includes('taiwan') || q.includes('china') || c.includes('geo')) {
+      pool = this.GEOPOLITICS_MARITIME_POOL;
+    } else if (q.includes('market') || q.includes('stock') || q.includes('dollar') || q.includes('trillion') || q.includes('valuation') || c.includes('econ')) {
+      pool = this.FINANCE_MARKETS_POOL;
+    } else if (q.includes('history') || q.includes('document') || q.includes('classified') || q.includes('archive') || c.includes('hist')) {
+      pool = this.HISTORICAL_ARCHIVAL_POOL;
+    }
+
+    // 1. Pick an asset from pool with 0 usage
+    for (let i = 0; i < pool.length; i++) {
+      const candidate = pool[(shotIndex + i) % pool.length];
+      if (this.getUsageCount(projectId, candidate) === 0) {
+        this.recordUsage(projectId, candidate);
+        return candidate;
+      }
+    }
+
+    // 2. Pick an asset with 1 usage (allowed up to MAX_USAGE_PER_ASSET = 2)
+    for (let i = 0; i < pool.length; i++) {
+      const candidate = pool[(shotIndex + i) % pool.length];
+      if (this.getUsageCount(projectId, candidate) < this.MAX_USAGE_PER_ASSET) {
+        this.recordUsage(projectId, candidate);
+        return candidate;
+      }
+    }
+
+    // 3. Fallback across all pooled assets: find any available asset with < 2 usage
+    const allPools = [
+      ...this.CHIP_SILICON_POOL,
+      ...this.NVIDIA_BLACKWELL_POOL,
+      ...this.DATACENTER_INFRASTRUCTURE_POOL,
+      ...this.AI_NEURAL_POOL,
+      ...this.GEOPOLITICS_MARITIME_POOL,
+      ...this.FINANCE_MARKETS_POOL,
+      ...this.HISTORICAL_ARCHIVAL_POOL
+    ];
+
+    for (const cand of allPools) {
+      if (this.getUsageCount(projectId, cand) < this.MAX_USAGE_PER_ASSET) {
+        this.recordUsage(projectId, cand);
+        return cand;
+      }
+    }
+
+    const fallback = allPools[shotIndex % allPools.length];
+    this.recordUsage(projectId, fallback);
+    return fallback;
+  }
+}
+
+/**
  * Visual Quality Checker
  * Inspects all shots before rendering.
  * Strictly guarantees:
  * 1. MANDATORY 3-4s visual changes (splits any shot > 4.2s).
  * 2. ZERO static image holds (subpixel Ken Burns on all photos).
- * 3. Repetition prevention (no duplicate URLs consecutively).
+ * 3. Strict Anti-Repetition Rule: No visual used > 2 times across the entire video.
  * 4. Mixed media balance (video footage, archival photos, tactical maps, kinetic titles).
  */
 export class QualityChecker {
-  static inspectAndUpgrade(scenes: SceneData[], category: string): { scenes: SceneData[]; report: QualityReport } {
+  static inspectAndUpgrade(scenes: SceneData[], category: string, projectId = 'doc_project'): { scenes: SceneData[]; report: QualityReport } {
     let staticDetected = 0;
     let staticUpgraded = 0;
     let duplicateMedia = 0;
@@ -401,6 +510,9 @@ export class QualityChecker {
     let motionGraphicsCount = 0;
     let archivalCount = 0;
     const notes: string[] = [];
+
+    // Reset project tracking for visual diversity
+    VisualDiversityEngine.resetProject(projectId);
 
     const cameraMovements: CameraMovement[] = [
       'dolly_in',
@@ -437,11 +549,11 @@ export class QualityChecker {
           subShot.narration = words.slice(k * wordsPerCut, (k + 1) * wordsPerCut).join(' ') || shot.narration;
           subShot.camera_movement = cameraMovements[(idx + k) % cameraMovements.length];
 
-          // Alternate visual types for the sub-cut
+          // Alternate visual types for the sub-cut with diverse assets
           if (k > 0) {
             if (subShot.visual_type === 'actual_video') {
               subShot.visual_type = 'archival_photo';
-              subShot.media_url = MediaSourceManager.searchLocalLibraryFootage(subShot.narration, category);
+              subShot.media_url = VisualDiversityEngine.getDiverseUniqueAsset(subShot.narration || shot.title, category, projectId, idx + k);
               subShot.badge = '[Archival Photo Analysis]';
             } else {
               subShot.visual_type = 'data_metric';
@@ -498,26 +610,27 @@ export class QualityChecker {
         cloned.quality_status = 'auto_enhanced';
       }
 
-      // If shot has no media_url, assign authentic photo fallback
-      if (!cloned.media_url) {
-        cloned.media_url = MediaSourceManager.searchLocalLibraryFootage(cloned.narration, category);
-      }
+      // Visual Diversity & Anti-Repetition Engine Check
+      // Strict rule: An asset can be used only 1 time or 2 times MAX across the entire video.
+      const currentUrl = cloned.media_url;
+      const isRepeatedImmediate = currentUrl && currentUrl === lastMediaUrl;
+      const isOverused = currentUrl ? !VisualDiversityEngine.isAvailable(projectId, currentUrl) : true;
 
-      // Avoid identical media clip back-to-back without camera variation
-      if (cloned.media_url === lastMediaUrl) {
-        duplicateMedia++;
-        if (cloned.media_url === '/videos/library/ocean_naval.mp4') {
-          cloned.media_url = '/videos/library/satellite_globe.mp4';
-        } else if (cloned.media_url === '/videos/library/datacenter_tech.mp4') {
-          cloned.media_url = 'https://images.unsplash.com/photo-1591488320449-011701bb6704?w=1920&q=85';
-        } else {
-          cloned.media_url = MediaSourceManager.searchLocalLibraryFootage(cloned.narration + ' ' + idx, category);
-        }
+      if (!currentUrl || isRepeatedImmediate || isOverused) {
+        if (isRepeatedImmediate || isOverused) duplicateMedia++;
+        cloned.media_url = VisualDiversityEngine.getDiverseUniqueAsset(
+          cloned.narration || cloned.title || category,
+          category,
+          projectId,
+          idx
+        );
         cloned.camera_movement = cameraMovements[(idx + 2) % cameraMovements.length];
-        notes.push(`Shot #${idx + 1} repetition prevented: alternative asset & camera movement applied.`);
+        notes.push(`Shot #${idx + 1} repetition prevented: assigned diverse asset (${VisualDiversityEngine.getUsageCount(projectId, cloned.media_url)}/2 uses max).`);
+      } else {
+        VisualDiversityEngine.recordUsage(projectId, currentUrl);
       }
 
-      if (cloned.media_url) lastMediaUrl = cloned.media_url;
+      lastMediaUrl = cloned.media_url;
 
       // Update counters
       if (cloned.visual_type === 'actual_video') realVideoCount++;

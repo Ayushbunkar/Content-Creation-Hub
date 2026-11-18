@@ -1,0 +1,14 @@
+[
+  { "id": "whoosh", "name": "Whoosh", "filename": "whoosh.wav", "category": "movement", "license": "CC0 1.0 Universal Public Domain", "source": "Procedural Audio Synthesis", "commercial_allowed": true },
+  { "id": "swish", "name": "Swish", "filename": "swish.wav", "category": "movement", "license": "CC0 1.0 Universal Public Domain", "source": "Procedural Audio Synthesis", "commercial_allowed": true },
+  { "id": "click", "name": "Tactile Click", "filename": "click.wav", "category": "interface", "license": "CC0 1.0 Universal Public Domain", "source": "Procedural Audio Synthesis", "commercial_allowed": true },
+  { "id": "paper_movement", "name": "Paper Movement", "filename": "paper-movement.wav", "category": "tactile", "license": "CC0 1.0 Universal Public Domain", "source": "Procedural Audio Synthesis", "commercial_allowed": true },
+  { "id": "newspaper_impact", "name": "Newspaper Impact", "filename": "newspaper-impact.wav", "category": "editorial", "license": "CC0 1.0 Universal Public Domain", "source": "Procedural Audio Synthesis", "commercial_allowed": true },
+  { "id": "camera_shutter", "name": "Camera Shutter", "filename": "camera-shutter.wav", "category": "mechanical", "license": "CC0 1.0 Universal Public Domain", "source": "Procedural Audio Synthesis", "commercial_allowed": true },
+  { "id": "bass_impact", "name": "Bass Impact", "filename": "bass-impact.wav", "category": "impact", "license": "CC0 1.0 Universal Public Domain", "source": "Procedural Audio Synthesis", "commercial_allowed": true },
+  { "id": "subtle_riser", "name": "Subtle Riser", "filename": "subtle-riser.wav", "category": "transition", "license": "CC0 1.0 Universal Public Domain", "source": "Procedural Audio Synthesis", "commercial_allowed": true },
+  { "id": "cinematic_transition", "name": "Cinematic Transition", "filename": "cinematic-transition.wav", "category": "transition", "license": "CC0 1.0 Universal Public Domain", "source": "Procedural Audio Synthesis", "commercial_allowed": true },
+  { "id": "typing", "name": "Typing Sounds", "filename": "typing.wav", "category": "tactile", "license": "CC0 1.0 Universal Public Domain", "source": "Procedural Audio Synthesis", "commercial_allowed": true },
+  { "id": "digital_interface", "name": "Digital Interface", "filename": "digital-interface.wav", "category": "interface", "license": "CC0 1.0 Universal Public Domain", "source": "Procedural Audio Synthesis", "commercial_allowed": true },
+  { "id": "ambient_sound", "name": "Ambient Sound", "filename": "ambient-sound.wav", "category": "atmosphere", "license": "CC0 1.0 Universal Public Domain", "source": "Procedural Audio Synthesis", "commercial_allowed": true }
+]

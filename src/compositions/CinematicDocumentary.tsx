@@ -6,10 +6,23 @@ import {
   AbsoluteFill,
   Img,
   Video,
+  OffthreadVideo,
   staticFile,
 } from "remotion";
-import { AudioTrackGroup } from "../audio/AudioTrack";
+import { AudioTrackGroup, createDuckingVolume } from "../audio/AudioTrack";
 import { FC, useMemo } from "react";
+import { CinematicVectorMap, GLOBAL_GEO_CATALOG, GeoPin, GeoRoute } from "./maps/CinematicVectorMap";
+import {
+  PaperCutCollage,
+  AnimatedTimeline,
+  AnimatedChart,
+  ChapterTitleAnim,
+  ImageReveal,
+  StatisticalCounter,
+  DocumentarySplit,
+  MOTION_PRESETS_REGISTRY,
+} from "./motion/MotionPresets";
+import { TitleSafeArea } from "./typography/DocumentaryTypography";
 
 export interface SubtitleCueData {
   index: number;
@@ -35,7 +48,12 @@ export type VisualShotType =
   | 'kinetic_title_card'
   | 'actual_video'
   | 'archival_document'
-  | 'ai_video';
+  | 'ai_video'
+  | 'paper_cut'
+  | 'timeline_event'
+  | 'chart_graph'
+  | 'chapter_title'
+  | 'image_reveal';
 
 export type CameraMovement =
   | 'dolly_in'
@@ -58,7 +76,7 @@ export interface CinematicSceneData {
   transition?: 'fade' | 'crossfade' | 'whip_pan' | 'zoom_in' | 'cut' | 'slide';
   title: string;
   subtitle?: string;
-  location?: string;
+  location?: string | { name?: string; coordinates?: any; source?: string };
   coordinates?: string;
   narration?: string;
   startFrame: number;
@@ -73,7 +91,7 @@ export interface CinematicSceneData {
     name: string;
     title: string;
     organization?: string;
-    location?: string;
+    location?: string | { name?: string; coordinates?: any; source?: string };
   };
   kineticTitleData?: {
     line1: string;
@@ -390,10 +408,38 @@ const getCameraTransform = (movement: CameraMovement = 'dolly_in', sceneFrame: n
 };
 
 const resolveMediaSrc = (url?: string, fallback = 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1920&q=85') => {
-  const raw = url || fallback;
+  let raw = url || fallback;
+  if (raw.includes(':3001/public/')) {
+    raw = raw.replace(/https?:\/\/[^/]+:3001\/public\//, '/');
+  } else if (raw.includes(':3001/')) {
+    raw = raw.replace(/https?:\/\/[^/]+:3001\//, '/');
+  } else if (raw.includes(':3000/public/')) {
+    raw = raw.replace(/https?:\/\/[^/]+:3000\/public\//, '/');
+  } else if (raw.includes(':3000/')) {
+    raw = raw.replace(/https?:\/\/[^/]+:3000\//, '/');
+  }
+  if (raw.startsWith('/public/')) {
+    raw = raw.slice(7);
+  } else if (raw.startsWith('public/')) {
+    raw = raw.slice(6);
+  }
   return (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:'))
     ? raw
     : staticFile(raw.replace(/^\//, ''));
+};
+
+const SmartMedia: FC<{
+  src: string;
+  style?: React.CSSProperties;
+  className?: string;
+}> = ({ src, style, className }) => {
+  const isExplicitVideo = /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(src);
+  const isExplicitImage = /\.(jpg|jpeg|png|webp|svg|gif|bmp)(\?.*)?$/i.test(src);
+  const isVideo = isExplicitVideo || (!isExplicitImage && src.includes('/videos/library/') && !src.includes('/cache/'));
+  if (isVideo) {
+    return <OffthreadVideo src={src} style={style} className={className} />;
+  }
+  return <Img src={src} style={style} className={className} />;
 };
 
 // ==========================================
@@ -410,7 +456,7 @@ const PersonIntroScene: FC<{
   const pData = scene.personData || {
     name: scene.title.toUpperCase(),
     title: scene.subtitle || 'STRATEGIC FIGURE // KEYNOTE DOSSIER',
-    organization: scene.location || 'EXECUTIVE LEADERSHIP',
+    organization: (typeof scene.location === 'object' ? scene.location?.name : scene.location) || 'EXECUTIVE LEADERSHIP',
     location: 'EXECUTIVE INTELLIGENCE'
   };
 
@@ -421,7 +467,7 @@ const PersonIntroScene: FC<{
     <AbsoluteFill style={{ backgroundColor: '#020617', overflow: 'hidden' }}>
       {/* High-Resolution Portrait with Ken Burns Push */}
       <div style={{ position: 'absolute', inset: 0, transform, transformOrigin: 'center 35%' }}>
-        <Img
+        <SmartMedia
           src={mediaSrc}
           style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'contrast(1.12) brightness(0.92) saturate(1.1)' }}
         />
@@ -603,7 +649,7 @@ const ArchivalPhotoScene: FC<{
   return (
     <AbsoluteFill style={{ backgroundColor: '#020617', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', inset: '-2%', transform, transformOrigin: 'center center' }}>
-        <Img
+        <SmartMedia
           src={mediaSrc}
           style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'contrast(1.15) brightness(0.92) saturate(1.12)' }}
         />
@@ -624,64 +670,48 @@ const ArchivalPhotoScene: FC<{
 };
 
 // ==========================================
-// 8. COMPONENT 4: TACTICAL VECTOR MAP
+// 8. COMPONENT 4: TACTICAL VECTOR MAP (D3-GEO + NATURAL EARTH 110M)
 // ==========================================
 const TacticalMapScene: FC<{ scene: CinematicSceneData; sceneFrame: number }> = ({ scene, sceneFrame }) => {
-  const camZoom = interpolate(sceneFrame, [0, 240], [1.0, 1.12], { easing: Easing.out(Easing.quad) });
-  const pulseRadius = (sceneFrame % 60) * 3.5;
-  const pulseOpacity = interpolate(sceneFrame % 60, [0, 60], [0.9, 0]);
-  const dashOffset = -(sceneFrame * 2.5);
+  // Derive highlighted entities and pins dynamically from scene data
+  const highlighted = scene.visualData?.highlightedEntities && scene.visualData.highlightedEntities.length > 0
+    ? scene.visualData.highlightedEntities
+    : ['United States of America', 'China', 'Taiwan'];
+
+  // Map markers to GeoPins
+  const pins: GeoPin[] | undefined = scene.visualData?.markers && scene.visualData.markers.length > 0
+    ? scene.visualData.markers.map(m => {
+        const match = GLOBAL_GEO_CATALOG[m.name.toLowerCase()];
+        return {
+          name: m.name,
+          coord: match ? match.coord : [(m.x - 0.5) * 360, (0.5 - m.y) * 160],
+          label: match?.label || m.type?.toUpperCase() || 'STRATEGIC SITE',
+          type: m.type,
+        };
+      })
+    : undefined;
+
+  const routes: GeoRoute[] | undefined = scene.visualData?.routes && scene.visualData.routes.length > 0
+    ? scene.visualData.routes.map(r => ({
+        from: r.from,
+        to: r.to,
+        label: r.label || 'STRATEGIC TRANSIT CORRIDOR',
+        type: 'flight',
+      }))
+    : undefined;
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#060a12', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', inset: 0, transform: `scale(${camZoom})`, transformOrigin: '55% 50%' }}>
-        <svg viewBox="0 0 1920 1080" style={{ width: '100%', height: '100%' }}>
-          <defs>
-            <linearGradient id="oceanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#08101e" />
-              <stop offset="100%" stopColor="#04070d" />
-            </linearGradient>
-
-            <pattern id="tacticalGrid" width="60" height="60" patternUnits="userSpaceOnUse">
-              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="rgba(56, 189, 248, 0.05)" strokeWidth="1" />
-              <circle cx="30" cy="30" r="1" fill="rgba(56, 189, 248, 0.15)" />
-            </pattern>
-          </defs>
-
-          <rect width="1920" height="1080" fill="url(#oceanGrad)" />
-          <rect width="1920" height="1080" fill="url(#tacticalGrid)" />
-
-          {/* Regional Landmass Contours */}
-          <g fill="#162235" stroke="#253852" strokeWidth="1.5">
-            <path d="M 520,180 L 740,160 L 980,180 L 1150,220 L 1320,320 L 1260,420 L 1120,440 L 960,420 L 820,380 L 680,320 L 560,260 Z" />
-            <path d="M 500,480 L 720,490 L 880,510 L 980,560 L 1080,680 L 980,820 L 760,860 L 580,780 L 480,620 Z" />
-            <path d="M 960,480 L 990,450 L 1020,480 L 980,520 Z" fill="#1e324a" stroke="#38bdf8" strokeWidth="2" />
-          </g>
-
-          {/* Glowing Corridors */}
-          <path
-            d="M 620,360 Q 820,410 980,455 T 1280,560"
-            fill="none"
-            stroke="#f59e0b"
-            strokeWidth="4"
-            strokeDasharray="12 8"
-            strokeDashoffset={dashOffset}
-            style={{ filter: 'drop-shadow(0 0 8px rgba(245, 158, 11, 0.8))' }}
-          />
-
-          {/* Strategic Target Pulse Rings */}
-          <circle cx="985" cy="455" r={pulseRadius} fill="none" stroke="#ef4444" strokeWidth="2" opacity={pulseOpacity} />
-          <circle cx="985" cy="455" r="7" fill="#ef4444" style={{ filter: 'drop-shadow(0 0 10px #ef4444)' }} />
-
-          {/* Location Callout Pin */}
-          <g transform="translate(1010, 430)">
-            <rect x="0" y="0" width="200" height="34" rx="4" fill="rgba(15, 23, 42, 0.9)" stroke="#ef4444" strokeWidth="1.5" />
-            <text x="12" y="22" fill="#ffffff" fontFamily="'JetBrains Mono', monospace" fontSize="13" fontWeight="bold">
-              {scene.visualData?.targetName || 'STRATEGIC THEATER'}
-            </text>
-          </g>
-        </svg>
-      </div>
+      <CinematicVectorMap
+        sceneFrame={sceneFrame}
+        durationFrames={scene.durationFrames || 180}
+        regionTitle={scene.visualData?.region || scene.title || 'GLOBAL STRATEGIC SURVEILLANCE'}
+        highlightedCountries={highlighted}
+        pins={pins}
+        routes={routes}
+        theme="tactical_navy"
+        tacticalHud={true}
+      />
     </AbsoluteFill>
   );
 };
@@ -702,7 +732,7 @@ const DataMetricScene: FC<{ scene: CinematicSceneData; sceneFrame: number }> = (
     <AbsoluteFill style={{ backgroundColor: '#070b14', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
       {/* Darkened Photographic Backdrop */}
       <div style={{ position: 'absolute', inset: 0, transform: `scale(${zoom})`, filter: 'brightness(0.22) contrast(1.25) blur(2.5px) saturate(1.2)' }}>
-        <Img src={bgSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <SmartMedia src={bgSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       </div>
 
       {/* Vignette & Grid */}
@@ -865,7 +895,7 @@ const ComparisonSplitScene: FC<{
       {/* Left Entity Side */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden', borderRight: '2px solid #38bdf8' }}>
         <div style={{ position: 'absolute', inset: 0, transform: `scale(${driftLeft})` }}>
-          <Img src={leftSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <SmartMedia src={leftSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(2, 6, 23, 0.9) 0%, transparent 60%)' }} />
         <div style={{ position: 'absolute', bottom: '70px', left: '40px', zIndex: 10 }}>
@@ -878,7 +908,7 @@ const ComparisonSplitScene: FC<{
       {/* Right Entity Side */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden', borderLeft: '2px solid #ef4444' }}>
         <div style={{ position: 'absolute', inset: 0, transform: `scale(${driftRight})` }}>
-          <Img src={rightSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <SmartMedia src={rightSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(2, 6, 23, 0.9) 0%, transparent 60%)' }} />
         <div style={{ position: 'absolute', bottom: '70px', right: '40px', textAlign: 'right', zIndex: 10 }}>
@@ -919,7 +949,7 @@ const LayeredParallaxScene: FC<{
           filter: 'brightness(0.32) contrast(1.2) blur(2px) saturate(1.15)',
         }}
       >
-        <Img src={mediaSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <SmartMedia src={mediaSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       </div>
 
       <div
@@ -964,7 +994,7 @@ const LayeredParallaxScene: FC<{
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', fontWeight: 800, color: '#38bdf8', letterSpacing: '2px', textTransform: 'uppercase' }}>
-              PARALLAX INTELLIGENCE DOSSIER // {scene.location || 'CONFIDENTIAL'}
+              PARALLAX INTELLIGENCE DOSSIER // {(typeof scene.location === 'object' ? scene.location?.name : scene.location) || 'CONFIDENTIAL'}
             </span>
             <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', color: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.15)', padding: '3px 10px', borderRadius: '4px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
               ARCHIVAL SUBJECT
@@ -1226,23 +1256,39 @@ const ActualVideoScene: FC<{
   });
 
   const rawUrl = scene.mediaUrl || '/videos/library/datacenter_tech.mp4';
-  const resolvedSrc = (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:'))
-    ? rawUrl
-    : staticFile(rawUrl.replace(/^\//, ''));
+  const resolvedSrc = resolveMediaSrc(rawUrl);
+
+  const isImage = /\.(jpg|jpeg|png|webp|temp\.jpg)$/i.test(rawUrl);
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#020617', overflow: 'hidden' }}>
-      <Video
-        src={resolvedSrc}
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          transform: `scale(${panScale}) translate(${panX}px, 0px)`,
-          filter: 'contrast(1.08) saturate(1.1) brightness(0.95)',
-        }}
-        volume={0}
-      />
+      {isImage ? (
+        <Img
+          src={resolvedSrc}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transform: `scale(${panScale}) translate(${panX}px, 0px)`,
+            filter: 'contrast(1.08) saturate(1.1) brightness(0.95)',
+          }}
+        />
+      ) : (
+        <OffthreadVideo
+          src={resolvedSrc}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transform: `scale(${panScale}) translate(${panX}px, 0px)`,
+            filter: 'contrast(1.08) saturate(1.1) brightness(0.95)',
+          }}
+          volume={0}
+          onError={(e) => {
+            console.warn('Video element playback warning:', e);
+          }}
+        />
+      )}
       {/* Cinematic Vignette */}
       <div
         style={{
@@ -1257,41 +1303,132 @@ const ActualVideoScene: FC<{
 };
 
 // ==========================================
-// 14. CLOSED CAPTIONS (CC)
+// 14. CLOSED CAPTIONS (CC) — STRICT 1-LINE DYNAMIC DISPLAY & TYPOGRAPHY PRESETS
 // ==========================================
-const SubtitlesRenderer: FC<{ cues: SubtitleCueData[]; frame: number }> = ({ cues, frame }) => {
+const SubtitlesRenderer: FC<{ cues: SubtitleCueData[]; frame: number; template?: string }> = ({ cues, frame, template = 'modern-documentary' }) => {
   const activeCue = useMemo(() => {
     return cues.find((c) => frame >= c.startFrame && frame <= c.endFrame);
   }, [cues, frame]);
 
   if (!activeCue) return null;
 
+  const cueRelativeFrame = frame - activeCue.startFrame;
+  const popScale = interpolate(cueRelativeFrame, [0, 4], [0.94, 1.0], { extrapolateRight: 'clamp' });
+  const popOpacity = interpolate(cueRelativeFrame, [0, 3], [0.5, 1.0], { extrapolateRight: 'clamp' });
+
+  // Paced word chunking (maximum 5-6 words per view for instant mobile readability)
+  const rawWords = activeCue.text.trim().split(/\s+/);
+  const totalCueFrames = Math.max(1, activeCue.endFrame - activeCue.startFrame);
+  const progressRatio = Math.min(1, Math.max(0, cueRelativeFrame / totalCueFrames));
+  
+  let displayText = activeCue.text;
+  let activeWordIdx = 0;
+  if (rawWords.length > 6) {
+    activeWordIdx = Math.min(rawWords.length - 1, Math.floor(progressRatio * rawWords.length));
+    const startIdx = Math.max(0, activeWordIdx - 2);
+    const endIdx = Math.min(rawWords.length, startIdx + 5);
+    displayText = rawWords.slice(startIdx, endIdx).join(' ');
+  } else {
+    activeWordIdx = Math.min(rawWords.length - 1, Math.floor(progressRatio * rawWords.length));
+  }
+
+  const wordsInDisplay = displayText.split(/\s+/);
+
+  // 1. Minimal White (Broadcast standard)
+  if (template === 'minimal-white') {
+    return (
+      <div style={{ position: 'absolute', bottom: '80px', left: '80px', right: '80px', textAlign: 'center', pointerEvents: 'none', zIndex: 95 }}>
+        <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '32px', fontWeight: 600, color: '#ffffff', textShadow: '0 2px 10px rgba(0,0,0,0.95), 0 0 20px rgba(0,0,0,0.85)' }}>
+          {displayText}
+        </span>
+      </div>
+    );
+  }
+
+  // 2. Bold Centered
+  if (template === 'bold-centered') {
+    return (
+      <div style={{ position: 'absolute', bottom: '80px', left: '80px', right: '80px', textAlign: 'center', pointerEvents: 'none', zIndex: 95, transform: `scale(${popScale})` }}>
+        <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '42px', fontWeight: 900, color: '#ffffff', textTransform: 'uppercase', textShadow: '0 4px 20px rgba(0,0,0,0.95), 0 0 30px rgba(0,0,0,0.8)' }}>
+          {displayText}
+        </span>
+      </div>
+    );
+  }
+
+  // 3. Karaoke / Yellow Highlight
+  if (template === 'karaoke-highlight' || template === 'yellow-highlight') {
+    return (
+      <div style={{ position: 'absolute', bottom: '80px', left: '50%', transform: `translateX(-50%) scale(${popScale})`, opacity: popOpacity, zIndex: 95, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
+        <div style={{ display: 'inline-flex', gap: '10px', alignItems: 'center', backgroundColor: 'rgba(5, 9, 20, 0.92)', padding: '12px 28px', borderRadius: '12px', border: '1px solid rgba(234, 179, 8, 0.3)', backdropFilter: 'blur(12px)', boxShadow: '0 10px 40px rgba(0,0,0,0.8)' }}>
+          {wordsInDisplay.map((w, wIdx) => {
+            const isHighlight = (wIdx === activeWordIdx % wordsInDisplay.length) || (template === 'yellow-highlight' && wIdx % 3 === 0);
+            return (
+              <span
+                key={wIdx}
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: '32px',
+                  fontWeight: 800,
+                  color: isHighlight ? '#facc15' : '#ffffff',
+                  textShadow: isHighlight ? '0 0 16px rgba(250, 204, 21, 0.6)' : '0 2px 8px rgba(0,0,0,0.9)',
+                  transform: isHighlight ? 'scale(1.06)' : 'scale(1.0)',
+                  transition: 'transform 0.1s ease',
+                }}
+              >
+                {w}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // 4. Modern Documentary (Default)
+  const fontSize = displayText.length > 36 ? '26px' : displayText.length > 28 ? '29px' : '32px';
   return (
     <div
       style={{
         position: 'absolute',
-        bottom: '10%',
+        bottom: '80px',
         left: '50%',
-        transform: 'translateX(-50%)',
+        transform: `translateX(-50%) scale(${popScale})`,
+        opacity: popOpacity,
         zIndex: 95,
-        maxWidth: '85%',
+        maxWidth: '90%',
         textAlign: 'center',
         pointerEvents: 'none',
+        whiteSpace: 'nowrap',
       }}
     >
       <div
         style={{
-          display: 'inline-block',
-          backgroundColor: 'rgba(10, 15, 26, 0.88)',
-          backdropFilter: 'blur(10px)',
-          padding: '12px 28px',
-          borderRadius: '10px',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.75)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(8, 12, 22, 0.92)',
+          backdropFilter: 'blur(12px)',
+          padding: '10px 24px',
+          borderRadius: '12px',
+          border: '1px solid rgba(255, 255, 255, 0.16)',
+          boxShadow: '0 8px 36px rgba(0, 0, 0, 0.85), 0 0 20px rgba(0, 240, 255, 0.12)',
+          whiteSpace: 'nowrap',
         }}
       >
-        <span style={{ fontFamily: "'Inter', 'SF Pro Text', sans-serif", fontSize: '32px', fontWeight: 800, color: '#ffffff', lineHeight: 1.35, letterSpacing: '-0.3px', textShadow: '0 2px 10px rgba(0, 0, 0, 0.9)' }}>
-          {activeCue.text}
+        <span
+          style={{
+            fontFamily: "'Inter', 'Montserrat', -apple-system, sans-serif",
+            fontSize,
+            fontWeight: 800,
+            color: '#FFFFFF',
+            lineHeight: 1.2,
+            letterSpacing: '-0.3px',
+            textShadow: '0 2px 10px rgba(0, 0, 0, 0.95)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {displayText}
         </span>
       </div>
     </div>
@@ -1309,6 +1446,7 @@ export const CinematicDocumentary: FC<CinematicDocumentaryProps> = ({
   musicSrc = "/audio/bgm/ambient_documentary.wav",
   subtitlesData,
   sfxCues = [],
+  captionTemplate = "modern-box",
   scenes = [],
 }) => {
   const { width, height, durationInFrames, fps } = useVideoConfig();
@@ -1331,6 +1469,20 @@ export const CinematicDocumentary: FC<CinematicDocumentaryProps> = ({
     return resolvedScenes.find((s) => frame >= s.startFrame && frame < s.startFrame + s.durationFrames) || resolvedScenes[0];
   }, [resolvedScenes, frame]);
 
+  // Audio ducking automation: lower BGM when narration is spoken (0.12 = -18dB), swell during pauses/chapter titles (0.35 = -9dB)
+  const narrationRanges = useMemo(() => {
+    if (!subtitlesData?.cues || subtitlesData.cues.length === 0) return [];
+    return subtitlesData.cues.map((c) => ({
+      start: c.startFrame,
+      end: c.endFrame,
+    }));
+  }, [subtitlesData]);
+
+  const duckingVolumeFn = useMemo(() => {
+    if (narrationRanges.length === 0) return 0.16;
+    return createDuckingVolume(narrationRanges, 0.35, 0.12, 12);
+  }, [narrationRanges]);
+
   const audioGroup = (
     <AudioTrackGroup
       narration={narrationSrc ? {
@@ -1343,7 +1495,7 @@ export const CinematicDocumentary: FC<CinematicDocumentaryProps> = ({
       } : undefined}
       music={musicSrc ? {
         src: musicSrc,
-        volume: 0.14,
+        volume: duckingVolumeFn,
         startFrom: 0,
         loop: true,
         fadeIn: 30,
@@ -1406,6 +1558,64 @@ export const CinematicDocumentary: FC<CinematicDocumentaryProps> = ({
           case 'tactical_map':
             sceneContent = <TacticalMapScene scene={scene} sceneFrame={currentSceneFrame} />;
             break;
+          case 'paper_cut':
+            sceneContent = (
+              <PaperCutCollage
+                frame={currentSceneFrame}
+                imageUrl={resolveMediaSrc(scene.mediaUrl)}
+                headline={scene.title}
+                category={scene.badge || 'VERIFIED RECORD'}
+              />
+            );
+            break;
+          case 'timeline_event':
+            sceneContent = (
+              <AnimatedTimeline
+                frame={currentSceneFrame}
+                events={[
+                  { date: 'Phase 1', headline: scene.title, description: scene.narration },
+                  { date: 'Phase 2', headline: 'Strategic Expansion', description: 'Institutional scaling and market integration.' },
+                  { date: 'Phase 3', headline: 'Global Dominance', description: 'Modern defense and technological leadership.' }
+                ]}
+              />
+            );
+            break;
+          case 'chart_graph':
+            sceneContent = (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                <AnimatedChart
+                  frame={currentSceneFrame}
+                  data={[
+                    { label: 'Q1', value: 40 },
+                    { label: 'Q2', value: 65 },
+                    { label: 'Q3', value: 85 },
+                    { label: 'Q4', value: 100 }
+                  ]}
+                />
+              </div>
+            );
+            break;
+          case 'chapter_title':
+            sceneContent = (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                <ChapterTitleAnim
+                  frame={currentSceneFrame}
+                  chapterNumber={scene.id?.replace(/[^0-9]/g, '') || 1}
+                  chapterTitle={scene.title}
+                  subtitle={scene.narration}
+                />
+              </div>
+            );
+            break;
+          case 'image_reveal':
+            sceneContent = (
+              <ImageReveal
+                frame={currentSceneFrame}
+                imageUrl={resolveMediaSrc(scene.mediaUrl)}
+                durationFrames={durFrames}
+              />
+            );
+            break;
           case 'cinematic_hook':
           default:
             sceneContent = <CinematicHookScene scene={scene} sceneFrame={currentSceneFrame} topic={topic} />;
@@ -1427,9 +1637,9 @@ export const CinematicDocumentary: FC<CinematicDocumentaryProps> = ({
       {/* Tactical HUD Overlay */}
       <TacticalHudOverlay frame={frame} topic={topic} category={category} activeScene={activeScene} />
 
-      {/* Subtitles Overlay */}
+      {/* Subtitles Overlay with Configured Typography Preset */}
       {subtitlesData?.cues && subtitlesData.cues.length > 0 && (
-        <SubtitlesRenderer cues={subtitlesData.cues} frame={frame} />
+        <SubtitlesRenderer cues={subtitlesData.cues} frame={frame} template={captionTemplate} />
       )}
 
       {/* Post Processing: Film Grain, Letterbox, Vignette */}

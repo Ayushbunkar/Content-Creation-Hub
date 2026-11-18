@@ -23,10 +23,27 @@ database.sqlite
 *.db
 
 # Generated audio and large media files
-public/audio/narration_*.wav
+public/audio/narration_*
+public/audio/*_words.*
+public/audio/*.png
 public/audio/*.wav
-!public/audio/page-turn.wav
+public/audio/*.temp.*
+!public/audio/sound-effects/
 !public/audio/bgm/
+!public/audio/bgm_metadata.json
+!public/audio/sfx_metadata.json
+
+# Temporary test artifacts and renders
+scratch_repo/
+*.png
+public/*.png
+public/subtitles_doc_*
+public/props_doc_*
+public/props_paper_*
+public/props_roman_*
+public/test_*
+test_*
+scripts/temp_*
 
 # OS and IDE caches
 .claude/

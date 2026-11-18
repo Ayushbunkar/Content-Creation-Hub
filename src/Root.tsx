@@ -6,6 +6,7 @@ import AudioTest from "./compositions/AudioTest";
 import CinematicDocumentary from "./compositions/CinematicDocumentary";
 import { AIBubbleReel } from "./compositions/AIBubbleReel";
 import { NvidiaHoneytrapReel } from "./compositions/NvidiaHoneytrapReel";
+import { PaperExplainerReel } from "./compositions/PaperExplainerReel";
 
 // Each <Composition> is an entry in the sidebar!
 
@@ -78,6 +79,43 @@ export const RemotionRoot: React.FC = () => {
           defaultProps={{
             narrationSrc: "/audio/nvidia_honeytrap_narration.wav",
             musicSrc: "/audio/bgm/mystery_investigation.wav",
+          }}
+        />
+        <Composition
+          id="PaperExplainerReel"
+          component={PaperExplainerReel}
+          durationInFrames={900}
+          fps={30}
+          width={1080}
+          height={1920}
+          calculateMetadata={({ props }) => {
+            const scenes = (props as any)?.scenes || [];
+            const durSec = (props as any)?.duration || (scenes.length > 0 ? scenes.length * 10 : 30);
+            const totalFrames = Math.max(90, durSec * 30);
+            const aspect = (props as any)?.aspectRatio || '9:16';
+            let width = 1080;
+            let height = 1920;
+            if (aspect === '16:9') {
+              width = 1920;
+              height = 1080;
+            } else if (aspect === '1:1') {
+              width = 1080;
+              height = 1080;
+            }
+            return {
+              durationInFrames: totalFrames,
+              width,
+              height,
+            };
+          }}
+          defaultProps={{
+            title: "How A 3-Milligram Seed Pulls 1,000 Tons Of Wood Out Of Thin Air",
+            verifiedConcept: "Over 95% of plant biomass derives from atmospheric carbon dioxide gas captured through photosynthesis, not soil mass.",
+            duration: 30,
+            aspectRatio: "9:16",
+            narrationSrc: "/audio/narration.wav",
+            musicSrc: "/audio/bgm/ambient_documentary.wav",
+            sfxEnabled: true,
           }}
         />
       </Folder>

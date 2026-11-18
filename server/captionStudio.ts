@@ -400,6 +400,7 @@ export class CaptionStudioService {
       : (['neon-glow', 'neon-captions', 'outline-caption', 'fire-word'].includes(template) ? '&H00000000&' : '&H80000000&');
 
     const borderStyleNum = isBoxedStyle ? 4 : 1;
+    const safeMarginX = targetWidth < targetHeight ? 110 : 60;
 
     let assContent = `[Script Info]
 Title: AI Viral Clipper Advanced Subtitles
@@ -410,12 +411,29 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${s.fontFamily},${s.fontSize},${assPrimary},${assSecondary},${assOutline},${assBack},1,0,0,0,100,100,${s.letterSpacing},0,${borderStyleNum},${s.outlineWidth},${s.shadowWidth},${s.alignment},40,40,${s.verticalMargin},1
-Style: Accent,${s.fontFamily},${s.fontSize},${assSecondary},${assPrimary},${assOutline},${assBack},1,0,0,0,100,100,${s.letterSpacing},0,${borderStyleNum},${s.outlineWidth},${s.shadowWidth},${s.alignment},40,40,${s.verticalMargin},1
+Style: Default,${s.fontFamily},${s.fontSize},${assPrimary},${assSecondary},${assOutline},${assBack},1,0,0,0,100,100,${s.letterSpacing},0,${borderStyleNum},${s.outlineWidth},${s.shadowWidth},${s.alignment},${safeMarginX},${safeMarginX},${s.verticalMargin},1
+Style: Accent,${s.fontFamily},${s.fontSize},${assSecondary},${assPrimary},${assOutline},${assBack},1,0,0,0,100,100,${s.letterSpacing},0,${borderStyleNum},${s.outlineWidth},${s.shadowWidth},${s.alignment},${safeMarginX},${safeMarginX},${s.verticalMargin},1
+Style: HookTitle,${s.fontFamily},${Math.round(44 * scaleFactor)},&H00FFFFFF,&H000000FF,&H00000000,&HCC000000,1,0,0,0,100,100,0,0,4,3,2,8,${safeMarginX},${safeMarginX},${Math.round(140 * scaleFactor)},1
+Style: Watermark,${s.fontFamily},${Math.round(24 * scaleFactor)},&H40FFFFFF,&H00000000,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,1,0,9,50,50,50,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
+
+    // 0. Optional Hook Title Card (First 3.5s)
+    if (customStyle?.hookTitle && customStyle?.showHookTitle !== false) {
+      const hookDur = Math.min(5.0, Math.max(2.0, parseFloat(customStyle.hookDuration || '3.5')));
+      const hookEndSec = hookDur;
+      const s = Math.floor(hookEndSec);
+      const cs = Math.floor((hookEndSec - s) * 100);
+      const hookEndStr = `0:00:0${s}.${cs.toString().padStart(2, '0')}`;
+      assContent += `Dialogue: 2,0:00:00.00,${hookEndStr},HookTitle,,0,0,0,,{\\b1\\c&H0000E5FF&}🔥 ${customStyle.hookTitle.toUpperCase()}\\N\n`;
+    }
+
+    // 0b. Optional Watermark Attribution
+    if (customStyle?.watermarkText) {
+      assContent += `Dialogue: 1,0:00:00.00,9:59:59.00,Watermark,,0,0,0,,${customStyle.watermarkText}\n`;
+    }
 
     // Deduplicate segments that have identical text or overlap within same time
     const cleanSegments: TranscriptSegment[] = [];
@@ -514,6 +532,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         textFormatted = `{\\an5\\fs${Math.round(s.fontSize * 1.15)}\\b1}${textFormatted}`;
       } else if (template === 'yellow-box-highlight') {
         textFormatted = `{\\c&H000000&\\3c&H00D7FF&\\b1}${textFormatted}`;
+      }
+
+      // Balance long lines (> 32 characters or > 6 words) into 2 lines for 9:16 safe framing if not already split
+      if (targetWidth < targetHeight && !textFormatted.includes('\\N') && !textFormatted.includes('\\kf')) {
+        const rawWords = textFormatted.split(' ');
+        if (rawWords.length >= 7 || textFormatted.length > 34) {
+          const mid = Math.ceil(rawWords.length / 2);
+          textFormatted = rawWords.slice(0, mid).join(' ') + '\\N' + rawWords.slice(mid).join(' ');
+        }
       }
 
       // Escape line breaks for ASS
