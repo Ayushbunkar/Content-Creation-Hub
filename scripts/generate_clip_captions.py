@@ -113,50 +113,97 @@ def main():
     temp_wav = ass_path.parent / f"temp_whisper_{ass_path.stem}.wav"
 
     try:
-        import whisper
         # Pre-extract normalized 16kHz audio for maximum transcription accuracy
         has_wav = extract_audio_wav(input_path, temp_wav)
         audio_src = str(temp_wav) if has_wav else str(input_path)
 
-        print(f"[captionGen] Running Whisper '{args.model}' word_timestamps=True on audio track...", file=sys.stderr)
-        model = whisper.load_model(args.model)
-        
-        # Transcribe with auto language detection (handles Hindi, Hinglish, English seamlessly)
-        res = model.transcribe(
-            audio_src,
-            word_timestamps=True,
-            no_speech_threshold=0.65,
-            logprob_threshold=-1.0,
-            condition_on_previous_text=False,
-            fp16=False
-        )
-        
         extracted_words = []
-        for seg in res.get('segments', []):
-            seg_words = seg.get('words', [])
-            if seg_words:
-                for w in seg_words:
-                    word_clean = clean_word(w.get('word', ''))
-                    if word_clean:
-                        extracted_words.append({
-                            'word': word_clean,
-                            'start': round(float(w.get('start', 0.0)), 2),
-                            'end': round(float(w.get('end', 0.0)), 2)
-                        })
-            else:
-                # If segment text exists without word boundaries, split evenly across segment duration
-                seg_text = seg.get('text', '').strip()
-                tokens = [clean_word(t) for t in seg_text.split() if clean_word(t)]
-                if tokens:
-                    s_start = float(seg.get('start', 0.0))
-                    s_end = float(seg.get('end', s_start + 2.0))
-                    w_step = (s_end - s_start) / len(tokens)
-                    for idx, tok in enumerate(tokens):
-                        extracted_words.append({
-                            'word': tok,
-                            'start': round(s_start + idx * w_step, 2),
-                            'end': round(s_start + (idx + 1) * w_step, 2)
-                        })
+        try_faster = True
+        try:
+            import torch
+            from faster_whisper import WhisperModel
+            import sys
+            import os
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from transcribe_words import devanagari_to_hinglish, has_devanagari
+
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            compute_type = "float16" if device == "cuda" else "int8"
+            print(f"[captionGen] Accelerated WhisperModel '{args.model}' loading on {device} ({compute_type})...", file=sys.stderr)
+            fw_model = WhisperModel(args.model, device=device, compute_type=compute_type)
+
+            segments, info = fw_model.transcribe(
+                audio_src,
+                word_timestamps=True,
+                initial_prompt="Namaste doston! Bhai ye dekho, kya scene hai, let's go carry mortal dynamo gaming stream."
+            )
+            for seg in segments:
+                if seg.words:
+                    for w in seg.words:
+                        w_clean = clean_word(w.word)
+                        if has_devanagari(w_clean):
+                            w_clean = devanagari_to_hinglish(w_clean)
+                        if w_clean:
+                            extracted_words.append({
+                                'word': w_clean,
+                                'start': round(float(w.start), 2),
+                                'end': round(float(w.end), 2)
+                            })
+                else:
+                    seg_text = seg.text.strip()
+                    if has_devanagari(seg_text):
+                        seg_text = devanagari_to_hinglish(seg_text)
+                    tokens = [clean_word(t) for t in seg_text.split() if clean_word(t)]
+                    if tokens:
+                        s_start = float(seg.start)
+                        s_end = float(seg.end or s_start + 2.0)
+                        w_step = (s_end - s_start) / len(tokens)
+                        for idx, tok in enumerate(tokens):
+                            extracted_words.append({
+                                'word': tok,
+                                'start': round(s_start + idx * w_step, 2),
+                                'end': round(s_start + (idx + 1) * w_step, 2)
+                            })
+        except Exception as fw_err:
+            print(f"[captionGen] faster_whisper notice ({fw_err}), falling back to standard Whisper...", file=sys.stderr)
+            import whisper
+            print(f"[captionGen] Running Whisper '{args.model}' word_timestamps=True on audio track...", file=sys.stderr)
+            model = whisper.load_model(args.model)
+            
+            # Transcribe with auto language detection (handles Hindi, Hinglish, English seamlessly)
+            res = model.transcribe(
+                audio_src,
+                word_timestamps=True,
+                no_speech_threshold=0.65,
+                logprob_threshold=-1.0,
+                condition_on_previous_text=False,
+                fp16=False
+            )
+            
+            for seg in res.get('segments', []):
+                seg_words = seg.get('words', [])
+                if seg_words:
+                    for w in seg_words:
+                        word_clean = clean_word(w.get('word', ''))
+                        if word_clean:
+                            extracted_words.append({
+                                'word': word_clean,
+                                'start': round(float(w.get('start', 0.0)), 2),
+                                'end': round(float(w.get('end', 0.0)), 2)
+                            })
+                else:
+                    seg_text = seg.get('text', '').strip()
+                    tokens = [clean_word(t) for t in seg_text.split() if clean_word(t)]
+                    if tokens:
+                        s_start = float(seg.get('start', 0.0))
+                        s_end = float(seg.get('end', s_start + 2.0))
+                        w_step = (s_end - s_start) / len(tokens)
+                        for idx, tok in enumerate(tokens):
+                            extracted_words.append({
+                                'word': tok,
+                                'start': round(s_start + idx * w_step, 2),
+                                'end': round(s_start + (idx + 1) * w_step, 2)
+                            })
                     
         if len(extracted_words) > 0:
             has_speech = True

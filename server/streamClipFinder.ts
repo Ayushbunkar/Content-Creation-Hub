@@ -439,15 +439,25 @@ export class StreamClipFinderService {
         const durSec = Math.max(5, moment.duration || 30);
         const ffmpegArgs = [
           '-y',
+          '-reconnect', '1',
+          '-reconnect_streamed', '1',
+          '-reconnect_delay_max', '5',
           '-ss', moment.clip_start_formatted,
-          '-t', String(durSec)
+          '-i', streamUrls[0]
         ];
         if (streamUrls.length >= 2) {
-          ffmpegArgs.push('-i', streamUrls[0], '-ss', moment.clip_start_formatted, '-t', String(durSec), '-i', streamUrls[1], '-map', '0:v:0', '-map', '1:a:0');
-        } else {
-          ffmpegArgs.push('-i', streamUrls[0]);
+          ffmpegArgs.push(
+            '-reconnect', '1',
+            '-reconnect_streamed', '1',
+            '-reconnect_delay_max', '5',
+            '-ss', moment.clip_start_formatted,
+            '-i', streamUrls[1],
+            '-map', '0:v:0',
+            '-map', '1:a:0'
+          );
         }
         ffmpegArgs.push(
+          '-t', String(durSec),
           '-c:v', 'libx264',
           '-preset', 'ultrafast',
           '-crf', '22',
@@ -467,7 +477,7 @@ export class StreamClipFinderService {
               try { if (fs.existsSync(tempRawPath)) fs.unlinkSync(tempRawPath); } catch (e) {}
               res();
             }
-          }, 25000);
+          }, 45000);
           cutProc.on('close', (code) => {
             clearTimeout(t);
             if (!finished) {
@@ -489,8 +499,63 @@ export class StreamClipFinderService {
         });
       }
 
-      // Check if direct stream slice is valid; if not, fallback to yt-dlp download-sections
-      const directValid = await this.isValidVideo(tempRawPath);
+      // Check if direct stream slice is valid; if not, check if this is an active live stream and capture from live edge directly!
+      let directValid = await this.isValidVideo(tempRawPath);
+      if (!directValid && streamUrls.length > 0) {
+        try { if (fs.existsSync(tempRawPath)) fs.unlinkSync(tempRawPath); } catch (e) {}
+        console.log(`[streamClipper] DVR seek missed; capturing real stream chunk directly from live edge...`);
+        const durSec = Math.max(5, moment.duration || 30);
+        const liveEdgeArgs = [
+          '-y',
+          '-reconnect', '1',
+          '-reconnect_streamed', '1',
+          '-reconnect_delay_max', '5',
+          '-i', streamUrls[0]
+        ];
+        if (streamUrls.length >= 2) {
+          liveEdgeArgs.push(
+            '-reconnect', '1',
+            '-reconnect_streamed', '1',
+            '-reconnect_delay_max', '5',
+            '-i', streamUrls[1],
+            '-map', '0:v:0',
+            '-map', '1:a:0'
+          );
+        }
+        liveEdgeArgs.push(
+          '-t', String(durSec),
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-crf', '22',
+          '-c:a', 'aac',
+          '-b:a', '128k',
+          '-movflags', '+faststart',
+          tempRawPath
+        );
+
+        await new Promise<void>((res) => {
+          let finished = false;
+          const liveProc = spawn('ffmpeg', liveEdgeArgs);
+          const t = setTimeout(() => {
+            if (!finished) {
+              finished = true;
+              try { liveProc.kill(); } catch (e) {}
+              res();
+            }
+          }, 35000);
+          liveProc.on('close', () => {
+            clearTimeout(t);
+            res();
+          });
+          liveProc.on('error', () => {
+            clearTimeout(t);
+            res();
+          });
+        });
+        directValid = await this.isValidVideo(tempRawPath);
+      }
+
+      // If still not valid and not an active stream, fallback to yt-dlp download-sections
       if (!directValid) {
         try { if (fs.existsSync(tempRawPath)) fs.unlinkSync(tempRawPath); } catch (e) {}
         console.log(`[streamClipper] Direct slice fallback to yt-dlp download-sections with node runtime...`);
@@ -616,7 +681,7 @@ export class StreamClipFinderService {
       '--streamer', streamerName || 'Creator',
       '--hook', moment.headline_hook || 'UNREAL MOMENT',
       '--duration', String(moment.duration || 30),
-      '--model', 'base'
+      '--model', 'tiny'
     ];
 
     return new Promise((resolve) => {
