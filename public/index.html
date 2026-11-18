@@ -1053,6 +1053,10 @@
         youtube: { connected: false, channelName: 'My YouTube Channel', handle: '@mychannel', subscribers: '0' },
         instagram: { connected: false, channelName: 'My Instagram Profile', handle: '@myprofile', subscribers: '0' }
       });
+      const [publishingHistory, setPublishingHistory] = useState([]);
+      const [historyFilter, setHistoryFilter] = useState('all');
+      const [mediaHostingStatus, setMediaHostingStatus] = useState(null);
+      const [clipPublishMap, setClipPublishMap] = useState({});
       const [socialPublishModal, setSocialPublishModal] = useState({
         isOpen: false,
         sourcePage: '',
@@ -1097,25 +1101,105 @@
         }
       };
 
+      const fetchPublishingHistory = async (filter = 'all') => {
+        try {
+          const res = await fetch(`/api/social/history?filter=${filter}`);
+          const data = await res.json();
+          if (data.history) {
+            setPublishingHistory(data.history);
+            // Build lookup map of published URLs by clipId
+            const map = {};
+            data.history.forEach(item => {
+              if (item.status === 'published' && item.publishedUrl) {
+                if (!map[item.clipId]) map[item.clipId] = {};
+                map[item.clipId][item.platform] = item.publishedUrl;
+              }
+            });
+            setClipPublishMap(prev => ({ ...prev, ...map }));
+          }
+        } catch (e) {
+          console.warn('Failed to load publishing history:', e);
+        }
+      };
+
+      const fetchMediaHostingStatus = async () => {
+        try {
+          const res = await fetch('/api/social/media-hosting');
+          const data = await res.json();
+          if (data.hosting) {
+            setMediaHostingStatus(data.hosting);
+          }
+        } catch (e) {}
+      };
+
+      const handleConnectOAuthGoogle = async () => {
+        try {
+          const res = await fetch('/api/social/oauth/google/url');
+          const data = await res.json();
+          if (data.url) {
+            const popup = window.open(data.url, 'google_oauth_popup', 'width=600,height=700,scrollbars=yes');
+            const onMsg = (evt) => {
+              if (evt.data?.type === 'YOUTUBE_CONNECTED') {
+                fetchSocialAccounts();
+                showAppModal({ title: 'YouTube Connected', message: 'Your YouTube channel was successfully connected via Google OAuth!', type: 'success' });
+                window.removeEventListener('message', onMsg);
+              }
+            };
+            window.addEventListener('message', onMsg);
+          } else {
+            showAppModal({ title: 'Google OAuth Config', message: data.error || 'Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env', type: 'info' });
+          }
+        } catch (e) {
+          showAppModal({ title: 'OAuth Error', message: e.message, type: 'error' });
+        }
+      };
+
+      const handleConnectOAuthMeta = async () => {
+        try {
+          const res = await fetch('/api/social/oauth/meta/url');
+          const data = await res.json();
+          if (data.url) {
+            const popup = window.open(data.url, 'meta_oauth_popup', 'width=600,height=700,scrollbars=yes');
+            const onMsg = (evt) => {
+              if (evt.data?.type === 'INSTAGRAM_CONNECTED') {
+                fetchSocialAccounts();
+                showAppModal({ title: 'Instagram Connected', message: 'Your Instagram Professional account was successfully connected via Meta OAuth!', type: 'success' });
+                window.removeEventListener('message', onMsg);
+              }
+            };
+            window.addEventListener('message', onMsg);
+          } else {
+            showAppModal({ title: 'Meta OAuth Config', message: data.error || 'Set META_APP_ID and META_APP_SECRET in .env', type: 'info' });
+          }
+        } catch (e) {
+          showAppModal({ title: 'OAuth Error', message: e.message, type: 'error' });
+        }
+      };
+
       const openSocialPublishModal = async (clipData) => {
         const streamerName = clipData.streamer || 'Creator';
         const rawTitle = clipData.clipTitle || clipData.hook || 'Viral Stream Highlight';
+        const targetClipId = clipData.clipId || (clipData.clipUrl ? clipData.clipUrl.split('/').pop().replace(/\.[^/.]+$/, '') : (`clip_${Date.now()}`));
+        const chosenPlatform = clipData.preferredPlatform || 'both';
+
         setSocialPublishModal({
           isOpen: true,
+          clipId: targetClipId,
           sourcePage: clipData.sourcePage || 'Video Studio',
           clipUrl: clipData.clipUrl || '',
           clipTitle: rawTitle,
           hook: clipData.hook || rawTitle,
           streamer: streamerName,
+          streamerHandle: clipData.streamerHandle || `@${streamerName.toLowerCase().replace(/\s+/g, '')}`,
           topic: clipData.topic || 'Gaming Stream Highlight',
           transcript: clipData.transcript || '',
-          platform: 'both',
+          platform: chosenPlatform,
           privacyStatus: 'public',
           isGeneratingMetadata: true,
           metadata: {
-            youtubeTitle: `${rawTitle} | ${streamerName} #shorts`,
-            youtubeDescription: `Crazy highlight from ${streamerName} stream!\n\nSubscribe for more daily shorts!\n#shorts #viral #gaming`,
-            instagramCaption: `${rawTitle} 🔥 Tag a friend who needs to see this! 👇\n.\n.\n#reels #viral #explore`,
+            youtubeTitle: `${streamerName} ${rawTitle} 😂🔥 #shorts`.slice(0, 95),
+            youtubeDescription: `${streamerName} has an unreal reaction live on stream! 😂🔥\n\n🎮 Game / Stream: ${clipData.topic || 'Gaming'}\n🎙️ Creator: ${streamerName}\n\nSubscribe for more daily shorts!\n#shorts #viral #trending`,
+            instagramCaption: `${rawTitle} 🔥💀\n\n${streamerName} being legendary as always! Tag a friend who needs to see this 😂👇\n.\n.\n#reels #viral #explore`,
             trendingHashtags: ['#shorts', '#viral', '#trending', '#gaming', '#reels'],
             suggestedTagsString: '#shorts #viral #trending #gaming #reels',
             alternativeTitles: []
@@ -1123,6 +1207,21 @@
           isPublishing: false,
           publishResults: null
         });
+
+        // Check if clip was previously published across any platform
+        try {
+          const statusRes = await fetch(`/api/social/clip-status/${targetClipId}`);
+          const statusData = await statusRes.json();
+          if (statusData.publications && statusData.publications.length > 0) {
+            const pubMap = {};
+            statusData.publications.forEach(p => {
+              if (p.status === 'published' && p.publishedUrl) {
+                pubMap[p.platform] = p.publishedUrl;
+              }
+            });
+            setClipPublishMap(prev => ({ ...prev, [targetClipId]: pubMap }));
+          }
+        } catch (e) {}
 
         try {
           const res = await fetch('/api/social/generate-metadata', {
@@ -1169,13 +1268,21 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              filePath: socialPublishModal.clipUrl,
+              clipId: socialPublishModal.clipId || `clip_${Date.now()}`,
+              sourcePage: socialPublishModal.sourcePage || 'studio',
+              videoPath: socialPublishModal.clipUrl,
               platforms: selectedPlatforms,
               title: socialPublishModal.metadata.youtubeTitle,
               description: socialPublishModal.metadata.youtubeDescription,
+              caption: socialPublishModal.metadata.instagramCaption,
               hashtags: socialPublishModal.metadata.trendingHashtags,
+              youtubeTags: socialPublishModal.metadata.youtubeTags || [socialPublishModal.streamer, 'shorts', 'gaming'],
               privacy: socialPublishModal.privacyStatus,
-              streamerName: socialPublishModal.streamer
+              streamer: {
+                streamerName: socialPublishModal.streamer,
+                streamerHandle: socialPublishModal.streamerHandle,
+                gameOrTopic: socialPublishModal.topic
+              }
             })
           });
           const data = await res.json();
@@ -1186,6 +1293,15 @@
               publishResults: data.results
             }));
             fetchSocialAccounts();
+            fetchPublishingHistory();
+            const mapUpdate = {};
+            data.results.forEach(r => {
+              if (r.status === 'published' && r.publishedUrl) {
+                if (!mapUpdate[socialPublishModal.clipId]) mapUpdate[socialPublishModal.clipId] = {};
+                mapUpdate[socialPublishModal.clipId][r.platform] = r.publishedUrl;
+              }
+            });
+            setClipPublishMap(prev => ({ ...prev, ...mapUpdate }));
           } else {
             setSocialPublishModal(prev => ({ ...prev, isPublishing: false }));
             showAppModal({ title: 'Publishing Failed', message: data.error || 'Failed to publish video.', type: 'error' });
@@ -3173,6 +3289,8 @@
         fetchAudioPoliceRegistry();
         fetchStreamPresets();
         fetchSocialAccounts();
+        fetchPublishingHistory();
+        fetchMediaHostingStatus();
 
         // WebSocket for live generation & transcription updates
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -4449,13 +4567,39 @@
                                     <video src={renderedData.clipUrl} controls class="w-full h-full object-contain"></video>
                                   </div>
 
+                                  {/* Publication Badges if already published */}
+                                  {(() => {
+                                    const mClipId = `stream_moment_${moment.rank || (idx + 1)}`;
+                                    const pub = clipPublishMap[mClipId];
+                                    if (pub && (pub.youtube || pub.instagram)) {
+                                      return (
+                                        <div class="flex items-center gap-2 p-2 rounded-lg bg-slate-950/80 border border-slate-800 text-[11px]">
+                                          <span class="text-slate-400 font-bold">Published:</span>
+                                          {pub.youtube && (
+                                            <a href={pub.youtube} target="_blank" rel="noopener noreferrer" class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-950 text-red-400 border border-red-800 hover:underline flex items-center space-x-1">
+                                              <span>▶ YouTube Shorts ↗</span>
+                                            </a>
+                                          )}
+                                          {pub.instagram && (
+                                            <a href={pub.instagram} target="_blank" rel="noopener noreferrer" class="px-2 py-0.5 rounded text-[10px] font-bold bg-pink-950 text-pink-400 border border-pink-800 hover:underline flex items-center space-x-1">
+                                              <span>📷 Instagram Reel ↗</span>
+                                            </a>
+                                          )}
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+
                                   <div class="flex items-center justify-between gap-2 flex-wrap">
                                     <span class="text-xs text-slate-400 font-mono">
                                       {renderedData.fileSizeMb} MB • 9:16 Vertical Reel
                                     </span>
-                                    <div class="flex items-center gap-2">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
                                       <button
                                         onClick={() => openSocialPublishModal({
+                                          clipId: `stream_moment_${moment.rank || (idx + 1)}`,
+                                          preferredPlatform: 'both',
                                           sourcePage: 'Stream Chat Clipper',
                                           clipUrl: renderedData.clipUrl,
                                           clipTitle: `${streamAnalysisResult?.streamerName || 'Streamer'} - ${moment.title}`,
@@ -4464,16 +4608,68 @@
                                           topic: 'Gaming Stream Highlight',
                                           transcript: (renderedData.transcript || []).map(t => t.text).join(' ')
                                         })}
-                                        class="px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-red-600 via-pink-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white transition flex items-center space-x-1.5 shadow-lg shadow-pink-600/30 cursor-pointer active:scale-95"
+                                        class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center space-x-1 cursor-pointer"
+                                        title="Edit AI Metadata before publishing"
                                       >
-                                        <span>🚀 1-Click Publish</span>
+                                        <span>✏️ Metadata</span>
+                                      </button>
+                                      <button
+                                        onClick={() => openSocialPublishModal({
+                                          clipId: `stream_moment_${moment.rank || (idx + 1)}`,
+                                          preferredPlatform: 'youtube',
+                                          sourcePage: 'Stream Chat Clipper',
+                                          clipUrl: renderedData.clipUrl,
+                                          clipTitle: `${streamAnalysisResult?.streamerName || 'Streamer'} - ${moment.title}`,
+                                          hook: moment.title,
+                                          streamer: streamAnalysisResult?.streamerName || 'Streamer',
+                                          topic: 'Gaming Stream Highlight',
+                                          transcript: (renderedData.transcript || []).map(t => t.text).join(' ')
+                                        })}
+                                        class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-500/30 transition flex items-center space-x-1 cursor-pointer"
+                                        title="Publish directly to YouTube Shorts"
+                                      >
+                                        <span>▶ YouTube</span>
+                                      </button>
+                                      <button
+                                        onClick={() => openSocialPublishModal({
+                                          clipId: `stream_moment_${moment.rank || (idx + 1)}`,
+                                          preferredPlatform: 'instagram',
+                                          sourcePage: 'Stream Chat Clipper',
+                                          clipUrl: renderedData.clipUrl,
+                                          clipTitle: `${streamAnalysisResult?.streamerName || 'Streamer'} - ${moment.title}`,
+                                          hook: moment.title,
+                                          streamer: streamAnalysisResult?.streamerName || 'Streamer',
+                                          topic: 'Gaming Stream Highlight',
+                                          transcript: (renderedData.transcript || []).map(t => t.text).join(' ')
+                                        })}
+                                        class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-pink-600/20 hover:bg-pink-600/40 text-pink-400 border border-pink-500/30 transition flex items-center space-x-1 cursor-pointer"
+                                        title="Publish directly to Instagram Reels"
+                                      >
+                                        <span>📷 Instagram</span>
+                                      </button>
+                                      <button
+                                        onClick={() => openSocialPublishModal({
+                                          clipId: `stream_moment_${moment.rank || (idx + 1)}`,
+                                          preferredPlatform: 'both',
+                                          sourcePage: 'Stream Chat Clipper',
+                                          clipUrl: renderedData.clipUrl,
+                                          clipTitle: `${streamAnalysisResult?.streamerName || 'Streamer'} - ${moment.title}`,
+                                          hook: moment.title,
+                                          streamer: streamAnalysisResult?.streamerName || 'Streamer',
+                                          topic: 'Gaming Stream Highlight',
+                                          transcript: (renderedData.transcript || []).map(t => t.text).join(' ')
+                                        })}
+                                        class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-red-600 via-pink-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white transition flex items-center space-x-1.5 shadow-lg shadow-pink-600/30 cursor-pointer active:scale-95"
+                                        title="1-Click Publish to both YouTube Shorts and Instagram Reels"
+                                      >
+                                        <span>🚀 1-Click Both</span>
                                       </button>
                                       <a
                                         href={renderedData.clipUrl}
                                         download={`stream_clip_moment_${moment.rank}.mp4`}
-                                        class="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center space-x-1.5 shadow-lg shadow-emerald-600/30"
+                                        class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center space-x-1 shadow-lg shadow-emerald-600/30"
                                       >
-                                        <span>⬇️ Download MP4</span>
+                                        <span>⬇️ MP4</span>
                                       </a>
                                     </div>
                                   </div>
@@ -7134,9 +7330,21 @@
                               </button>
 
                               {selectedClip.exported_video && (
-                                <div class="flex items-center space-x-2">
+                                <div class="flex items-center space-x-1.5 flex-wrap">
+                                  {clipPublishMap[selectedClip.id]?.youtube && (
+                                    <a href={clipPublishMap[selectedClip.id].youtube} target="_blank" rel="noopener noreferrer" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-red-950 text-red-400 border border-red-800 hover:underline">
+                                      ✓ Shorts ↗
+                                    </a>
+                                  )}
+                                  {clipPublishMap[selectedClip.id]?.instagram && (
+                                    <a href={clipPublishMap[selectedClip.id].instagram} target="_blank" rel="noopener noreferrer" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-pink-950 text-pink-400 border border-pink-800 hover:underline">
+                                      ✓ Reel ↗
+                                    </a>
+                                  )}
                                   <button
                                     onClick={() => openSocialPublishModal({
+                                      clipId: selectedClip.id,
+                                      preferredPlatform: 'both',
                                       sourcePage: 'AI Viral Clipper',
                                       clipUrl: `/${selectedClip.exported_video}`,
                                       clipTitle: selectedClip.headline_hook || activeClipperProject?.title || 'Viral Short',
@@ -7145,16 +7353,65 @@
                                       topic: 'Podcast & Gaming Viral Clip',
                                       transcript: (selectedClip.transcript_segments || []).map(s => s.text).join(' ')
                                     })}
-                                    class="px-4 py-2.5 bg-gradient-to-r from-red-600 via-pink-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-pink-600/30 transition flex items-center space-x-1.5 cursor-pointer active:scale-95"
+                                    class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 transition flex items-center space-x-1 cursor-pointer"
+                                    title="Edit AI Metadata before publishing"
                                   >
-                                    <span>🚀 1-Click Publish</span>
+                                    <span>✏️ Metadata</span>
+                                  </button>
+                                  <button
+                                    onClick={() => openSocialPublishModal({
+                                      clipId: selectedClip.id,
+                                      preferredPlatform: 'youtube',
+                                      sourcePage: 'AI Viral Clipper',
+                                      clipUrl: `/${selectedClip.exported_video}`,
+                                      clipTitle: selectedClip.headline_hook || activeClipperProject?.title || 'Viral Short',
+                                      hook: selectedClip.headline_hook || 'Mindblowing Moment',
+                                      streamer: activeClipperProject?.title?.split('|')[0]?.trim() || 'Creator',
+                                      topic: 'Podcast & Gaming Viral Clip',
+                                      transcript: (selectedClip.transcript_segments || []).map(s => s.text).join(' ')
+                                    })}
+                                    class="px-3 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-400 font-bold text-xs rounded-xl border border-red-500/30 transition flex items-center space-x-1 cursor-pointer"
+                                  >
+                                    <span>▶ YouTube</span>
+                                  </button>
+                                  <button
+                                    onClick={() => openSocialPublishModal({
+                                      clipId: selectedClip.id,
+                                      preferredPlatform: 'instagram',
+                                      sourcePage: 'AI Viral Clipper',
+                                      clipUrl: `/${selectedClip.exported_video}`,
+                                      clipTitle: selectedClip.headline_hook || activeClipperProject?.title || 'Viral Short',
+                                      hook: selectedClip.headline_hook || 'Mindblowing Moment',
+                                      streamer: activeClipperProject?.title?.split('|')[0]?.trim() || 'Creator',
+                                      topic: 'Podcast & Gaming Viral Clip',
+                                      transcript: (selectedClip.transcript_segments || []).map(s => s.text).join(' ')
+                                    })}
+                                    class="px-3 py-2 bg-pink-600/20 hover:bg-pink-600/40 text-pink-400 font-bold text-xs rounded-xl border border-pink-500/30 transition flex items-center space-x-1 cursor-pointer"
+                                  >
+                                    <span>📷 Instagram</span>
+                                  </button>
+                                  <button
+                                    onClick={() => openSocialPublishModal({
+                                      clipId: selectedClip.id,
+                                      preferredPlatform: 'both',
+                                      sourcePage: 'AI Viral Clipper',
+                                      clipUrl: `/${selectedClip.exported_video}`,
+                                      clipTitle: selectedClip.headline_hook || activeClipperProject?.title || 'Viral Short',
+                                      hook: selectedClip.headline_hook || 'Mindblowing Moment',
+                                      streamer: activeClipperProject?.title?.split('|')[0]?.trim() || 'Creator',
+                                      topic: 'Podcast & Gaming Viral Clip',
+                                      transcript: (selectedClip.transcript_segments || []).map(s => s.text).join(' ')
+                                    })}
+                                    class="px-3.5 py-2 bg-gradient-to-r from-red-600 via-pink-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-pink-600/30 transition flex items-center space-x-1.5 cursor-pointer active:scale-95"
+                                  >
+                                    <span>🚀 1-Click Both</span>
                                   </button>
                                   <a
                                     href={`/${selectedClip.exported_video}`}
                                     download
-                                    class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/30 transition flex items-center space-x-1.5"
+                                    class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/30 transition flex items-center space-x-1.5"
                                   >
-                                    <span>⬇️ Download MP4</span>
+                                    <span>⬇️ MP4</span>
                                   </a>
                                 </div>
                               )}
@@ -9018,14 +9275,39 @@
                                 </button>
 
                                 {exportedVideoUrl && (
-                                  <div class="p-3 bg-emerald-950/40 border border-emerald-800 rounded-lg flex items-center justify-between gap-2 flex-wrap">
-                                    <div>
-                                      <span class="text-emerald-400 font-bold block">✓ Render Ready</span>
-                                      <span class="text-[10px] text-slate-400">{exportResolution} Ultra-Clear MP4</span>
+                                  <div class="p-3 bg-emerald-950/40 border border-emerald-800 rounded-lg space-y-2">
+                                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                                      <div>
+                                        <span class="text-emerald-400 font-bold block">✓ Render Ready</span>
+                                        <span class="text-[10px] text-slate-400">{exportResolution} Ultra-Clear MP4</span>
+                                      </div>
+                                      {(() => {
+                                        const cId = `caption_${activeCapProject?.id || 'export'}`;
+                                        const pub = clipPublishMap[cId];
+                                        if (pub && (pub.youtube || pub.instagram)) {
+                                          return (
+                                            <div class="flex items-center space-x-1.5">
+                                              {pub.youtube && (
+                                                <a href={pub.youtube} target="_blank" rel="noopener noreferrer" class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-950 text-red-400 border border-red-800 hover:underline">
+                                                  ✓ Shorts ↗
+                                                </a>
+                                              )}
+                                              {pub.instagram && (
+                                                <a href={pub.instagram} target="_blank" rel="noopener noreferrer" class="px-2 py-0.5 rounded text-[10px] font-bold bg-pink-950 text-pink-400 border border-pink-800 hover:underline">
+                                                  ✓ Reel ↗
+                                                </a>
+                                              )}
+                                            </div>
+                                          );
+                                        }
+                                        return null;
+                                      })()}
                                     </div>
-                                    <div class="flex items-center space-x-2">
+                                    <div class="flex items-center space-x-1.5 flex-wrap pt-1 border-t border-emerald-900/40">
                                       <button
                                         onClick={() => openSocialPublishModal({
+                                          clipId: `caption_${activeCapProject?.id || 'export'}`,
+                                          preferredPlatform: 'both',
                                           sourcePage: 'Caption Studio',
                                           clipUrl: exportedVideoUrl,
                                           clipTitle: activeCapProject?.name || 'Caption Studio Video',
@@ -9034,9 +9316,58 @@
                                           topic: 'Animated Subtitled Video',
                                           transcript: (activeCapProject?.transcript || []).map(t => t.text).join(' ')
                                         })}
-                                        class="px-3.5 py-1.5 bg-gradient-to-r from-red-600 via-pink-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-lg font-bold text-xs flex items-center space-x-1 shadow-md shadow-pink-600/30 cursor-pointer active:scale-95"
+                                        class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-bold text-xs flex items-center space-x-1 border border-slate-700 transition cursor-pointer"
+                                        title="Edit AI Metadata before publishing"
                                       >
-                                        <span>🚀 1-Click Publish</span>
+                                        <span>✏️ Metadata</span>
+                                      </button>
+                                      <button
+                                        onClick={() => openSocialPublishModal({
+                                          clipId: `caption_${activeCapProject?.id || 'export'}`,
+                                          preferredPlatform: 'youtube',
+                                          sourcePage: 'Caption Studio',
+                                          clipUrl: exportedVideoUrl,
+                                          clipTitle: activeCapProject?.name || 'Caption Studio Video',
+                                          hook: activeCapProject?.name || 'Viral Subtitled Video',
+                                          streamer: 'Creator',
+                                          topic: 'Animated Subtitled Video',
+                                          transcript: (activeCapProject?.transcript || []).map(t => t.text).join(' ')
+                                        })}
+                                        class="px-2.5 py-1.5 bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-500/30 rounded-lg font-bold text-xs flex items-center space-x-1 transition cursor-pointer"
+                                      >
+                                        <span>▶ YouTube</span>
+                                      </button>
+                                      <button
+                                        onClick={() => openSocialPublishModal({
+                                          clipId: `caption_${activeCapProject?.id || 'export'}`,
+                                          preferredPlatform: 'instagram',
+                                          sourcePage: 'Caption Studio',
+                                          clipUrl: exportedVideoUrl,
+                                          clipTitle: activeCapProject?.name || 'Caption Studio Video',
+                                          hook: activeCapProject?.name || 'Viral Subtitled Video',
+                                          streamer: 'Creator',
+                                          topic: 'Animated Subtitled Video',
+                                          transcript: (activeCapProject?.transcript || []).map(t => t.text).join(' ')
+                                        })}
+                                        class="px-2.5 py-1.5 bg-pink-600/20 hover:bg-pink-600/40 text-pink-400 border border-pink-500/30 rounded-lg font-bold text-xs flex items-center space-x-1 transition cursor-pointer"
+                                      >
+                                        <span>📷 Instagram</span>
+                                      </button>
+                                      <button
+                                        onClick={() => openSocialPublishModal({
+                                          clipId: `caption_${activeCapProject?.id || 'export'}`,
+                                          preferredPlatform: 'both',
+                                          sourcePage: 'Caption Studio',
+                                          clipUrl: exportedVideoUrl,
+                                          clipTitle: activeCapProject?.name || 'Caption Studio Video',
+                                          hook: activeCapProject?.name || 'Viral Subtitled Video',
+                                          streamer: 'Creator',
+                                          topic: 'Animated Subtitled Video',
+                                          transcript: (activeCapProject?.transcript || []).map(t => t.text).join(' ')
+                                        })}
+                                        class="px-3 py-1.5 bg-gradient-to-r from-red-600 via-pink-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-lg font-bold text-xs flex items-center space-x-1 shadow-md shadow-pink-600/30 cursor-pointer active:scale-95"
+                                      >
+                                        <span>🚀 1-Click Both</span>
                                       </button>
                                       <a
                                         href={exportedVideoUrl}
@@ -10565,20 +10896,34 @@
                         </p>
                       </div>
 
-                      <div class="flex items-center space-x-3">
+                      <div class="flex items-center space-x-2 flex-wrap">
+                        {mediaHostingStatus && (
+                          <div class="hidden sm:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] text-slate-400 font-medium">
+                            <span class={`w-2 h-2 rounded-full ${mediaHostingStatus.configured ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
+                            <span>Media Hosting: <strong class="text-slate-200 uppercase">{mediaHostingStatus.provider}</strong></span>
+                          </div>
+                        )}
                         <button
-                          onClick={() => setAccountConnectModal({ isOpen: true, platform: 'youtube', channelName: socialAccounts.youtube?.channelName || '', handle: socialAccounts.youtube?.handle || '', subscribers: socialAccounts.youtube?.subscribers || '', apiKey: '' })}
-                          class="px-3.5 py-2 bg-slate-800/90 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-bold text-slate-200 flex items-center space-x-2 transition cursor-pointer"
+                          onClick={handleConnectOAuthGoogle}
+                          class="px-3 py-2 bg-red-600/20 hover:bg-red-600/40 border border-red-500/40 rounded-xl text-xs font-bold text-red-300 flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
+                          title="Connect YouTube channel using official Google OAuth 2.0"
                         >
-                          <span class="text-red-500 font-black">▶</span>
-                          <span>{socialAccounts.youtube?.connected ? 'Manage YouTube' : '+ Connect YouTube'}</span>
+                          <span class="text-red-400 font-black">▶</span>
+                          <span>OAuth Google</span>
                         </button>
                         <button
-                          onClick={() => setAccountConnectModal({ isOpen: true, platform: 'instagram', channelName: socialAccounts.instagram?.channelName || '', handle: socialAccounts.instagram?.handle || '', subscribers: socialAccounts.instagram?.subscribers || '', apiKey: '' })}
-                          class="px-3.5 py-2 bg-slate-800/90 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-bold text-slate-200 flex items-center space-x-2 transition cursor-pointer"
+                          onClick={handleConnectOAuthMeta}
+                          class="px-3 py-2 bg-pink-600/20 hover:bg-pink-600/40 border border-pink-500/40 rounded-xl text-xs font-bold text-pink-300 flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
+                          title="Connect Instagram account using Meta OAuth Graph API"
                         >
-                          <span class="text-pink-500 font-black">📷</span>
-                          <span>{socialAccounts.instagram?.connected ? 'Manage Instagram' : '+ Connect Instagram'}</span>
+                          <span class="text-pink-400 font-black">📷</span>
+                          <span>OAuth Meta</span>
+                        </button>
+                        <button
+                          onClick={() => setAccountConnectModal({ isOpen: true, platform: 'youtube', channelName: socialAccounts.youtube?.channelName || '', handle: socialAccounts.youtube?.handle || '', subscribers: socialAccounts.youtube?.subscribers || '', apiKey: '' })}
+                          class="px-3 py-2 bg-slate-800/90 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-bold text-slate-200 flex items-center space-x-1.5 transition cursor-pointer"
+                        >
+                          <span>⚙️ Configure</span>
                         </button>
                       </div>
                     </div>
@@ -11016,6 +11361,150 @@
                         </div>
                       </div>
                     </div>
+                  </div>
+
+                  {/* ================= SOCIAL PUBLISHING HISTORY & PIPELINE STATUS ================= */}
+                  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-800 gap-3">
+                      <div>
+                        <div class="flex items-center space-x-2">
+                          <span class="text-xs font-bold text-slate-200 uppercase tracking-wider">3. Publishing History & Multi-Platform Status</span>
+                          <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-950 text-indigo-400 border border-indigo-800">
+                            {publishingHistory.length} Publications
+                          </span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-0.5">Real-time status across YouTube Shorts and Instagram Reels with direct links & independent retries</p>
+                      </div>
+
+                      {/* Filter Buttons */}
+                      <div class="flex items-center space-x-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                        {['all', 'published', 'publishing', 'failed'].map(f => (
+                          <button
+                            key={f}
+                            onClick={() => {
+                              setHistoryFilter(f);
+                              fetchPublishingHistory(f);
+                            }}
+                            class={`px-2.5 py-1 rounded-lg text-xs font-bold capitalize transition cursor-pointer ${
+                              historyFilter === f
+                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                                : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                          >
+                            {f}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => fetchPublishingHistory(historyFilter)}
+                          class="p-1 text-slate-400 hover:text-slate-200 text-xs transition cursor-pointer"
+                          title="Refresh History"
+                        >
+                          🔄
+                        </button>
+                      </div>
+                    </div>
+
+                    {publishingHistory.length === 0 ? (
+                      <div class="text-center py-8 text-slate-500 text-xs">
+                        <span class="text-2xl block mb-2">📡</span>
+                        No publications recorded yet. Select any clip and hit <strong class="text-slate-400">1-Click Publish</strong> to start broadcasting!
+                      </div>
+                    ) : (
+                      <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-300">
+                          <thead class="text-[10px] uppercase text-slate-500 font-bold border-b border-slate-800 bg-slate-950/60">
+                            <tr>
+                              <th class="py-2.5 px-3">Clip / Title</th>
+                              <th class="py-2.5 px-3">Platform</th>
+                              <th class="py-2.5 px-3">Creator / Streamer</th>
+                              <th class="py-2.5 px-3">Status</th>
+                              <th class="py-2.5 px-3">Published Link</th>
+                              <th class="py-2.5 px-3 text-right">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody class="divide-y divide-slate-800/60 font-medium">
+                            {publishingHistory.map((item) => (
+                              <tr key={item.id} class="hover:bg-slate-800/30 transition">
+                                <td class="py-3 px-3">
+                                  <div class="font-bold text-slate-100 max-w-xs truncate">{item.title || item.clipId}</div>
+                                  <div class="text-[10px] text-slate-500 font-mono">{item.clipId}</div>
+                                </td>
+                                <td class="py-3 px-3">
+                                  <span class={`inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    item.platform === 'youtube'
+                                      ? 'bg-red-950 text-red-400 border border-red-800'
+                                      : 'bg-pink-950 text-pink-400 border border-pink-800'
+                                  }`}>
+                                    <span>{item.platform === 'youtube' ? '▶' : '📷'}</span>
+                                    <span class="capitalize">{item.platform}</span>
+                                  </span>
+                                </td>
+                                <td class="py-3 px-3">
+                                  <span class="text-indigo-300 font-semibold">{item.streamerName || 'Creator'}</span>
+                                </td>
+                                <td class="py-3 px-3">
+                                  <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    item.status === 'published'
+                                      ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800'
+                                      : item.status === 'failed'
+                                      ? 'bg-rose-950/80 text-rose-400 border border-rose-800'
+                                      : 'bg-amber-950/80 text-amber-400 border border-amber-800 animate-pulse'
+                                  }`}>
+                                    {item.status === 'published' ? '✓ Published' : item.status === 'failed' ? '✕ Failed' : '⏳ Publishing'}
+                                  </span>
+                                </td>
+                                <td class="py-3 px-3 font-mono">
+                                  {item.publishedUrl ? (
+                                    <a
+                                      href={item.publishedUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      class="text-indigo-400 hover:text-indigo-300 hover:underline flex items-center space-x-1 text-[11px]"
+                                    >
+                                      <span>{item.platform === 'youtube' ? 'Open Shorts ↗' : 'Open Reel ↗'}</span>
+                                    </a>
+                                  ) : (
+                                    <span class="text-slate-500 text-[10px]">{item.error || 'Pending output'}</span>
+                                  )}
+                                </td>
+                                <td class="py-3 px-3 text-right">
+                                  {item.status === 'failed' && (
+                                    <button
+                                      onClick={() => {
+                                        openSocialPublishModal({
+                                          clipId: item.clipId,
+                                          preferredPlatform: item.platform,
+                                          sourcePage: 'Social Studio Hub',
+                                          clipUrl: item.videoPath,
+                                          clipTitle: item.title,
+                                          hook: item.title,
+                                          streamer: item.streamerName,
+                                          topic: 'Retry Video Publication'
+                                        });
+                                      }}
+                                      class="px-2 py-1 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-700/50 rounded text-[10px] font-bold transition cursor-pointer"
+                                    >
+                                      🔄 Retry
+                                    </button>
+                                  )}
+                                  {item.status === 'published' && (
+                                    <button
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(item.publishedUrl);
+                                        showAppModal({ title: 'Copied', message: 'Published link copied to clipboard!', type: 'success' });
+                                      }}
+                                      class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-medium transition cursor-pointer"
+                                    >
+                                      📋 Copy Link
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

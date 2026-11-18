@@ -2,8 +2,8 @@ node_modules/
 dist/
 .DS_Store
 .env
-
-# Output videos and renders
+*.key
+storage/
 out/
 output/
 

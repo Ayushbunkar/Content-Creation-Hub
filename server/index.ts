@@ -22,7 +22,7 @@ import { ScenePlanningEngine } from './scenePlanningEngine';
 import { SoundDesignSystem, SFX_CATALOG, BGM_CATALOG } from './soundDesignSystem';
 import { QualityControlEngine } from './qualityControlEngine';
 import { PerformanceResourceManager } from './resourceManager';
-import { SocialPublisher } from './socialPublisher';
+import { SocialPublishingService } from './social';
 
 const app = express();
 const server = http.createServer(app);
@@ -2473,13 +2473,13 @@ app.post('/api/system/cleanup', (req, res) => {
 });
 
 // ==========================================
-// SOCIAL PUBLISHING PIPELINE (YOUTUBE & INSTAGRAM)
+// UNIFIED SOCIAL PUBLISHING & METADATA PIPELINE
 // ==========================================
 
 // Get connected social accounts status
-app.get('/api/social/accounts', (req, res) => {
+app.get('/api/social/accounts', async (req, res) => {
   try {
-    const accounts = SocialPublisher.getAccounts();
+    const accounts = await SocialPublishingService.getAccounts();
     res.json({ success: true, accounts });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -2487,13 +2487,13 @@ app.get('/api/social/accounts', (req, res) => {
 });
 
 // Connect account profile / credentials
-app.post('/api/social/connect-account', (req, res) => {
+app.post('/api/social/connect-account', async (req, res) => {
   try {
     const { platform, details } = req.body;
     if (!platform || (platform !== 'youtube' && platform !== 'instagram')) {
       return res.status(400).json({ error: 'Valid platform (youtube or instagram) is required' });
     }
-    const updated = SocialPublisher.connectAccount(platform, details || {});
+    const updated = await SocialPublishingService.saveAccount(platform, details || {});
     res.json({ success: true, accounts: updated });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -2501,61 +2501,196 @@ app.post('/api/social/connect-account', (req, res) => {
 });
 
 // Disconnect account
-app.post('/api/social/disconnect-account', (req, res) => {
+app.post('/api/social/disconnect-account', async (req, res) => {
   try {
     const { platform } = req.body;
     if (!platform || (platform !== 'youtube' && platform !== 'instagram')) {
       return res.status(400).json({ error: 'Valid platform (youtube or instagram) is required' });
     }
-    const updated = SocialPublisher.disconnectAccount(platform);
+    const updated = await SocialPublishingService.disconnectAccount(platform);
     res.json({ success: true, accounts: updated });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Generate viral titles, descriptions, and trending hashtags from clip context
+// Google OAuth Authorization URL
+app.get('/api/social/oauth/google/url', (req, res) => {
+  try {
+    const state = req.query.state as string;
+    const auth = SocialPublishingService.getGoogleAuthUrl(state);
+    res.json({ success: !auth.error, ...auth });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Google OAuth Callback Handler
+app.get('/api/social/oauth/google/callback', async (req, res) => {
+  try {
+    const code = req.query.code as string;
+    if (!code) return res.status(400).send('Authorization code missing');
+    const result = await SocialPublishingService.handleGoogleCallback(code);
+    if (result.error) {
+      return res.send(`<html><body><script>alert('YouTube Connection Error: ${result.error}'); window.close();</script></body></html>`);
+    }
+    res.send(`<html><body><script>if(window.opener){window.opener.postMessage({type:'YOUTUBE_CONNECTED'},'*');} window.close();</script><p>YouTube Account Connected! You can close this window.</p></body></html>`);
+  } catch (err: any) {
+    res.status(500).send(`OAuth Error: ${err.message}`);
+  }
+});
+
+// Meta OAuth Authorization URL
+app.get('/api/social/oauth/meta/url', (req, res) => {
+  try {
+    const state = req.query.state as string;
+    const auth = SocialPublishingService.getMetaAuthUrl(state);
+    res.json({ success: !auth.error, ...auth });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Meta OAuth Callback Handler
+app.get('/api/social/oauth/meta/callback', async (req, res) => {
+  try {
+    const code = req.query.code as string;
+    if (!code) return res.status(400).send('Authorization code missing');
+    const result = await SocialPublishingService.handleMetaCallback(code);
+    if (result.error) {
+      return res.send(`<html><body><script>alert('Instagram Connection Error: ${result.error}'); window.close();</script></body></html>`);
+    }
+    res.send(`<html><body><script>if(window.opener){window.opener.postMessage({type:'INSTAGRAM_CONNECTED'},'*');} window.close();</script><p>Instagram Account Connected! You can close this window.</p></body></html>`);
+  } catch (err: any) {
+    res.status(500).send(`OAuth Error: ${err.message}`);
+  }
+});
+
+// Resolve Streamer Identity (Strict 5-Tier Hierarchy)
+app.post('/api/social/resolve-streamer', (req, res) => {
+  try {
+    const streamer = SocialPublishingService.resolveStreamerIdentity(req.body);
+    res.json({ success: true, streamer });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Media Hosting Configuration Status (for Instagram Reels)
+app.get('/api/social/media-hosting', (req, res) => {
+  try {
+    const hosting = SocialPublishingService.getMediaHostingStatus();
+    res.json({ success: true, hosting });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Validate Video File for Shorts & Reels
+app.post('/api/social/validate-video', (req, res) => {
+  try {
+    const { videoPath } = req.body;
+    if (!videoPath) return res.status(400).json({ error: 'videoPath is required' });
+    const fullPath = path.isAbsolute(videoPath) ? videoPath : path.join(process.cwd(), videoPath.replace(/^\//, ''));
+    const validation = SocialPublishingService.validateVideo(fullPath);
+    res.json({ success: true, validation });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Generate Comprehensive Platform-Specific AI Metadata & Hashtags
 app.post('/api/social/generate-metadata', (req, res) => {
   try {
-    const { streamerName, headlineHook, transcriptSnippet, gameOrTopic, duration, platform } = req.body;
-    const metadata = SocialPublisher.generateMetadata({
-      streamerName,
-      headlineHook,
-      transcriptSnippet,
-      gameOrTopic,
-      duration,
-      platform
+    const { clipId, streamer, streamerName, headlineHook, transcriptSnippet, transcript, gameOrTopic, duration, privacy } = req.body;
+    
+    // Resolve streamer identity with priority
+    const resolvedStreamer = streamer && streamer.streamerName
+      ? streamer
+      : SocialPublishingService.resolveStreamerIdentity({
+          userInput: { streamerName: streamerName || 'Creator', gameOrTopic }
+        });
+
+    const metadata = SocialPublishingService.generateMetadata({
+      clipId: clipId || `clip_${Date.now()}`,
+      streamer: resolvedStreamer,
+      headlineHook: headlineHook || 'VIRAL STREAM MOMENT',
+      transcript: transcript || transcriptSnippet || '',
+      gameOrTopic: gameOrTopic || resolvedStreamer.gameOrTopic,
+      duration: duration || 30,
+      privacy: privacy || 'public'
     });
+
     res.json({ success: true, metadata });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// 1-Click Publish to YouTube Shorts and/or Instagram Reels
+// 1-Click Direct Publishing to YouTube Shorts and/or Instagram Reels
 app.post('/api/social/publish', async (req, res) => {
   try {
-    const { filePath, platforms, title, description, hashtags, privacy, streamerName } = req.body;
-    if (!filePath) {
-      return res.status(400).json({ error: 'filePath is required' });
+    const { clipId, sourcePage, projectId, filePath, videoPath, platforms, title, description, caption, hashtags, youtubeTags, privacy, streamer, streamerName } = req.body;
+    const targetVideo = videoPath || filePath;
+
+    if (!targetVideo) {
+      return res.status(400).json({ error: 'videoPath is required' });
     }
     if (!platforms || !Array.isArray(platforms) || platforms.length === 0) {
       return res.status(400).json({ error: 'platforms array is required (e.g. ["youtube", "instagram"])' });
     }
 
-    const results = await SocialPublisher.publishVideo({
-      filePath,
+    const resolvedStreamer = streamer && streamer.streamerName
+      ? streamer
+      : SocialPublishingService.resolveStreamerIdentity({
+          userInput: { streamerName: streamerName || 'Creator' }
+        });
+
+    const fullPath = path.isAbsolute(targetVideo)
+      ? targetVideo
+      : path.join(process.cwd(), targetVideo.replace(/^\//, ''));
+
+    const result = await SocialPublishingService.publishVideo({
+      clipId: clipId || `clip_${Date.now()}`,
+      sourcePage: sourcePage || 'studio',
+      projectId,
+      videoPath: fullPath,
       platforms,
-      title: title || 'Viral Reel #shorts',
-      description: description || '',
-      hashtags: hashtags || [],
-      privacy: privacy || 'public',
-      streamerName: streamerName || 'Creator'
+      streamer: resolvedStreamer,
+      metadata: {
+        youtubeTitle: title,
+        youtubeDescription: description,
+        youtubeTags,
+        youtubePrivacy: privacy || 'public',
+        instagramCaption: caption,
+        instagramHashtags: hashtags
+      }
     });
 
-    res.json({ success: true, results });
+    res.json({ success: true, ...result });
   } catch (err: any) {
     console.error('[SocialPublisher] Publish error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get publication records for specific clip ID (shared across all three pages)
+app.get('/api/social/clip-status/:clipId', async (req, res) => {
+  try {
+    const publications = await SocialPublishingService.getPublicationsForClip(req.params.clipId);
+    res.json({ success: true, publications });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get publishing history dashboard records
+app.get('/api/social/history', async (req, res) => {
+  try {
+    const filter = (req.query.filter as any) || 'all';
+    const history = await SocialPublishingService.getPublishingHistory(filter);
+    res.json({ success: true, history });
+  } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -2563,6 +2698,7 @@ app.post('/api/social/publish', async (req, res) => {
 // Start server
 async function main() {
   await initDatabase();
+  await SocialPublishingService.init();
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`=======================================================`);
     console.log(` LOCAL AI VIDEO STUDIO — PRODUCTION SERVER RUNNING`);
