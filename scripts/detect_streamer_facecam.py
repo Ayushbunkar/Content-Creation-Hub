@@ -65,16 +65,21 @@ def detect_facecam(video_path: str, target_cam_h: int = 768, target_cam_w: int =
     video_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 1920)
     video_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 1080)
 
-    # Sample 4 keyframes evenly across the video
+    # Sample 8 keyframes evenly across the video duration for ultra-reliable detection
     sample_indices = [
-        int(total_frames * 0.15),
-        int(total_frames * 0.40),
+        int(total_frames * 0.10),
+        int(total_frames * 0.22),
+        int(total_frames * 0.35),
+        int(total_frames * 0.50),
         int(total_frames * 0.65),
-        int(total_frames * 0.85)
+        int(total_frames * 0.78),
+        int(total_frames * 0.88),
+        int(total_frames * 0.95)
     ]
 
     all_faces = []
     scale_factor = 0.5  # downsample for 4x faster detection
+    clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
 
     for f_idx in sample_indices:
         if f_idx >= total_frames:
@@ -86,16 +91,16 @@ def detect_facecam(video_path: str, target_cam_h: int = 768, target_cam_w: int =
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         small_gray = cv2.resize(gray, (0, 0), fx=scale_factor, fy=scale_factor)
-        small_gray = cv2.equalizeHist(small_gray)
+        small_gray = clahe.apply(small_gray)
 
-        # Detect faces: min size 25x25 in downsampled space (= 50x50 in 1080p)
+        # Detect faces: min size 18x18 in downsampled space (= 36x36 in 1080p, catches small webcams)
         frame_faces = []
         for cascade in cascades:
             dets = cascade.detectMultiScale(
                 small_gray,
-                scaleFactor=1.15,
+                scaleFactor=1.12,
                 minNeighbors=3,
-                minSize=(25, 25)
+                minSize=(18, 18)
             )
             for (x, y, w, h) in dets:
                 orig_x = int(x / scale_factor)

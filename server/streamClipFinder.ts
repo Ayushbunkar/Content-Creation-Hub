@@ -648,7 +648,8 @@ export class StreamClipFinderService {
     if (cropMode === 'split_50_50') dividerY = 960;
     else if (cropMode === 'split_30_70') dividerY = 576;
     else if (cropMode === 'split_70_30') dividerY = 1344;
-    else dividerY = 960;
+    else if (cropMode === 'split_speed_60_40' || cropMode === 'split_40_60') dividerY = 768;
+    else dividerY = 768;
 
     let detectedCamCrop: string | undefined = undefined;
     if ((camPosition === 'auto_detect' || !camPosition) && cropMode.startsWith('split_')) {
@@ -716,7 +717,7 @@ export class StreamClipFinderService {
         success: false,
         face_detected: false,
         position_label: 'center_left',
-        ffmpeg_cam_crop: 'crop=iw*0.42:ih*0.52:0:ih*0.28'
+        ffmpeg_cam_crop: 'crop=iw*0.24:ih*0.30:0:ih*0.38'
       };
     }
 
@@ -730,12 +731,12 @@ export class StreamClipFinderService {
 
       const timer = setTimeout(() => {
         try { proc.kill(); } catch (e) {}
-        console.warn('[FacecamDetector] Timed out after 45s, using safe center-left');
+        console.warn('[FacecamDetector] Timed out after 45s, using safe tight center-left');
         resolve({
           success: false,
           face_detected: false,
           position_label: 'center_left',
-          ffmpeg_cam_crop: 'crop=iw*0.42:ih*0.52:0:ih*0.28'
+          ffmpeg_cam_crop: 'crop=iw*0.24:ih*0.30:0:ih*0.38'
         });
       }, 45000);
 
@@ -755,7 +756,7 @@ export class StreamClipFinderService {
             success: false,
             face_detected: false,
             position_label: 'center_left',
-            ffmpeg_cam_crop: 'crop=iw*0.42:ih*0.52:0:ih*0.28'
+            ffmpeg_cam_crop: 'crop=iw*0.24:ih*0.30:0:ih*0.38'
           });
         }
       });
@@ -766,7 +767,7 @@ export class StreamClipFinderService {
           success: false,
           face_detected: false,
           position_label: 'center_left',
-          ffmpeg_cam_crop: 'crop=iw*0.42:ih*0.52:0:ih*0.28'
+          ffmpeg_cam_crop: 'crop=iw*0.24:ih*0.30:0:ih*0.38'
         });
       });
     });
