@@ -30,12 +30,14 @@ def detect_facecam(video_path: str, target_cam_h: int = 768, target_cam_w: int =
             "message": "OpenCV not available or video file missing"
         }
 
-    # Load multi-cascade classifiers for maximum recall (frontal, tilted, angled)
+    # Load multi-cascade classifiers for maximum recall (frontal, alt, profile, upper-body)
     cascades = []
     cascade_names = [
         'haarcascade_frontalface_alt2.xml',
+        'haarcascade_frontalface_alt.xml',
         'haarcascade_profileface.xml',
-        'haarcascade_frontalface_default.xml'
+        'haarcascade_frontalface_default.xml',
+        'haarcascade_upperbody.xml'
     ]
     for cname in cascade_names:
         cpath = os.path.join(cv2.data.haarcascades, cname)
@@ -46,8 +48,8 @@ def detect_facecam(video_path: str, target_cam_h: int = 768, target_cam_w: int =
         return {
             "success": False,
             "face_detected": False,
-            "position_label": "top_left",
-            "ffmpeg_cam_crop": "crop=iw*0.42:ih*0.52:0:0",
+            "position_label": "center_left",
+            "ffmpeg_cam_crop": "crop=iw*0.24:ih*0.30:0:ih*0.38",
             "message": "Haar cascades missing"
         }
 
@@ -124,12 +126,12 @@ def detect_facecam(video_path: str, target_cam_h: int = 768, target_cam_w: int =
     cap.release()
 
     if not all_faces:
-        # Fallback to middle-left / top-left safe window
+        # Fallback to tight middle-left safe window
         return {
             "success": True,
             "face_detected": False,
             "position_label": "center_left",
-            "ffmpeg_cam_crop": "crop=iw*0.42:ih*0.52:0:ih*0.25",
+            "ffmpeg_cam_crop": "crop=iw*0.24:ih*0.30:0:ih*0.38",
             "message": "No clear face detected, using safe center-left streamer layout"
         }
 

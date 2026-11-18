@@ -47,6 +47,12 @@ try {
 
 const app = express();
 const server = http.createServer(app);
+
+// Configure persistent timeouts for long-running video clipping and downloads
+server.timeout = 600000; // 10 minutes
+server.keepAliveTimeout = 610000;
+server.headersTimeout = 620000;
+
 const wss = new WebSocketServer({ server });
 
 const PORT = 3000;
