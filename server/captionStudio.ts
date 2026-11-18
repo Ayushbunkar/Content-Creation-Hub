@@ -202,6 +202,11 @@ export class CaptionStudioService {
         '--language', language || 'auto',
         '--device', 'cpu'
       ];
+      if (language === 'hinglish') {
+        args.push('--hinglish');
+      } else if (language === 'en_translate') {
+        args.push('--task', 'translate');
+      }
 
       const p = spawn(pythonExe, args, {
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' }

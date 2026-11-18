@@ -687,7 +687,54 @@ print(json.dumps(results))
   }
 
   /**
-   * Switch or translate a clip's language to English or Hindi
+   * Transliterate Devanagari Hindi segments to clean Roman Hinglish
+   */
+  public static async transliterateSegmentsToHinglish(segments: TranscriptSegment[]): Promise<TranscriptSegment[]> {
+    if (!segments || segments.length === 0) return [];
+    return new Promise((resolve) => {
+      const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
+      const pythonExe = fs.existsSync(venvPy) ? venvPy : 'python';
+      const script = `
+import sys, os, json
+sys.path.insert(0, os.getcwd())
+from scripts.transcribe_words import devanagari_to_hinglish
+
+try:
+    data = json.loads(sys.stdin.read())
+    for seg in data:
+        seg['text'] = devanagari_to_hinglish(seg.get('text', ''))
+        if 'words' in seg and seg['words']:
+            for w in seg['words']:
+                w['word'] = devanagari_to_hinglish(w.get('word', ''))
+    print(json.dumps(data, ensure_ascii=False))
+except Exception as e:
+    print(json.dumps([]))
+`;
+      const p = spawn(pythonExe, ['-c', script], {
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      });
+      let stdout = '';
+      p.stdout.on('data', d => { stdout += d.toString(); });
+      p.stdin.write(JSON.stringify(segments));
+      p.stdin.end();
+      p.on('close', code => {
+        try {
+          if (code === 0 && stdout.trim()) {
+            const parsed = JSON.parse(stdout);
+            resolve(parsed.length > 0 ? parsed : segments);
+          } else {
+            resolve(segments);
+          }
+        } catch {
+          resolve(segments);
+        }
+      });
+      p.on('error', () => resolve(segments));
+    });
+  }
+
+  /**
+   * Switch or translate a clip's language to English, Hinglish, or Hindi
    */
   public static async setClipLanguage(clipId: string, language: 'en' | 'hi' | 'hinglish'): Promise<any> {
     const clip = await getQuery<any>('SELECT * FROM clipper_clips WHERE id = ?', [clipId]);
@@ -703,8 +750,16 @@ print(json.dumps(results))
       }
     }
 
-    // 2. If native not found, translate existing segments
-    if (segments.length === 0 && clip.transcript_segments) {
+    // 2. Handle Hinglish: transliterate Devanagari to Roman Hinglish
+    if (language === 'hinglish') {
+      try {
+        const rawSegs = JSON.parse(clip.transcript_segments || '[]');
+        segments = await this.transliterateSegmentsToHinglish(rawSegs);
+      } catch (e) {
+        console.warn('Transliteration error in setClipLanguage:', e);
+      }
+    } else if (segments.length === 0 && clip.transcript_segments) {
+      // 3. If native not found, translate existing segments
       try {
         const rawSegs = JSON.parse(clip.transcript_segments);
         segments = await this.translateSegments(rawSegs, language === 'hi' ? 'hi' : 'en');
@@ -946,6 +1001,11 @@ print(json.dumps(results))
         '--language', language || 'auto',
         '--device', 'cpu'
       ];
+      if (language === 'hinglish') {
+        args.push('--hinglish');
+      } else if (language === 'en_translate') {
+        args.push('--task', 'translate');
+      }
 
       const p = spawn(pythonExe, args, {
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
