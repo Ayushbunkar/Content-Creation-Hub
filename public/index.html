@@ -1574,7 +1574,7 @@
       const [clipperStatusMessage, setClipperStatusMessage] = useState('');
       const [clipperError, setClipperError] = useState(null);
       const [isBatchRendering, setIsBatchRendering] = useState(false);
-      const [clipInspectorTab, setClipInspectorTab] = useState('trim'); // 'trim', 'virality', 'platform', 'thumbnails', 'retention'
+      const [clipInspectorTab, setClipInspectorTab] = useState('captions'); // 'captions', 'framing', 'trim', 'virality', 'platform', 'thumbnails', 'all'
       const [selectedPlatformTab, setSelectedPlatformTab] = useState('youtube'); // 'youtube', 'reels', 'tiktok', 'linkedin'
 
       // Central Theme-Matching Studio Modal System (Replaces browser default alerts)
@@ -6935,584 +6935,636 @@
                             </div>
                           </div>
 
-                          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-                            {/* LEFT COLUMN: Live Synchronized Video Player & Reframing Mode */}
-                            <div class="lg:col-span-5 space-y-4">
-                              {/* Live Synchronized Player with Dual-Layer Blurred Backdrop */}
-                              <ClipperLivePlayer
-                                clip={selectedClip}
-                                project={activeClipperProject}
-                                onUpdate={handleUpdateSelectedClip}
-                                onOpenConcat={handleOpenInConcat}
-                              />
-
-                              {/* Aspect Ratio Selector */}
-                              <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2">
-                                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">
-                                  Output Aspect Ratio
-                                </label>
-                                <div class="grid grid-cols-3 gap-2">
-                                  <button
-                                    onClick={() => handleUpdateSelectedClip({ aspect_ratio: '9:16' })}
-                                    class={`px-3 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center space-x-1 ${
-                                      (selectedClip.aspect_ratio || '9:16') === '9:16'
-                                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/40 border border-indigo-400'
-                                        : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-                                    }`}
-                                  >
-                                    <span>📱 9:16 Reel</span>
-                                  </button>
-
-                                  <button
-                                    onClick={() => handleUpdateSelectedClip({ aspect_ratio: '1:1' })}
-                                    class={`px-3 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center space-x-1 ${
-                                      selectedClip.aspect_ratio === '1:1'
-                                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/40 border border-indigo-400'
-                                        : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-                                    }`}
-                                  >
-                                    <span>⏹️ 1:1 Square</span>
-                                  </button>
-
-                                  <button
-                                    onClick={() => handleUpdateSelectedClip({ aspect_ratio: '16:9' })}
-                                    class={`px-3 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center space-x-1 ${
-                                      selectedClip.aspect_ratio === '16:9'
-                                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/40 border border-indigo-400'
-                                        : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-                                    }`}
-                                  >
-                                    <span>🖥️ 16:9 Wide</span>
-                                  </button>
+                            {/* LEFT COLUMN: Pinned / Sticky Live Video Player (Never scrolls away!) */}
+                            <div class="lg:col-span-5 space-y-4 lg:sticky lg:top-4 lg:self-start z-10">
+                              <div class="bg-slate-950/90 border border-slate-800 rounded-2xl p-4 shadow-2xl backdrop-blur-md space-y-3">
+                                <div class="flex items-center justify-between pb-2.5 border-b border-slate-800">
+                                  <div class="flex items-center space-x-2">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    <span class="text-xs font-bold text-slate-100 uppercase tracking-wider">Live Video Preview</span>
+                                  </div>
+                                  <div class="flex items-center space-x-2">
+                                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-indigo-950/80 text-indigo-300 border border-indigo-800/60">
+                                      {selectedClip.aspect_ratio || '9:16'}
+                                    </span>
+                                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-amber-950/60 text-amber-300 border border-amber-800/60">
+                                      {selectedClip.duration}s
+                                    </span>
+                                  </div>
                                 </div>
-                              </div>
 
-                              {/* Smart Reframing Selector */}
-                              <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
-                                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">🎬 Framing Style & Split Presets</label>
-                                <div class="grid grid-cols-2 gap-2">
-                                  {[
-                                    { v: 'blur_background', label: 'Gaussian Backdrop', icon: '✨' },
-                                    { v: 'center_crop',     label: 'Full Center Crop', icon: '🎯' },
-                                    { v: 'split_facecam',   label: 'Gaming Facecam Split', icon: '🎮' },
-                                    { v: 'split_screen',    label: 'Podcast 50/50 Split', icon: '👥' }
-                                  ].map(opt => (
+                                {/* Live Synchronized Player with Dual-Layer Blurred Backdrop */}
+                                <ClipperLivePlayer
+                                  clip={selectedClip}
+                                  project={activeClipperProject}
+                                  onUpdate={handleUpdateSelectedClip}
+                                  onOpenConcat={handleOpenInConcat}
+                                />
+
+                                {/* Quick Action Toolbar directly under Video */}
+                                <div class="pt-2 border-t border-slate-800/80 space-y-2">
+                                  <button
+                                    onClick={() => handleRenderSingleClip(selectedClip.id)}
+                                    disabled={isClipperBusy}
+                                    class="w-full py-2.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-amber-600 hover:from-indigo-500 hover:to-amber-500 text-white font-black text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition disabled:opacity-50 flex items-center justify-center space-x-2 active:scale-98"
+                                  >
+                                    <span>⚡ Render {selectedClip.aspect_ratio || '9:16'} Video</span>
+                                  </button>
+
+                                  <div class="grid grid-cols-2 gap-2">
+                                    {selectedClip.exported_video ? (
+                                      <a
+                                        href={`/${selectedClip.exported_video}`}
+                                        download
+                                        class="py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/30 transition flex items-center justify-center space-x-1.5"
+                                      >
+                                        <span>⬇️ Download MP4</span>
+                                      </a>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleOpenInConcat({ videoPath: selectedClip.exported_video || activeClipperProject?.video_path, clipId: selectedClip.id, projectId: activeClipperProject?.id })}
+                                        class="py-2 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 transition flex items-center justify-center space-x-1"
+                                      >
+                                        <span>✂️ Edit in Concat</span>
+                                      </button>
+                                    )}
+
                                     <button
-                                      key={opt.v}
-                                      onClick={() => handleUpdateSelectedClip({ reframing_mode: opt.v })}
-                                      class={`px-3 py-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
-                                        (selectedClip.reframing_mode || 'blur_background') === opt.v
-                                          ? 'bg-indigo-600 text-white border border-indigo-400 shadow-lg shadow-indigo-600/30'
-                                          : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-                                      }`}
-                                    ><span>{opt.icon}</span> <span class="truncate">{opt.label}</span></button>
-                                  ))}
-                                </div>
-                              </div>
-
-                              {/* Advanced Creator Viral Enhancers & Audio Police */}
-                              <div class="bg-slate-950 border border-amber-900/40 rounded-xl p-3 space-y-2.5">
-                                <div class="flex items-center justify-between">
-                                  <div class="flex items-center space-x-1.5">
-                                    <span class="text-sm">⚡</span>
-                                    <span class="text-xs font-bold text-amber-300 uppercase tracking-wider">Creator Viral Enhancers</span>
-                                  </div>
-                                  <span class="text-[9px] bg-amber-950 text-amber-400 border border-amber-800/60 px-2 py-0.5 rounded-full font-mono font-semibold">Broadcast Pro</span>
-                                </div>
-
-                                <div class="grid grid-cols-2 gap-2">
-                                  {/* 1-Click Romanize to Hinglish */}
-                                  <button
-                                    onClick={() => handleRomanizeHinglish(selectedClip.id)}
-                                    title="Converts Hindi Devanagari subtitles to authentic creator Roman Hinglish (Carry/Tanmay/Shub style)"
-                                    class="px-2.5 py-2 bg-gradient-to-r from-orange-950/80 to-amber-950/80 hover:from-orange-900 hover:to-amber-900 border border-orange-700/60 text-orange-200 rounded-lg text-[11px] font-bold flex items-center justify-center space-x-1.5 transition shadow-sm"
-                                  >
-                                    <span>🇮🇳</span>
-                                    <span>Romanize Hinglish</span>
-                                  </button>
-
-                                  {/* Inject Viral Emojis */}
-                                  <button
-                                    onClick={() => handleInjectEmojis(selectedClip.id)}
-                                    title="Injects trending high-impact retention emojis (🔥, 💀, 🤯, 😂) into key punchlines"
-                                    class="px-2.5 py-2 bg-gradient-to-r from-purple-950/80 to-indigo-950/80 hover:from-purple-900 hover:to-indigo-900 border border-purple-700/60 text-purple-200 rounded-lg text-[11px] font-bold flex items-center justify-center space-x-1.5 transition shadow-sm"
-                                  >
-                                    <span>🔥</span>
-                                    <span>Inject Emojis</span>
-                                  </button>
-                                </div>
-
-                                {/* Hook Title & Audio Mastering Toggles */}
-                                <div class="pt-1.5 border-t border-slate-900 space-y-2 text-[11px] text-slate-300">
-                                  <label class="flex items-center space-x-2 cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={(selectedClip.custom_style || {}).showHookTitle !== false}
-                                      onChange={(e) => handleUpdateSelectedClip({
-                                        custom_style: { ...(selectedClip.custom_style || {}), showHookTitle: e.target.checked }
-                                      })}
-                                      class="rounded text-amber-500 focus:ring-0 bg-slate-900 border-slate-700"
-                                    />
-                                    <span class="font-semibold text-slate-300">Show Viral Hook Title Card (First 3.8s)</span>
-                                  </label>
-
-                                  <div class="flex items-center justify-between text-[10px] text-emerald-400 bg-emerald-950/40 border border-emerald-900/60 rounded px-2.5 py-1.5">
-                                    <span class="flex items-center gap-1.5 font-mono">
-                                      <span>🔊</span> EBU R128 Peak Limiter & Loudness Normalization
-                                    </span>
-                                    <span class="font-bold uppercase tracking-wider text-[9px] bg-emerald-900/80 px-1.5 py-0.5 rounded text-emerald-200">Active</span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* ===== 1. AI SMART SPEAKER CAMERA — AUTO ZOOM & TRACKING ===== */}
-                              <div class="bg-slate-950 border border-cyan-900/60 rounded-xl p-3 space-y-3">
-                                <div class="flex items-center justify-between">
-                                  <div class="flex items-center space-x-1.5">
-                                    <span class="text-sm">📹</span>
-                                    <span class="text-xs font-bold text-cyan-300 uppercase tracking-wider">Smart Speaker Camera & Zoom</span>
-                                  </div>
-                                  <span class="text-[9px] bg-cyan-950 text-cyan-400 border border-cyan-800/60 px-2 py-0.5 rounded-full font-mono font-semibold">Face Track • Easing</span>
-                                </div>
-
-                                {/* Camera Preset Selector (12 Presets) */}
-                                <div>
-                                  <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Camera Movement Preset (12)</label>
-                                  <select
-                                    value={(selectedClip.custom_style || {}).cameraPreset || 'automatic_smart_zoom'}
-                                    onChange={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), cameraPreset: e.target.value } })}
-                                    class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-cyan-200 focus:outline-none focus:border-cyan-500"
-                                  >
-                                    {CAMERA_PRESETS.map(p => (
-                                      <option key={p.id} value={p.id}>{p.emoji} {p.name}</option>
-                                    ))}
-                                  </select>
-                                  <p class="text-[10px] text-slate-500 mt-1 italic">
-                                    {(CAMERA_PRESETS.find(p => p.id === ((selectedClip.custom_style || {}).cameraPreset || 'automatic_smart_zoom')) || CAMERA_PRESETS[0]).desc}
-                                  </p>
-                                </div>
-
-                                {/* Zoom Intensity Presets */}
-                                <div>
-                                  <div class="flex items-center justify-between mb-1">
-                                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Zoom Intensity</label>
-                                    <span class="text-[11px] font-mono text-cyan-400 font-bold">
-                                      {parseFloat((selectedClip.custom_style || {}).zoomIntensity || 1.15).toFixed(2)}x
-                                    </span>
-                                  </div>
-                                  <div class="grid grid-cols-4 gap-1 mb-2">
-                                    {[
-                                      { label: 'Subtle', val: 1.05 },
-                                      { label: 'Natural', val: 1.10 },
-                                      { label: 'Medium', val: 1.20 },
-                                      { label: 'Strong', val: 1.30 }
-                                    ].map(z => {
-                                      const currentZ = parseFloat((selectedClip.custom_style || {}).zoomIntensity || 1.15);
-                                      const isMatch = Math.abs(currentZ - z.val) < 0.03;
-                                      return (
-                                        <button
-                                          key={z.label}
-                                          onClick={() => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), zoomIntensity: z.val } })}
-                                          class={`py-1 rounded text-[10px] font-bold border transition ${
-                                            isMatch
-                                              ? 'bg-cyan-600 text-white border-cyan-400'
-                                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                                          }`}
-                                        >
-                                          {z.label} ({z.val}x)
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="1.02"
-                                    max="1.45"
-                                    step="0.01"
-                                    value={parseFloat((selectedClip.custom_style || {}).zoomIntensity || 1.15)}
-                                    onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), zoomIntensity: parseFloat(e.target.value) } })}
-                                    class="w-full h-1.5 rounded-full accent-cyan-400 cursor-pointer"
-                                  />
-                                </div>
-
-                                {/* Smart Headroom & Proportion Status */}
-                                <div class="flex items-center justify-between bg-slate-900/80 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[10px] text-slate-400">
-                                  <span>👤 Face Headroom: <strong class="text-emerald-400">36% Golden Safe Zone</strong></span>
-                                  <span>📈 Easing: <strong class="text-cyan-400">Smooth Cosine</strong></span>
-                                </div>
-                              </div>
-
-                              {/* ===== 2. PROFESSIONAL CAPTION STYLE STUDIO (25 PRESETS) ===== */}
-                              <div class="bg-slate-950 border border-indigo-800/50 rounded-xl p-3 space-y-3">
-                                <div class="flex items-center justify-between">
-                                  <span class="text-xs font-bold text-indigo-300 uppercase tracking-wider">✨ Professional Caption Studio</span>
-                                  <span class="text-[10px] text-indigo-400 bg-indigo-950 border border-indigo-800 px-2 py-0.5 rounded-full font-bold">25 Presets</span>
-                                </div>
-
-                                {/* Style Gallery Cards (25 Styles) */}
-                                <div class="grid grid-cols-2 gap-1.5 max-h-60 overflow-y-auto pr-0.5" style={{scrollbarWidth:'thin', scrollbarColor:'#4338ca transparent'}}>
-                                  {[...new Map(CAPTION_TEMPLATES.map(t => [t.id, t])).values()].map(t => {
-                                    const currentTmpl = selectedClip.caption_template || 'minimal-montserrat';
-                                    const isActive = currentTmpl === t.id;
-                                    return (
-                                      <button
-                                        key={t.id}
-                                        onClick={() => handleUpdateSelectedClip({
-                                          caption_template: t.id,
-                                          custom_style: {
-                                            ...(selectedClip.custom_style || {}),
-                                            fontFamily: t.font || (selectedClip.custom_style || {}).fontFamily || 'Montserrat',
-                                            color: t.preview.text || (selectedClip.custom_style || {}).color || '#FFFFFF',
-                                            highlightColor: t.preview.accent || (selectedClip.custom_style || {}).highlightColor || '#FFD700'
-                                          }
-                                        })}
-                                        class={`relative text-left rounded-xl p-2.5 border transition-all ${
-                                          isActive
-                                            ? 'border-indigo-500 bg-indigo-900/40 shadow-md shadow-indigo-900/40'
-                                            : 'border-slate-800 bg-slate-900/60 hover:border-slate-600 hover:bg-slate-800/60'
-                                        }`}
-                                        style={{minHeight:'64px'}}
-                                      >
-                                        {/* Mini Preview Bar */}
-                                        <div class="rounded-md mb-1 px-1.5 py-1 flex items-center justify-center overflow-hidden" style={{
-                                          background: t.preview.bg || '#1a1a2e',
-                                          border: '1px solid rgba(255,255,255,0.08)',
-                                          minHeight: '26px'
-                                        }}>
-                                          <span class="text-[11px] font-black truncate" style={{
-                                            color: t.preview.text,
-                                            textShadow: t.preview.glow ? `0 0 8px ${t.preview.glow}` : '1px 1px 2px rgba(0,0,0,0.9)',
-                                            WebkitTextStroke: t.id === 'outline-caption' || t.id === 'gaming-captions' ? `1px ${t.preview.accent}` : undefined,
-                                            fontFamily: t.font || 'Montserrat, sans-serif'
-                                          }}>
-                                            {t.emoji} {t.name.split(' ')[0]}
-                                            {t.preview.accent && <span style={{color: t.preview.accent}}> ★</span>}
-                                          </span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                          <span class={`text-[10px] font-bold truncate ${isActive ? 'text-indigo-300' : 'text-slate-400'}`}>
-                                            {t.styleNum ? `#${t.styleNum} ` : ''}{t.name}
-                                          </span>
-                                          {isActive && <span class="text-[9px] bg-indigo-600 text-white px-1 py-0.2 rounded font-bold">✓</span>}
-                                        </div>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-
-                                {/* Highlighting Mode Selector (5 Modes) */}
-                                <div>
-                                  <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Highlighting Mode (Voiceover Sync)</label>
-                                  <div class="grid grid-cols-3 gap-1">
-                                    {[
-                                      { id: 'word-by-word',     label: 'Word by Word', icon: '🎤' },
-                                      { id: 'keyword-emphasis', label: 'Keyword',      icon: '🔑' },
-                                      { id: 'phrase-by-phrase', label: 'Phrase',       icon: '📝' },
-                                      { id: 'entire-sentence',  label: 'Sentence',     icon: '📜' },
-                                      { id: 'no-highlighting',  label: 'Clean Text',   icon: '⚪' }
-                                    ].map(hm => {
-                                      const activeHm = (selectedClip.custom_style || {}).highlightMode || 'word-by-word';
-                                      const isCur = activeHm === hm.id;
-                                      return (
-                                        <button
-                                          key={hm.id}
-                                          onClick={() => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), highlightMode: hm.id } })}
-                                          class={`py-1 rounded text-[10px] font-semibold border transition ${
-                                            isCur ? 'bg-amber-600 text-white border-amber-400' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                                          }`}
-                                        >
-                                          {hm.icon} {hm.label}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-
-                                {/* Font + Language Row */}
-                                <div class="grid grid-cols-2 gap-2">
-                                  <div>
-                                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Typography Font</label>
-                                    <select
-                                      value={(selectedClip.custom_style || {}).fontFamily || 'Montserrat'}
-                                      onChange={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), fontFamily: e.target.value } })}
-                                      class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-slate-200 focus:outline-none focus:border-indigo-500"
+                                      onClick={() => handleOpenClipInCaptionStudio(selectedClip.id)}
+                                      class="py-2 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 transition flex items-center justify-center space-x-1"
                                     >
-                                      <option value="Montserrat">Montserrat (Recommended)</option>
-                                      <option value="Inter">Inter</option>
-                                      <option value="Poppins">Poppins</option>
-                                      <option value="Roboto">Roboto</option>
-                                      <option value="Bebas Neue">Bebas Neue</option>
-                                      <option value="Oswald">Oswald (Impact)</option>
-                                      <option value="Anton">Anton</option>
-                                      <option value="Space Grotesk">Space Grotesk</option>
-                                      <option value="Playfair Display">Playfair Display (Serif)</option>
-                                      <option value="Courier New">Courier New (Typewriter)</option>
-                                      <option value="Noto Sans Devanagari">Noto Sans Devanagari (Hindi)</option>
-                                    </select>
+                                      <span>🎨 Caption Studio</span>
+                                    </button>
                                   </div>
-                                  <div>
-                                    <div class="flex items-center justify-between mb-1">
-                                      <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Spoken Language</label>
-                                      <span class="text-[9px] text-emerald-400 font-mono font-semibold">{selectedClip.caption_language === 'en' ? '🇺🇸 ENGLISH' : (selectedClip.caption_language === 'hi' ? '🇮🇳 HINDI' : 'AUTO')}</span>
-                                    </div>
-                                    <select
-                                      value={selectedClip.caption_language || 'auto'}
-                                      onChange={(e) => {
-                                        const lang = e.target.value;
-                                        if (lang === 'en' || lang === 'hi' || lang === 'hinglish') {
-                                          handleSwitchClipLanguage(lang);
-                                        } else {
-                                          handleUpdateSelectedClip({ caption_language: lang });
-                                        }
-                                      }}
-                                      class="w-full bg-slate-900 border border-indigo-600/50 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-slate-200 focus:outline-none focus:border-indigo-400"
-                                    >
-                                      <option value="en">🇺🇸 English (Active & Verified)</option>
-                                      <option value="hi">🇮🇳 Hindi (हिंदी)</option>
-                                      <option value="hinglish">🔀 Hinglish (Roman Script)</option>
-                                      <option value="auto">🌐 Auto-Detect</option>
-                                      <option value="ar">🇸🇦 Arabic / Urdu</option>
-                                    </select>
-                                    <div class="flex gap-1 mt-1.5">
-                                      <button
-                                        onClick={() => handleSwitchClipLanguage('en')}
-                                        class={`px-2 py-1 rounded text-[10px] font-bold transition-all ${selectedClip.caption_language === 'en' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'}`}
-                                      >
-                                        🇺🇸 English
-                                      </button>
-                                      <button
-                                        onClick={() => handleSwitchClipLanguage('hi')}
-                                        class={`px-2 py-1 rounded text-[10px] font-bold transition-all ${selectedClip.caption_language === 'hi' ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'}`}
-                                      >
-                                        🇮🇳 हिंदी
-                                      </button>
-                                      <button
-                                        onClick={() => handleSwitchProjectLanguage('en')}
-                                        title="Convert all clips in this project to English captions"
-                                        class="px-2 py-1 rounded text-[10px] font-bold bg-emerald-950/60 text-emerald-300 hover:bg-emerald-800 border border-emerald-600/40 ml-auto"
-                                      >
-                                        ⚡ All to EN
-                                      </button>
-                                    </div>
+
+                                  <div class="flex items-center justify-between text-[11px] text-slate-400 bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-855">
+                                    <span>Preset: <strong class="text-indigo-300 font-mono">{selectedClip.caption_template || 'minimal-montserrat'}</strong></span>
+                                    <span>Ratio: <strong class="text-amber-300 font-mono">{selectedClip.aspect_ratio || '9:16'}</strong></span>
                                   </div>
                                 </div>
-
-                                {/* Safe Caption Positioning */}
-                                <div>
-                                  <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">📍 Safe Position (Avoid Face/Logos)</label>
-                                  <div class="grid grid-cols-4 gap-1">
-                                    {[
-                                      { label: 'Bottom',   value: 480,  icon: '⬇️', pos: 'bottom' },
-                                      { label: 'Center',   value: 960,  icon: '⏺️', pos: 'center' },
-                                      { label: 'Top',      value: 1620, icon: '⬆️', pos: 'top' },
-                                      { label: 'Lower 3rd',value: 320,  icon: '📺', pos: 'lower-third' }
-                                    ].map(pos => {
-                                      const currentOffset = (selectedClip.custom_style || {}).verticalOffset;
-                                      const isActive = currentOffset === pos.value || (!currentOffset && pos.value === 480);
-                                      return (
-                                        <button
-                                          key={pos.label}
-                                          onClick={() => handleUpdateSelectedClip({
-                                            custom_style: {
-                                              ...(selectedClip.custom_style || {}),
-                                              verticalOffset: pos.value,
-                                              position: pos.pos
-                                            }
-                                          })}
-                                          class={`py-1.5 rounded-lg text-[10px] font-bold border transition ${
-                                            isActive
-                                              ? 'bg-purple-700 border-purple-500 text-white'
-                                              : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600'
-                                          }`}
-                                        >{pos.icon} {pos.label}</button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-
-                                {/* Font Size Slider */}
-                                <div>
-                                  <div class="flex items-center justify-between mb-1">
-                                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">🔡 Caption Size</label>
-                                    <span class="text-[11px] font-mono text-indigo-300 font-bold">{(selectedClip.custom_style || {}).fontSize || 68}px</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="36"
-                                    max="110"
-                                    step="2"
-                                    value={(selectedClip.custom_style || {}).fontSize || 68}
-                                    onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), fontSize: parseInt(e.target.value) } })}
-                                    class="w-full h-1.5 rounded-full accent-indigo-500 cursor-pointer"
-                                  />
-                                </div>
-
-                                {/* Color Pickers */}
-                                <div class="grid grid-cols-2 gap-2">
-                                  <div>
-                                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">🎨 Text Color</label>
-                                    <div class="flex items-center space-x-1.5">
-                                      <input
-                                        type="color"
-                                        value={(selectedClip.custom_style || {}).color || '#FFFFFF'}
-                                        onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), color: e.target.value } })}
-                                        class="w-8 h-8 rounded-lg border border-slate-700 cursor-pointer bg-transparent"
-                                      />
-                                      <input
-                                        type="text"
-                                        value={(selectedClip.custom_style || {}).color || '#FFFFFF'}
-                                        onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), color: e.target.value } })}
-                                        class="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[11px] font-mono text-slate-200"
-                                      />
-                                    </div>
-                                    <div class="flex gap-1 mt-1">
-                                      {['#FFFFFF','#FFD700','#00F5FF','#FF3B30','#FF6B00'].map(c => (
-                                        <button key={c} onClick={() => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), color: c } })}
-                                          class="w-5 h-5 rounded-md border border-slate-600 hover:scale-110 transition-transform"
-                                          style={{background: c}} title={c}
-                                        />
-                                      ))}
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">⚡ Active Word Highlight</label>
-                                    <div class="flex items-center space-x-1.5">
-                                      <input
-                                        type="color"
-                                        value={(selectedClip.custom_style || {}).highlightColor || '#FFD700'}
-                                        onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), highlightColor: e.target.value } })}
-                                        class="w-8 h-8 rounded-lg border border-slate-700 cursor-pointer bg-transparent"
-                                      />
-                                      <input
-                                        type="text"
-                                        value={(selectedClip.custom_style || {}).highlightColor || '#FFD700'}
-                                        onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), highlightColor: e.target.value } })}
-                                        class="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[11px] font-mono text-slate-200"
-                                      />
-                                    </div>
-                                    <div class="flex gap-1 mt-1">
-                                      {['#FFD700','#FF3B30','#00F5FF','#FF00AA','#4ECDC4'].map(c => (
-                                        <button key={c} onClick={() => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), highlightColor: c } })}
-                                          class="w-5 h-5 rounded-md border border-slate-600 hover:scale-110 transition-transform"
-                                          style={{background: c}} title={c}
-                                        />
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Live CSS Preview with Camera & Subtitle Simulation */}
-                                {(() => {
-                                  const currentTmplId = selectedClip.caption_template || 'minimal-montserrat';
-                                  const tmpl = CAPTION_TEMPLATES.find(t => t.id === currentTmplId) || CAPTION_TEMPLATES[0];
-                                  const cs = selectedClip.custom_style || {};
-                                  const cameraP = CAMERA_PRESETS.find(p => p.id === (cs.cameraPreset || 'automatic_smart_zoom')) || CAMERA_PRESETS[0];
-                                  const previewText = selectedClip.hook ? selectedClip.hook.substring(0, 42) : 'मैंने दुनिया के सबसे बड़े एथलीट्स...';
-                                  const words = previewText.split(' ');
-                                  return (
-                                    <div class="rounded-xl overflow-hidden border border-slate-700 mt-2">
-                                      <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 bg-slate-900 flex items-center justify-between">
-                                        <span>👁️ Live Simulation — {tmpl.name}</span>
-                                        <span class="text-cyan-400 font-mono">{cameraP.emoji} {cameraP.name} ({parseFloat(cs.zoomIntensity || 1.15).toFixed(2)}x)</span>
-                                      </div>
-                                      <div class="relative flex items-end justify-center overflow-hidden" style={{
-                                        background: 'linear-gradient(180deg, #111827 0%, #1e1b4b 50%, #030712 100%)',
-                                        height: '90px',
-                                        padding: '10px'
-                                      }}>
-                                        {/* Camera Framing Indicator */}
-                                        <div class="absolute top-2 left-2 text-[9px] bg-cyan-950/80 border border-cyan-800 text-cyan-300 px-1.5 py-0.5 rounded flex items-center space-x-1">
-                                          <span>🎯 Smart Camera:</span>
-                                          <span class="font-bold">{cameraP.name}</span>
-                                        </div>
-
-                                        {/* Subtitle preview */}
-                                        <div style={{
-                                          background: ['boxed-caption','netflix-doc','news-broadcast','cinematic-two-line','centered-impact'].includes(tmpl.id) ? 'rgba(0,0,0,0.8)' :
-                                                      tmpl.id === 'yellow-box-highlight' ? '#FFD700' :
-                                                      tmpl.id === 'magazine-paper' ? '#F5F0E8' : 'transparent',
-                                          padding: ['boxed-caption','netflix-doc','news-broadcast','yellow-box-highlight'].includes(tmpl.id) ? '4px 10px' : '0',
-                                          borderRadius: '6px',
-                                          textAlign: 'center'
-                                        }}>
-                                          <span style={{
-                                            color: cs.color || tmpl.preview.text,
-                                            fontFamily: cs.fontFamily || tmpl.font || 'Montserrat, sans-serif',
-                                            fontSize: `${Math.round((cs.fontSize || 68) * 0.22)}px`,
-                                            fontWeight: '800',
-                                            textShadow: tmpl.id === 'neon-captions' || tmpl.id === 'neon-glow' ? `0 0 10px ${cs.color || '#00F5FF'}, 0 0 20px ${cs.color || '#00F5FF'}` :
-                                                        '1px 1px 3px rgba(0,0,0,0.95)',
-                                            WebkitTextStroke: tmpl.id === 'outline-caption' || tmpl.id === 'gaming-captions' ? '0.6px black' : undefined,
-                                            letterSpacing: tmpl.id === 'netflix-doc' ? '0.08em' : 'normal',
-                                            display: 'block',
-                                            lineHeight: '1.25'
-                                          }}>
-                                            {tmpl.id === 'news-broadcast' && <span style={{color: '#FF0000', fontWeight:'900', marginRight:'4px'}}>⬤</span>}
-                                            {words.map((w, idx) => (
-                                              <span
-                                                key={idx}
-                                                style={{
-                                                  color: (idx === 1 || idx === 3) ? (cs.highlightColor || tmpl.preview.accent) : (tmpl.id === 'yellow-box-highlight' ? '#000000' : (cs.color || tmpl.preview.text)),
-                                                  backgroundColor: tmpl.id === 'yellow-box-highlight' && idx === 1 ? '#000000' : undefined,
-                                                  padding: tmpl.id === 'yellow-box-highlight' && idx === 1 ? '1px 4px' : undefined,
-                                                  borderRadius: '3px',
-                                                  margin: '0 2px'
-                                                }}
-                                              >
-                                                {w}
-                                              </span>
-                                            ))}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
                               </div>
                             </div>
 
-                            {/* RIGHT COLUMN: Tabbed Multi-Feature Studio */}
-                            <div class="lg:col-span-7 space-y-4">
-                              {/* Sub-Tabs Navigation */}
-                              <div class="flex flex-wrap items-center gap-1.5 bg-slate-950 border border-slate-800 p-1 rounded-xl text-xs font-bold">
-                                <button
-                                  onClick={() => setClipInspectorTab('trim')}
-                                  class={`px-3 py-1.5 rounded-lg transition ${clipInspectorTab === 'trim' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
-                                >
-                                  ✂️ Trim & Captions
-                                </button>
-                                <button
-                                  onClick={() => setClipInspectorTab('virality')}
-                                  class={`px-3 py-1.5 rounded-lg transition ${clipInspectorTab === 'virality' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
-                                >
-                                  🔥 Virality Breakdown
-                                </button>
-                                <button
-                                  onClick={() => setClipInspectorTab('platform')}
-                                  class={`px-3 py-1.5 rounded-lg transition ${clipInspectorTab === 'platform' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
-                                >
-                                  🚀 Social Optimization
-                                </button>
-                                <button
-                                  onClick={() => setClipInspectorTab('thumbnails')}
-                                  class={`px-3 py-1.5 rounded-lg transition ${clipInspectorTab === 'thumbnails' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
-                                >
-                                  🖼️ Thumbnails
-                                </button>
-                                <button
-                                  onClick={() => setClipInspectorTab('retention')}
-                                  class={`px-3 py-1.5 rounded-lg transition ${clipInspectorTab === 'retention' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
-                                >
-                                  🎚️ Audio & Retention
-                                </button>
+                            {/* RIGHT COLUMN: Full Scrollable Settings & Studio Suite */}
+                            <div class="lg:col-span-7 space-y-4 max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar pr-2">
+
+                              {/* Sub-Tabs Sticky Navigation */}
+                              <div class="sticky top-0 z-20 flex flex-wrap items-center gap-1.5 bg-slate-950/95 border border-slate-800/90 backdrop-blur-md p-1.5 rounded-xl text-xs font-bold shadow-xl">
+                                {[
+                                  { id: 'captions',   label: '🎨 Captions & Style' },
+                                  { id: 'framing',    label: '🎬 Framing & Zoom' },
+                                  { id: 'trim',       label: '✂️ Trim & Script' },
+                                  { id: 'virality',   label: '🔥 Virality' },
+                                  { id: 'platform',   label: '🚀 Socials' },
+                                  { id: 'thumbnails', label: '🖼️ Thumbnails' },
+                                  { id: 'all',        label: '📑 All Options' }
+                                ].map(tab => (
+                                  <button
+                                    key={tab.id}
+                                    onClick={() => setClipInspectorTab(tab.id)}
+                                    class={`px-3 py-1.5 rounded-lg transition font-semibold ${
+                                      clipInspectorTab === tab.id
+                                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/40 border border-indigo-400'
+                                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                                    }`}
+                                  >
+                                    {tab.label}
+                                  </button>
+                                ))}
                               </div>
 
-                              {/* TAB 1: TRIM & SUBTITLES */}
-                              {clipInspectorTab === 'trim' && (
+                              {/* TAB 1: PROFESSIONAL CAPTION STYLE STUDIO (25 PRESETS) */}
+                              {(clipInspectorTab === 'captions' || clipInspectorTab === 'all') && (
+                                <div class="bg-slate-950 border border-indigo-800/50 rounded-xl p-4 space-y-3.5 shadow-lg">
+                                  <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                                    <div class="flex items-center space-x-2">
+                                      <span class="text-base">✨</span>
+                                      <span class="text-xs font-bold text-indigo-300 uppercase tracking-wider">Professional Caption Studio</span>
+                                    </div>
+                                    <span class="text-[10px] text-indigo-400 bg-indigo-950 border border-indigo-800 px-2 py-0.5 rounded-full font-bold">25 Presets</span>
+                                  </div>
+
+                                  {/* Style Gallery Cards (25 Styles) */}
+                                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto pr-0.5" style={{scrollbarWidth:'thin', scrollbarColor:'#4338ca transparent'}}>
+                                    {[...new Map(CAPTION_TEMPLATES.map(t => [t.id, t])).values()].map(t => {
+                                      const currentTmpl = selectedClip.caption_template || 'minimal-montserrat';
+                                      const isActive = currentTmpl === t.id;
+                                      return (
+                                        <button
+                                          key={t.id}
+                                          onClick={() => handleUpdateSelectedClip({
+                                            caption_template: t.id,
+                                            custom_style: {
+                                              ...(selectedClip.custom_style || {}),
+                                              fontFamily: t.font || (selectedClip.custom_style || {}).fontFamily || 'Montserrat',
+                                              color: t.preview.text || (selectedClip.custom_style || {}).color || '#FFFFFF',
+                                              highlightColor: t.preview.accent || (selectedClip.custom_style || {}).highlightColor || '#FFD700'
+                                            }
+                                          })}
+                                          class={`relative text-left rounded-xl p-2.5 border transition-all ${
+                                            isActive
+                                              ? 'border-indigo-500 bg-indigo-900/40 shadow-md shadow-indigo-900/40'
+                                              : 'border-slate-800 bg-slate-900/60 hover:border-slate-600 hover:bg-slate-800/60'
+                                          }`}
+                                          style={{minHeight:'64px'}}
+                                        >
+                                          {/* Mini Preview Bar */}
+                                          <div class="rounded-md mb-1 px-1.5 py-1 flex items-center justify-center overflow-hidden" style={{
+                                            background: t.preview.bg || '#1a1a2e',
+                                            border: '1px solid rgba(255,255,255,0.08)',
+                                            minHeight: '26px'
+                                          }}>
+                                            <span class="text-[11px] font-black truncate" style={{
+                                              color: t.preview.text,
+                                              textShadow: t.preview.glow ? `0 0 8px ${t.preview.glow}` : '1px 1px 2px rgba(0,0,0,0.9)',
+                                              WebkitTextStroke: t.id === 'outline-caption' || t.id === 'gaming-captions' ? `1px ${t.preview.accent}` : undefined,
+                                              fontFamily: t.font || 'Montserrat, sans-serif'
+                                            }}>
+                                              {t.emoji} {t.name.split(' ')[0]}
+                                              {t.preview.accent && <span style={{color: t.preview.accent}}> ★</span>}
+                                            </span>
+                                          </div>
+                                          <div class="flex items-center justify-between">
+                                            <span class={`text-[10px] font-bold truncate ${isActive ? 'text-indigo-300' : 'text-slate-400'}`}>
+                                              {t.styleNum ? `#${t.styleNum} ` : ''}{t.name}
+                                            </span>
+                                            {isActive && <span class="text-[9px] bg-indigo-600 text-white px-1 py-0.2 rounded font-bold">✓</span>}
+                                          </div>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+
+                                  {/* Highlighting Mode Selector (5 Modes) */}
+                                  <div>
+                                    <label class="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Highlighting Mode (Voiceover Sync)</label>
+                                    <div class="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                                      {[
+                                        { id: 'word-by-word',     label: 'Word by Word', icon: '🎤' },
+                                        { id: 'keyword-emphasis', label: 'Keyword',      icon: '🔑' },
+                                        { id: 'phrase-by-phrase', label: 'Phrase',       icon: '📝' },
+                                        { id: 'entire-sentence',  label: 'Sentence',     icon: '📜' },
+                                        { id: 'no-highlighting',  label: 'Clean Text',   icon: '⚪' }
+                                      ].map(hm => {
+                                        const activeHm = (selectedClip.custom_style || {}).highlightMode || 'word-by-word';
+                                        const isCur = activeHm === hm.id;
+                                        return (
+                                          <button
+                                            key={hm.id}
+                                            onClick={() => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), highlightMode: hm.id } })}
+                                            class={`py-1.5 px-2 rounded-lg text-[10px] font-semibold border transition ${
+                                              isCur ? 'bg-amber-600 text-white border-amber-400 shadow' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                                            }`}
+                                          >
+                                            {hm.icon} {hm.label}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+
+                                  {/* Font + Language Row */}
+                                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                      <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Typography Font</label>
+                                      <select
+                                        value={(selectedClip.custom_style || {}).fontFamily || 'Montserrat'}
+                                        onChange={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), fontFamily: e.target.value } })}
+                                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-slate-200 focus:outline-none focus:border-indigo-500"
+                                      >
+                                        <option value="Montserrat">Montserrat (Recommended)</option>
+                                        <option value="Inter">Inter</option>
+                                        <option value="Poppins">Poppins</option>
+                                        <option value="Roboto">Roboto</option>
+                                        <option value="Bebas Neue">Bebas Neue</option>
+                                        <option value="Oswald">Oswald (Impact)</option>
+                                        <option value="Anton">Anton</option>
+                                        <option value="Space Grotesk">Space Grotesk</option>
+                                        <option value="Playfair Display">Playfair Display (Serif)</option>
+                                        <option value="Courier New">Courier New (Typewriter)</option>
+                                        <option value="Noto Sans Devanagari">Noto Sans Devanagari (Hindi)</option>
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <div class="flex items-center justify-between mb-1">
+                                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Spoken Language</label>
+                                        <span class="text-[9px] text-emerald-400 font-mono font-semibold">{selectedClip.caption_language === 'en' ? '🇺🇸 ENGLISH' : (selectedClip.caption_language === 'hi' ? '🇮🇳 HINDI' : 'AUTO')}</span>
+                                      </div>
+                                      <select
+                                        value={selectedClip.caption_language || 'auto'}
+                                        onChange={(e) => {
+                                          const lang = e.target.value;
+                                          if (lang === 'en' || lang === 'hi' || lang === 'hinglish') {
+                                            handleSwitchClipLanguage(lang);
+                                          } else {
+                                            handleUpdateSelectedClip({ caption_language: lang });
+                                          }
+                                        }}
+                                        class="w-full bg-slate-900 border border-indigo-600/50 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-slate-200 focus:outline-none focus:border-indigo-400"
+                                      >
+                                        <option value="en">🇺🇸 English (Active & Verified)</option>
+                                        <option value="hi">🇮🇳 Hindi (हिंदी)</option>
+                                        <option value="hinglish">🔀 Hinglish (Roman Script)</option>
+                                        <option value="auto">🌐 Auto-Detect</option>
+                                        <option value="ar">🇸🇦 Arabic / Urdu</option>
+                                      </select>
+                                      <div class="flex gap-1 mt-1.5">
+                                        <button
+                                          onClick={() => handleSwitchClipLanguage('en')}
+                                          class={`px-2 py-1 rounded text-[10px] font-bold transition-all ${selectedClip.caption_language === 'en' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'}`}
+                                        >
+                                          🇺🇸 English
+                                        </button>
+                                        <button
+                                          onClick={() => handleSwitchClipLanguage('hi')}
+                                          class={`px-2 py-1 rounded text-[10px] font-bold transition-all ${selectedClip.caption_language === 'hi' ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'}`}
+                                        >
+                                          🇮🇳 हिंदी
+                                        </button>
+                                        <button
+                                          onClick={() => handleSwitchProjectLanguage('en')}
+                                          title="Convert all clips in this project to English captions"
+                                          class="px-2 py-1 rounded text-[10px] font-bold bg-emerald-950/60 text-emerald-300 hover:bg-emerald-800 border border-emerald-600/40 ml-auto"
+                                        >
+                                          ⚡ All to EN
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Safe Caption Positioning */}
+                                  <div>
+                                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">📍 Safe Position (Avoid Face/Logos)</label>
+                                    <div class="grid grid-cols-4 gap-1.5">
+                                      {[
+                                        { label: 'Bottom',   value: 480,  icon: '⬇️', pos: 'bottom' },
+                                        { label: 'Center',   value: 960,  icon: '⏺️', pos: 'center' },
+                                        { label: 'Top',      value: 1620, icon: '⬆️', pos: 'top' },
+                                        { label: 'Lower 3rd',value: 320,  icon: '📺', pos: 'lower-third' }
+                                      ].map(pos => {
+                                        const currentOffset = (selectedClip.custom_style || {}).verticalOffset;
+                                        const isActive = currentOffset === pos.value || (!currentOffset && pos.value === 480);
+                                        return (
+                                          <button
+                                            key={pos.label}
+                                            onClick={() => handleUpdateSelectedClip({
+                                              custom_style: {
+                                                ...(selectedClip.custom_style || {}),
+                                                verticalOffset: pos.value,
+                                                position: pos.pos
+                                              }
+                                            })}
+                                            class={`py-1.5 rounded-lg text-[10px] font-bold border transition ${
+                                              isActive
+                                                ? 'bg-purple-700 border-purple-500 text-white shadow'
+                                                : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                                            }`}
+                                          >{pos.icon} {pos.label}</button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+
+                                  {/* Font Size Slider */}
+                                  <div>
+                                    <div class="flex items-center justify-between mb-1">
+                                      <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">🔡 Caption Size</label>
+                                      <span class="text-[11px] font-mono text-indigo-300 font-bold">{(selectedClip.custom_style || {}).fontSize || 68}px</span>
+                                    </div>
+                                    <input
+                                      type="range"
+                                      min="36"
+                                      max="110"
+                                      step="2"
+                                      value={(selectedClip.custom_style || {}).fontSize || 68}
+                                      onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), fontSize: parseInt(e.target.value) } })}
+                                      class="w-full h-1.5 rounded-full accent-indigo-500 cursor-pointer"
+                                    />
+                                  </div>
+
+                                  {/* Color Pickers */}
+                                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                      <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">🎨 Text Color</label>
+                                      <div class="flex items-center space-x-1.5">
+                                        <input
+                                          type="color"
+                                          value={(selectedClip.custom_style || {}).color || '#FFFFFF'}
+                                          onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), color: e.target.value } })}
+                                          class="w-8 h-8 rounded-lg border border-slate-700 cursor-pointer bg-transparent"
+                                        />
+                                        <input
+                                          type="text"
+                                          value={(selectedClip.custom_style || {}).color || '#FFFFFF'}
+                                          onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), color: e.target.value } })}
+                                          class="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[11px] font-mono text-slate-200"
+                                        />
+                                      </div>
+                                      <div class="flex gap-1 mt-1">
+                                        {['#FFFFFF','#FFD700','#00F5FF','#FF3B30','#FF6B00'].map(c => (
+                                          <button key={c} onClick={() => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), color: c } })}
+                                            class="w-5 h-5 rounded-md border border-slate-600 hover:scale-110 transition-transform"
+                                            style={{background: c}} title={c}
+                                          />
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">⚡ Active Word Highlight</label>
+                                      <div class="flex items-center space-x-1.5">
+                                        <input
+                                          type="color"
+                                          value={(selectedClip.custom_style || {}).highlightColor || '#FFD700'}
+                                          onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), highlightColor: e.target.value } })}
+                                          class="w-8 h-8 rounded-lg border border-slate-700 cursor-pointer bg-transparent"
+                                        />
+                                        <input
+                                          type="text"
+                                          value={(selectedClip.custom_style || {}).highlightColor || '#FFD700'}
+                                          onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), highlightColor: e.target.value } })}
+                                          class="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[11px] font-mono text-slate-200"
+                                        />
+                                      </div>
+                                      <div class="flex gap-1 mt-1">
+                                        {['#FFD700','#FF3B30','#00F5FF','#FF00AA','#4ECDC4'].map(c => (
+                                          <button key={c} onClick={() => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), highlightColor: c } })}
+                                            class="w-5 h-5 rounded-md border border-slate-600 hover:scale-110 transition-transform"
+                                            style={{background: c}} title={c}
+                                          />
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Live CSS Preview with Camera & Subtitle Simulation */}
+                                  {(() => {
+                                    const currentTmplId = selectedClip.caption_template || 'minimal-montserrat';
+                                    const tmpl = CAPTION_TEMPLATES.find(t => t.id === currentTmplId) || CAPTION_TEMPLATES[0];
+                                    const cs = selectedClip.custom_style || {};
+                                    const cameraP = CAMERA_PRESETS.find(p => p.id === (cs.cameraPreset || 'automatic_smart_zoom')) || CAMERA_PRESETS[0];
+                                    const previewText = selectedClip.hook ? selectedClip.hook.substring(0, 42) : 'मैंने दुनिया के सबसे बड़े एथलीट्स...';
+                                    const words = previewText.split(' ');
+                                    return (
+                                      <div class="rounded-xl overflow-hidden border border-slate-700 mt-2">
+                                        <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider px-2.5 py-1 bg-slate-900 flex items-center justify-between">
+                                          <span>👁️ Live Simulation — {tmpl.name}</span>
+                                          <span class="text-cyan-400 font-mono">{cameraP.emoji} {cameraP.name} ({parseFloat(cs.zoomIntensity || 1.15).toFixed(2)}x)</span>
+                                        </div>
+                                        <div class="relative flex items-end justify-center overflow-hidden" style={{
+                                          background: 'linear-gradient(180deg, #111827 0%, #1e1b4b 50%, #030712 100%)',
+                                          height: '90px',
+                                          padding: '10px'
+                                        }}>
+                                          <div class="absolute top-2 left-2 text-[9px] bg-cyan-950/80 border border-cyan-800 text-cyan-300 px-1.5 py-0.5 rounded flex items-center space-x-1">
+                                            <span>🎯 Camera:</span>
+                                            <span class="font-bold">{cameraP.name}</span>
+                                          </div>
+                                          <div style={{
+                                            background: ['boxed-caption','netflix-doc','news-broadcast','cinematic-two-line','centered-impact'].includes(tmpl.id) ? 'rgba(0,0,0,0.8)' :
+                                                        tmpl.id === 'yellow-box-highlight' ? '#FFD700' :
+                                                        tmpl.id === 'magazine-paper' ? '#F5F0E8' : 'transparent',
+                                            padding: ['boxed-caption','netflix-doc','news-broadcast','yellow-box-highlight'].includes(tmpl.id) ? '4px 10px' : '0',
+                                            borderRadius: '6px',
+                                            textAlign: 'center'
+                                          }}>
+                                            <span style={{
+                                              color: cs.color || tmpl.preview.text,
+                                              fontFamily: cs.fontFamily || tmpl.font || 'Montserrat, sans-serif',
+                                              fontSize: `${Math.round((cs.fontSize || 68) * 0.22)}px`,
+                                              fontWeight: '800',
+                                              textShadow: tmpl.id === 'neon-captions' || tmpl.id === 'neon-glow' ? `0 0 10px ${cs.color || '#00F5FF'}, 0 0 20px ${cs.color || '#00F5FF'}` :
+                                                          '1px 1px 3px rgba(0,0,0,0.95)',
+                                              WebkitTextStroke: tmpl.id === 'outline-caption' || tmpl.id === 'gaming-captions' ? '0.6px black' : undefined,
+                                              letterSpacing: tmpl.id === 'netflix-doc' ? '0.08em' : 'normal',
+                                              display: 'block',
+                                              lineHeight: '1.25'
+                                            }}>
+                                              {tmpl.id === 'news-broadcast' && <span style={{color: '#FF0000', fontWeight:'900', marginRight:'4px'}}>⬤</span>}
+                                              {words.map((w, idx) => (
+                                                <span
+                                                  key={idx}
+                                                  style={{
+                                                    color: (idx === 1 || idx === 3) ? (cs.highlightColor || tmpl.preview.accent) : (tmpl.id === 'yellow-box-highlight' ? '#000000' : (cs.color || tmpl.preview.text)),
+                                                    backgroundColor: tmpl.id === 'yellow-box-highlight' && idx === 1 ? '#000000' : undefined,
+                                                    padding: tmpl.id === 'yellow-box-highlight' && idx === 1 ? '1px 4px' : undefined,
+                                                    borderRadius: '3px',
+                                                    margin: '0 2px'
+                                                  }}
+                                                >
+                                                  {w}
+                                                </span>
+                                              ))}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              )}
+
+                              {/* TAB 2: FRAMING, ASPECT RATIO & CAMERA 3D ZOOM */}
+                              {(clipInspectorTab === 'framing' || clipInspectorTab === 'all') && (
+                                <div class="space-y-4">
+                                  {/* Aspect Ratio Selector */}
+                                  <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2.5 shadow-lg">
+                                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                                      Output Aspect Ratio
+                                    </label>
+                                    <div class="grid grid-cols-3 gap-2">
+                                      <button
+                                        onClick={() => handleUpdateSelectedClip({ aspect_ratio: '9:16' })}
+                                        class={`px-3 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+                                          (selectedClip.aspect_ratio || '9:16') === '9:16'
+                                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/40 border border-indigo-400'
+                                            : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                                        }`}
+                                      >
+                                        <span>📱 9:16 Reel</span>
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleUpdateSelectedClip({ aspect_ratio: '1:1' })}
+                                        class={`px-3 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+                                          selectedClip.aspect_ratio === '1:1'
+                                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/40 border border-indigo-400'
+                                            : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                                        }`}
+                                      >
+                                        <span>⏹️ 1:1 Square</span>
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleUpdateSelectedClip({ aspect_ratio: '16:9' })}
+                                        class={`px-3 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+                                          selectedClip.aspect_ratio === '16:9'
+                                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/40 border border-indigo-400'
+                                            : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                                        }`}
+                                      >
+                                        <span>🖥️ 16:9 Wide</span>
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Smart Reframing Selector */}
+                                  <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2.5 shadow-lg">
+                                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">🎬 Framing Style & Split Presets</label>
+                                    <div class="grid grid-cols-2 gap-2">
+                                      {[
+                                        { v: 'blur_background', label: 'Gaussian Backdrop', icon: '✨' },
+                                        { v: 'center_crop',     label: 'Full Center Crop', icon: '🎯' },
+                                        { v: 'split_facecam',   label: 'Gaming Facecam Split', icon: '🎮' },
+                                        { v: 'split_screen',    label: 'Podcast 50/50 Split', icon: '👥' }
+                                      ].map(opt => (
+                                        <button
+                                          key={opt.v}
+                                          onClick={() => handleUpdateSelectedClip({ reframing_mode: opt.v })}
+                                          class={`px-3 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 ${
+                                            (selectedClip.reframing_mode || 'blur_background') === opt.v
+                                              ? 'bg-indigo-600 text-white border border-indigo-400 shadow-lg shadow-indigo-600/30'
+                                              : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                                          }`}
+                                        ><span>{opt.icon}</span> <span class="truncate">{opt.label}</span></button>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  {/* AI Smart Speaker Camera & Zoom */}
+                                  <div class="bg-slate-950 border border-cyan-900/60 rounded-xl p-4 space-y-3.5 shadow-lg">
+                                    <div class="flex items-center justify-between">
+                                      <div class="flex items-center space-x-2">
+                                        <span class="text-sm">📹</span>
+                                        <span class="text-xs font-bold text-cyan-300 uppercase tracking-wider">Smart Speaker Camera & Zoom</span>
+                                      </div>
+                                      <span class="text-[9px] bg-cyan-950 text-cyan-400 border border-cyan-800/60 px-2.5 py-0.5 rounded-full font-mono font-semibold">Face Track • Easing</span>
+                                    </div>
+
+                                    <div>
+                                      <label class="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Camera Movement Preset (12)</label>
+                                      <select
+                                        value={(selectedClip.custom_style || {}).cameraPreset || 'automatic_smart_zoom'}
+                                        onChange={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), cameraPreset: e.target.value } })}
+                                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-xs font-semibold text-cyan-200 focus:outline-none focus:border-cyan-500"
+                                      >
+                                        {CAMERA_PRESETS.map(p => (
+                                          <option key={p.id} value={p.id}>{p.emoji} {p.name}</option>
+                                        ))}
+                                      </select>
+                                      <p class="text-[10px] text-slate-500 mt-1 italic">
+                                        {(CAMERA_PRESETS.find(p => p.id === ((selectedClip.custom_style || {}).cameraPreset || 'automatic_smart_zoom')) || CAMERA_PRESETS[0]).desc}
+                                      </p>
+                                    </div>
+
+                                    <div>
+                                      <div class="flex items-center justify-between mb-1.5">
+                                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Zoom Intensity</label>
+                                        <span class="text-xs font-mono text-cyan-400 font-bold">
+                                          {parseFloat((selectedClip.custom_style || {}).zoomIntensity || 1.15).toFixed(2)}x
+                                        </span>
+                                      </div>
+                                      <div class="grid grid-cols-4 gap-1.5 mb-2.5">
+                                        {[
+                                          { label: 'Subtle', val: 1.05 },
+                                          { label: 'Natural', val: 1.10 },
+                                          { label: 'Medium', val: 1.20 },
+                                          { label: 'Strong', val: 1.30 }
+                                        ].map(z => {
+                                          const currentZ = parseFloat((selectedClip.custom_style || {}).zoomIntensity || 1.15);
+                                          const isMatch = Math.abs(currentZ - z.val) < 0.03;
+                                          return (
+                                            <button
+                                              key={z.label}
+                                              onClick={() => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), zoomIntensity: z.val } })}
+                                              class={`py-1.5 rounded-lg text-[10px] font-bold border transition ${
+                                                isMatch
+                                                  ? 'bg-cyan-600 text-white border-cyan-400 shadow'
+                                                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                                              }`}
+                                            >
+                                              {z.label} ({z.val}x)
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                      <input
+                                        type="range"
+                                        min="1.02"
+                                        max="1.45"
+                                        step="0.01"
+                                        value={parseFloat((selectedClip.custom_style || {}).zoomIntensity || 1.15)}
+                                        onInput={(e) => handleUpdateSelectedClip({ custom_style: { ...(selectedClip.custom_style || {}), zoomIntensity: parseFloat(e.target.value) } })}
+                                        class="w-full h-1.5 rounded-full accent-cyan-400 cursor-pointer"
+                                      />
+                                    </div>
+
+                                    <div class="flex items-center justify-between bg-slate-900/80 border border-slate-800 rounded-lg px-3 py-1.5 text-[10px] text-slate-400">
+                                      <span>👤 Face Headroom: <strong class="text-emerald-400">36% Safe Zone</strong></span>
+                                      <span>📈 Easing: <strong class="text-cyan-400">Smooth Cosine</strong></span>
+                                    </div>
+                                  </div>
+
+                                  {/* Advanced Creator Viral Enhancers & Audio Police */}
+                                  <div class="bg-slate-950 border border-amber-900/40 rounded-xl p-4 space-y-3 shadow-lg">
+                                    <div class="flex items-center justify-between">
+                                      <div class="flex items-center space-x-2">
+                                        <span class="text-sm">⚡</span>
+                                        <span class="text-xs font-bold text-amber-300 uppercase tracking-wider">Creator Viral Enhancers</span>
+                                      </div>
+                                      <span class="text-[9px] bg-amber-950 text-amber-400 border border-amber-800/60 px-2.5 py-0.5 rounded-full font-mono font-semibold">Broadcast Pro</span>
+                                    </div>
+
+                                    <div class="grid grid-cols-2 gap-2">
+                                      <button
+                                        onClick={() => handleRomanizeHinglish(selectedClip.id)}
+                                        title="Converts Hindi Devanagari subtitles to authentic creator Roman Hinglish"
+                                        class="px-3 py-2 bg-gradient-to-r from-orange-950/80 to-amber-950/80 hover:from-orange-900 hover:to-amber-900 border border-orange-700/60 text-orange-200 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition shadow"
+                                      >
+                                        <span>🇮🇳</span>
+                                        <span>Romanize Hinglish</span>
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleInjectEmojis(selectedClip.id)}
+                                        title="Injects trending high-impact retention emojis (🔥, 💀, 🤯, 😂) into key punchlines"
+                                        class="px-3 py-2 bg-gradient-to-r from-purple-950/80 to-indigo-950/80 hover:from-purple-900 hover:to-indigo-900 border border-purple-700/60 text-purple-200 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition shadow"
+                                      >
+                                        <span>🔥</span>
+                                        <span>Inject Emojis</span>
+                                      </button>
+                                    </div>
+
+                                    <div class="pt-2 border-t border-slate-900 space-y-2 text-xs text-slate-300">
+                                      <label class="flex items-center space-x-2 cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={(selectedClip.custom_style || {}).showHookTitle !== false}
+                                          onChange={(e) => handleUpdateSelectedClip({
+                                            custom_style: { ...(selectedClip.custom_style || {}), showHookTitle: e.target.checked }
+                                          })}
+                                          class="rounded text-amber-500 focus:ring-0 bg-slate-900 border-slate-700"
+                                        />
+                                        <span class="font-semibold text-slate-300">Show Viral Hook Title Card (First 3.8s)</span>
+                                      </label>
+
+                                      <div class="flex items-center justify-between text-[10px] text-emerald-400 bg-emerald-950/40 border border-emerald-900/60 rounded px-2.5 py-1.5">
+                                        <span class="flex items-center gap-1.5 font-mono">
+                                          <span>🔊</span> EBU R128 Peak Limiter & Loudness Normalization
+                                        </span>
+                                        <span class="font-bold uppercase tracking-wider text-[9px] bg-emerald-900/80 px-1.5 py-0.5 rounded text-emerald-200">Active</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* TAB 3: TRIM & TRANSCRIPT SCRIPT */}
+                              {(clipInspectorTab === 'trim' || clipInspectorTab === 'all') && (
                                 <div class="space-y-4">
                                   {/* Timecode Fine-Tuning */}
-                                  <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+                                  <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 shadow-lg">
                                     <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
                                       <span>Timecode Fine-Tuning</span>
                                       <span class="text-indigo-400 font-mono text-[11px] font-semibold">{selectedClip.duration}s duration</span>
@@ -7576,7 +7628,7 @@
                                       <span class="text-[11px] text-slate-500">Edit text or timing inline</span>
                                     </div>
 
-                                    <div class="max-h-60 overflow-y-auto space-y-2 bg-slate-950 p-3 rounded-xl border border-slate-800 custom-scrollbar text-xs">
+                                    <div class="max-h-64 overflow-y-auto space-y-2 bg-slate-950 p-3 rounded-xl border border-slate-800 custom-scrollbar text-xs">
                                       {selectedClip.transcript_segments && selectedClip.transcript_segments.map((seg, sIdx) => (
                                         <div key={sIdx} class="flex items-start space-x-2 bg-slate-900/60 p-2 rounded-lg border border-slate-850">
                                           <span class="text-[10px] font-mono text-indigo-400 pt-1 shrink-0">
@@ -7599,9 +7651,9 @@
                                 </div>
                               )}
 
-                              {/* TAB 2: VIRALITY BREAKDOWN (Module 2) */}
-                              {clipInspectorTab === 'virality' && (
-                                <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                              {/* TAB 4: VIRALITY BREAKDOWN */}
+                              {(clipInspectorTab === 'virality' || clipInspectorTab === 'all') && (
+                                <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4 shadow-lg">
                                   <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                                     <div>
                                       <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">
@@ -7615,7 +7667,6 @@
                                     </div>
                                   </div>
 
-                                  {/* Metric Progress Bars */}
                                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                                     {[
                                       { label: '🎣 Hook Strength (20%)', score: selectedClip.virality_metrics?.hookScore || Math.min(98, selectedClip.engagement_score + 4), color: 'bg-indigo-500' },
@@ -7639,7 +7690,6 @@
                                     ))}
                                   </div>
 
-                                  {/* AI Viral Reason & Confidence */}
                                   <div class="bg-indigo-950/40 border border-indigo-800/60 p-3 rounded-lg text-xs space-y-1">
                                     <div class="flex items-center justify-between text-indigo-300 font-bold">
                                       <span>💡 Algorithmic Trigger:</span>
@@ -7650,10 +7700,9 @@
                                 </div>
                               )}
 
-                              {/* TAB 3: PLATFORM-SPECIFIC OPTIMIZATION (Module 9) */}
-                              {clipInspectorTab === 'platform' && (
-                                <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
-                                  {/* Platform Sub-Selector */}
+                              {/* TAB 5: PLATFORM SOCIAL OPTIMIZATION */}
+                              {(clipInspectorTab === 'platform' || clipInspectorTab === 'all') && (
+                                <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4 shadow-lg">
                                   <div class="flex items-center space-x-2 border-b border-slate-800 pb-3 text-xs font-bold">
                                     <button
                                       onClick={() => setSelectedPlatformTab('youtube')}
@@ -7681,7 +7730,6 @@
                                     </button>
                                   </div>
 
-                                  {/* YouTube Shorts Metadata */}
                                   {selectedPlatformTab === 'youtube' && (
                                     <div class="space-y-3 text-xs">
                                       <div>
@@ -7710,14 +7758,13 @@
                                         <textarea
                                           readOnly
                                           rows="3"
-                                          value={selectedClip.platform_metadata?.youtube?.description || `Watch this insane moment: "${selectedClip.hook}". Subscribe for more daily insights!\n\n#Shorts #Viral #Podcast #Trending`}
+                                          value={selectedClip.platform_metadata?.youtube?.description || `Watch this insane moment: "${selectedClip.hook}". Subscribe for more daily insights!\r\n\r\n#Shorts #Viral #Podcast #Trending`}
                                           class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 font-mono text-[11px]"
                                         />
                                       </div>
                                     </div>
                                   )}
 
-                                  {/* Instagram Reels Metadata */}
                                   {selectedPlatformTab === 'reels' && (
                                     <div class="space-y-3 text-xs">
                                       <div>
@@ -7725,13 +7772,13 @@
                                         <textarea
                                           readOnly
                                           rows="4"
-                                          value={selectedClip.platform_metadata?.instagram?.caption || `Wait until the end... 🤯\n\n"${selectedClip.hook}"\n\nDrop your thoughts in the comments 👇\n\n#reels #viralvideos #trendingreels #fyp #explorepage #mindset`}
+                                          value={selectedClip.platform_metadata?.instagram?.caption || `Wait until the end... 🤯\r\n\r\n"${selectedClip.hook}"\r\n\r\nDrop your thoughts in the comments 👇\r\n\r\n#reels #viralvideos #trendingreels #fyp #explorepage #mindset`}
                                           class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 font-mono text-[11px]"
                                         />
                                       </div>
                                       <button
                                         onClick={() => {
-                                          navigator.clipboard.writeText(selectedClip.platform_metadata?.instagram?.caption || `Wait until the end... 🤯\n\n"${selectedClip.hook}"\n\n#reels #viralvideos #trendingreels`);
+                                          navigator.clipboard.writeText(selectedClip.platform_metadata?.instagram?.caption || `Wait until the end... 🤯\r\n\r\n"${selectedClip.hook}"\r\n\r\n#reels #viralvideos #trendingreels`);
                                           alert('Copied Instagram Caption!');
                                         }}
                                         class="px-3 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-lg font-bold"
@@ -7741,7 +7788,6 @@
                                     </div>
                                   )}
 
-                                  {/* TikTok Metadata */}
                                   {selectedPlatformTab === 'tiktok' && (
                                     <div class="space-y-3 text-xs">
                                       <div>
@@ -7767,7 +7813,6 @@
                                     </div>
                                   )}
 
-                                  {/* LinkedIn Metadata */}
                                   {selectedPlatformTab === 'linkedin' && (
                                     <div class="space-y-3 text-xs">
                                       <div>
@@ -7775,13 +7820,13 @@
                                         <textarea
                                           readOnly
                                           rows="4"
-                                          value={selectedClip.platform_metadata?.linkedin?.post || `Key takeaway from this discussion:\n\n"${selectedClip.hook}"\n\nWhat are your thoughts on this approach? Let's discuss in the comments.\n\n#Leadership #Innovation #Strategy #BusinessInsights`}
+                                          value={selectedClip.platform_metadata?.linkedin?.post || `Key takeaway from this discussion:\r\n\r\n"${selectedClip.hook}"\r\n\r\nWhat are your thoughts on this approach? Let's discuss in the comments.\r\n\r\n#Leadership #Innovation #Strategy #BusinessInsights`}
                                           class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 font-mono text-[11px]"
                                         />
                                       </div>
                                       <button
                                         onClick={() => {
-                                          navigator.clipboard.writeText(selectedClip.platform_metadata?.linkedin?.post || `Key takeaway:\n"${selectedClip.hook}"\n\n#Leadership #Innovation`);
+                                          navigator.clipboard.writeText(selectedClip.platform_metadata?.linkedin?.post || `Key takeaway:\r\n"${selectedClip.hook}"\r\n\r\n#Leadership #Innovation`);
                                           alert('Copied LinkedIn Post!');
                                         }}
                                         class="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold"
@@ -7793,96 +7838,92 @@
                                 </div>
                               )}
 
-                              {/* TAB 4: THUMBNAILS (Module 11) */}
-                              {clipInspectorTab === 'thumbnails' && (
-                                <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
-                                  <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                                    3 High-CTR Thumbnail Concepts
-                                  </h4>
-                                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                    {[
-                                      {
-                                        title: 'Concept A (Curiosity Gap)',
-                                        headline: (selectedClip.thumbnail_concepts && selectedClip.thumbnail_concepts[0]?.headline) || 'THEY LIED TO YOU',
-                                        badge: 'SHOCKING',
-                                        color: 'from-amber-600 to-red-600'
-                                      },
-                                      {
-                                        title: 'Concept B (Contrarian)',
-                                        headline: (selectedClip.thumbnail_concepts && selectedClip.thumbnail_concepts[1]?.headline) || 'DO NOT DO THIS',
-                                        badge: 'WARNING',
-                                        color: 'from-purple-600 to-indigo-600'
-                                      },
-                                      {
-                                        title: 'Concept C (Secret Insight)',
-                                        headline: (selectedClip.thumbnail_concepts && selectedClip.thumbnail_concepts[2]?.headline) || 'THIS CHANGES EVERYTHING',
-                                        badge: 'UNSEEN',
-                                        color: 'from-emerald-600 to-cyan-600'
-                                      }
-                                    ].map((c, i) => (
-                                      <div key={i} class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2 flex flex-col justify-between">
-                                        <div class="space-y-1.5">
-                                          <span class="text-[10px] font-bold text-slate-400">{c.title}</span>
-                                          <div class={`h-28 rounded-lg bg-gradient-to-br ${c.color} p-2 flex flex-col justify-between shadow-lg relative overflow-hidden`}>
-                                            <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-black/80 text-white self-start">
-                                              {c.badge}
-                                            </span>
-                                            <h5 class="font-black text-white text-sm leading-tight uppercase drop-shadow-md">
-                                              {c.headline}
-                                            </h5>
+                              {/* TAB 6: THUMBNAILS & RETENTION */}
+                              {(clipInspectorTab === 'thumbnails' || clipInspectorTab === 'all') && (
+                                <div class="space-y-4">
+                                  <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4 shadow-lg">
+                                    <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                                      3 High-CTR Thumbnail Concepts
+                                    </h4>
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                      {[
+                                        {
+                                          title: 'Concept A (Curiosity Gap)',
+                                          headline: (selectedClip.thumbnail_concepts && selectedClip.thumbnail_concepts[0]?.headline) || 'THEY LIED TO YOU',
+                                          badge: 'SHOCKING',
+                                          color: 'from-amber-600 to-red-600'
+                                        },
+                                        {
+                                          title: 'Concept B (Contrarian)',
+                                          headline: (selectedClip.thumbnail_concepts && selectedClip.thumbnail_concepts[1]?.headline) || 'DO NOT DO THIS',
+                                          badge: 'WARNING',
+                                          color: 'from-purple-600 to-indigo-600'
+                                        },
+                                        {
+                                          title: 'Concept C (Secret Insight)',
+                                          headline: (selectedClip.thumbnail_concepts && selectedClip.thumbnail_concepts[2]?.headline) || 'THIS CHANGES EVERYTHING',
+                                          badge: 'UNSEEN',
+                                          color: 'from-emerald-600 to-cyan-600'
+                                        }
+                                      ].map((c, i) => (
+                                        <div key={i} class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2 flex flex-col justify-between">
+                                          <div class="space-y-1.5">
+                                            <span class="text-[10px] font-bold text-slate-400">{c.title}</span>
+                                            <div class={`h-28 rounded-lg bg-gradient-to-br ${c.color} p-2 flex flex-col justify-between shadow-lg relative overflow-hidden`}>
+                                              <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-black/80 text-white self-start">
+                                                {c.badge}
+                                              </span>
+                                              <h5 class="font-black text-white text-sm leading-tight uppercase drop-shadow-md">
+                                                {c.headline}
+                                              </h5>
+                                            </div>
                                           </div>
+                                          <button
+                                            onClick={() => alert(`Applied Headline: "${c.headline}"`)}
+                                            class="w-full py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg transition"
+                                          >
+                                            Use Concept
+                                          </button>
                                         </div>
-                                        <button
-                                          onClick={() => alert(`Applied Headline: "${c.headline}"`)}
-                                          class="w-full py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg transition"
-                                        >
-                                          Use Concept
-                                        </button>
-                                      </div>
-                                    ))}
+                                      ))}
+                                    </div>
                                   </div>
-                                </div>
-                              )}
 
-                              {/* TAB 5: RETENTION & AUDIO TOOLS (Modules 6 & 8) */}
-                              {clipInspectorTab === 'retention' && (
-                                <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4 text-xs">
-                                  <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                                    Smart Audio & Retention Enhancements
-                                  </h4>
+                                  <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4 text-xs shadow-lg">
+                                    <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                                      Smart Audio & Retention Enhancements
+                                    </h4>
 
-                                  <div class="space-y-3">
-                                    {/* Silence Trimmer */}
-                                    <div class="flex items-center justify-between p-3 bg-slate-900/80 rounded-lg border border-slate-800">
-                                      <div>
-                                        <span class="font-bold text-slate-200">✂️ Auto-Trim Dead Air & Pauses (&gt; 0.4s)</span>
-                                        <p class="text-[11px] text-slate-400">Tightens pacing to maximize algorithmic watch-time retention</p>
+                                    <div class="space-y-3">
+                                      <div class="flex items-center justify-between p-3 bg-slate-900/80 rounded-lg border border-slate-800">
+                                        <div>
+                                          <span class="font-bold text-slate-200">✂️ Auto-Trim Dead Air & Pauses (&gt; 0.4s)</span>
+                                          <p class="text-[11px] text-slate-400">Tightens pacing to maximize algorithmic watch-time retention</p>
+                                        </div>
+                                        <span class="px-2 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded text-[11px] font-bold">
+                                          Active
+                                        </span>
                                       </div>
-                                      <span class="px-2 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded text-[11px] font-bold">
-                                        Active
-                                      </span>
-                                    </div>
 
-                                    {/* Loop Friendly Ending */}
-                                    <div class="flex items-center justify-between p-3 bg-slate-900/80 rounded-lg border border-slate-800">
-                                      <div>
-                                        <span class="font-bold text-slate-200">🔁 Seamless Loop Transition</span>
-                                        <p class="text-[11px] text-slate-400">Ensures concluding sentence bridges seamlessly back into hook</p>
+                                      <div class="flex items-center justify-between p-3 bg-slate-900/80 rounded-lg border border-slate-800">
+                                        <div>
+                                          <span class="font-bold text-slate-200">🔁 Seamless Loop Transition</span>
+                                          <p class="text-[11px] text-slate-400">Ensures concluding sentence bridges seamlessly back into hook</p>
+                                        </div>
+                                        <span class="px-2 py-0.5 bg-indigo-950 text-indigo-400 border border-indigo-800 rounded text-[11px] font-bold">
+                                          Enabled
+                                        </span>
                                       </div>
-                                      <span class="px-2 py-0.5 bg-indigo-950 text-indigo-400 border border-indigo-800 rounded text-[11px] font-bold">
-                                        Enabled
-                                      </span>
-                                    </div>
 
-                                    {/* Audio Ducking & SFX */}
-                                    <div class="flex items-center justify-between p-3 bg-slate-900/80 rounded-lg border border-slate-800">
-                                      <div>
-                                        <span class="font-bold text-slate-200">🎵 BGM Auto-Ducking (-18dB) & Whoosh SFX</span>
-                                        <p class="text-[11px] text-slate-400">Lowers background score during voice; inserts cinematic bass drops on punchlines</p>
+                                      <div class="flex items-center justify-between p-3 bg-slate-900/80 rounded-lg border border-slate-800">
+                                        <div>
+                                          <span class="font-bold text-slate-200">🎵 BGM Auto-Ducking (-18dB) & Whoosh SFX</span>
+                                          <p class="text-[11px] text-slate-400">Lowers background score during voice; inserts cinematic bass drops on punchlines</p>
+                                        </div>
+                                        <span class="px-2 py-0.5 bg-amber-950 text-amber-400 border border-amber-800 rounded text-[11px] font-bold">
+                                          Studio EQ
+                                        </span>
                                       </div>
-                                      <span class="px-2 py-0.5 bg-amber-950 text-amber-400 border border-amber-800 rounded text-[11px] font-bold">
-                                        Studio EQ
-                                      </span>
                                     </div>
                                   </div>
                                 </div>
