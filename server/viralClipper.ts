@@ -84,6 +84,34 @@ export class ViralClipperService {
     });
   }
 
+  private static runningProcesses = new Map<string, any[]>();
+
+  static registerProcess(projectId: string, proc: any) {
+    if (!projectId || !proc) return;
+    const list = this.runningProcesses.get(projectId) || [];
+    list.push(proc);
+    this.runningProcesses.set(projectId, list);
+    const clean = () => {
+      const cur = (this.runningProcesses.get(projectId) || []).filter(p => p !== proc);
+      if (cur.length) this.runningProcesses.set(projectId, cur);
+      else this.runningProcesses.delete(projectId);
+    };
+    proc.on('close', clean);
+    proc.on('error', clean);
+  }
+
+  static async cancelProject(projectId: string): Promise<boolean> {
+    const list = this.runningProcesses.get(projectId) || [];
+    for (const p of list) {
+      try { p.kill('SIGTERM'); } catch (e) {}
+      try { p.kill('SIGKILL'); } catch (e) {}
+    }
+    this.runningProcesses.delete(projectId);
+    await runQuery("UPDATE clipper_projects SET status = 'cancelled', progress = 0, error_message = 'Pipeline paused / cancelled by user', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [projectId]);
+    this.broadcast({ projectId, stage: 'cancelled', progress: 0, message: 'Pipeline paused / cancelled by user' });
+    return true;
+  }
+
   /**
    * Fetch video metadata from YouTube, podcast, or online URL using yt-dlp
    */
@@ -193,7 +221,7 @@ export class ViralClipperService {
   /**
    * Download video from YouTube or supported URL
    */
-  static async downloadSourceVideo(url: string, outputTemplate: string, onProgress?: (pct: number) => void): Promise<string> {
+  static async downloadSourceVideo(url: string, outputTemplate: string, onProgress?: (pct: number) => void, projectId?: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const nodeRuntime = process.execPath ? `node:${process.execPath}` : 'node';
       // Prefer standard 1080p/720p mp4 for smooth Remotion/FFmpeg processing
@@ -210,6 +238,7 @@ export class ViralClipperService {
       const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
       const pythonExe = fs.existsSync(venvPy) ? venvPy : 'python';
       const p = spawn(pythonExe, args);
+      if (projectId) this.registerProcess(projectId, p);
       let stdout = '';
       let stderr = '';
 
@@ -301,7 +330,7 @@ export class ViralClipperService {
 
         const downloadedPath = await this.downloadSourceVideo(project.source_url, template, (pct) => {
           this.broadcast({ projectId, stage: 'downloading', progress: Math.round(pct * 0.3), message: `Downloading: ${pct}%` });
-        });
+        }, projectId);
 
         videoPath = downloadedPath;
         const relPath = path.relative(process.cwd(), videoPath).replace(/\\/g, '/');
@@ -387,7 +416,7 @@ export class ViralClipperService {
         transcriptData = await this.executeWhisper(audioPath, transcriptJsonPath, language, probe.durationSeconds, (pct) => {
           const overallPct = Math.min(78, 50 + Math.round(pct * 0.28));
           this.broadcast({ projectId, stage: 'transcribing', progress: overallPct, message: `Transcribing dialogue: ${pct}%...` });
-        });
+        }, projectId);
         await runQuery('UPDATE clipper_projects SET transcript_json = ? WHERE id = ?', [
           JSON.stringify(transcriptData), projectId
         ]);
@@ -459,6 +488,12 @@ export class ViralClipperService {
 
     } catch (err: any) {
       console.error('ViralClipper processing error:', err);
+      try {
+        const cur = await getQuery<any>('SELECT status FROM clipper_projects WHERE id = ?', [projectId]);
+        if (cur?.status === 'cancelled') {
+          return;
+        }
+      } catch (checkErr) {}
       await runQuery('UPDATE clipper_projects SET status = ?, error_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [
         'failed', err.message, projectId
       ]);
@@ -502,7 +537,7 @@ export class ViralClipperService {
         let cleanText = textLines.join(' ').trim();
         cleanText = cleanText.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
 
-        const isTitleCard = line.includes('line:0%') || line.includes('line:10%') || line.includes('position:0%');
+        const isTitleCard = line.includes('line:0%') || line.includes('line:10%');
         if (cleanText && !isTitleCard) {
           // If timeFilter is specified, check boundary overlap
           if (timeFilter) {
@@ -839,6 +874,7 @@ print(json.dumps(results))
       ];
 
       const p = spawn(pythonExe, args);
+      if (projectId) this.registerProcess(projectId, p);
       let stderr = '';
       p.stderr.on('data', d => { stderr += d.toString(); });
       p.on('close', () => {
@@ -890,7 +926,8 @@ print(json.dumps(results))
     outputPath: string,
     language: string,
     totalDuration: number = 0,
-    onProgress?: (pct: number) => void
+    onProgress?: (pct: number) => void,
+    projectId?: string
   ): Promise<any> {
     return new Promise((resolve, reject) => {
       const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
@@ -909,21 +946,27 @@ print(json.dumps(results))
       const p = spawn(pythonExe, args, {
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
       });
+      if (projectId) this.registerProcess(projectId, p);
 
       let stdout = '';
       let stderr = '';
+      let lastReportedPct = 10;
 
       p.stdout.on('data', (d) => {
         const chunk = d.toString();
         stdout += chunk;
-        if (onProgress) {
-          const match = /\[(\d+):(\d+\.\d+)\s*-->/g.exec(chunk);
-          if (match && totalDuration > 0) {
-            const sec = parseInt(match[1], 10) * 60 + parseFloat(match[2]);
-            const pct = Math.min(99, Math.max(1, Math.round((sec / totalDuration) * 100)));
+        if (onProgress && totalDuration > 0) {
+          const re = /\[(\d+):(\d+\.?\d*)\s*-->/g;
+          let m: RegExpExecArray | null;
+          let maxSec = 0;
+          while ((m = re.exec(chunk)) !== null) {
+            const sec = parseInt(m[1], 10) * 60 + parseFloat(m[2]);
+            if (sec > maxSec) maxSec = sec;
+          }
+          if (maxSec > 0) {
+            const pct = Math.min(99, Math.max(lastReportedPct, Math.round((maxSec / totalDuration) * 100)));
+            lastReportedPct = pct;
             onProgress(pct);
-          } else {
-            onProgress(50);
           }
         }
       });

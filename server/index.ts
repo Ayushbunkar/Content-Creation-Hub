@@ -1556,6 +1556,17 @@ app.post('/api/clipper/projects/:id/reprocess', async (req, res) => {
   }
 });
 
+// 5b. Pause / Cancel clipper pipeline
+app.post('/api/clipper/projects/:id/cancel', async (req, res) => {
+  try {
+    const projectId = String(req.params.id);
+    await ViralClipperService.cancelProject(projectId);
+    res.json({ success: true, message: 'Pipeline paused and cancelled successfully' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 6. Update individual clip parameters
 app.put('/api/clipper/clips/:clipId', async (req, res) => {
   try {
