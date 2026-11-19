@@ -7,11 +7,17 @@
 > ```powershell
 > cd $HOME; git clone https://github.com/Ayushbunkar/Content-Creation-Hub.git; cd Content-Creation-Hub; .\setup.bat
 > ```
+> *(Or to install directly on your **Desktop**:)*
+> ```powershell
+> cd $HOME\Desktop; git clone https://github.com/Ayushbunkar/Content-Creation-Hub.git; cd Content-Creation-Hub; .\setup.bat
+> ```
 > *Or in standard Command Prompt (cmd.exe):*
 > ```cmd
 > cd /d %USERPROFILE% && git clone https://github.com/Ayushbunkar/Content-Creation-Hub.git && cd Content-Creation-Hub && .\setup.bat
 > ```
 > *(Zero manual prerequisite installations needed — `setup.bat` automatically detects and installs Node.js, Python, portable FFmpeg, AI virtual environments, default configuration, and launches the Studio on http://127.0.0.1:3000)*
+>
+> 💡 *Note: The `cd $HOME` part is essential because Windows restricts cloning inside `C:\Windows\System32` (Permission Denied).*
 
 [![Platform](https://img.shields.io/badge/Platform-Windows%2011%20%7C%2010-0078D6?logo=windows&logoColor=white)](https://microsoft.com/windows)
 [![Node.js](https://img.shields.io/badge/Node.js-Auto--Installed%20%7C%20v20%20%7C%20v22-339933?logo=node.js&logoColor=white)](https://nodejs.org)
@@ -206,7 +212,16 @@ Once setup is complete, you can launch the Studio anytime through any of these s
 - **NPM Command**: Run `npm start` in the terminal.
 - **Direct Web Access**: Visit `http://127.0.0.1:3000` in Edge, Chrome, or Brave.
 
-### ❓ Troubleshooting "127.0.0.1 refused to connect"
+### ❓ Troubleshooting
+
+#### 1. "fatal: could not create work tree dir: Permission denied"
+If PowerShell or CMD opened inside `C:\Windows\System32`, Windows prevents git from creating folders there.
+Always make sure to run with `cd $HOME`:
+```powershell
+cd $HOME; git clone https://github.com/Ayushbunkar/Content-Creation-Hub.git; cd Content-Creation-Hub; .\setup.bat
+```
+
+#### 2. "127.0.0.1 refused to connect"
 If you ever see connection refused in the browser, it simply means the backend server isn't running yet. Run:
 ```powershell
 .\run.bat
