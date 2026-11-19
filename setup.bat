@@ -34,28 +34,23 @@ if %errorlevel% neq 0 (
 
 :: STEP 4: Locate Real Functional Python
 set "PYTHON_CMD="
-python -c "import sys" >nul 2>&1
-if %errorlevel% equ 0 (
-    set "PYTHON_CMD=python"
+if exist "C:\Program Files\Python311\python.exe" (
+    set "PYTHON_CMD=C:\Program Files\Python311\python.exe"
 ) else (
-    py -c "import sys" >nul 2>&1
-    if %errorlevel% equ 0 (
-        set "PYTHON_CMD=py"
+    if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
+        set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
     ) else (
-        if exist "C:\Program Files\Python311\python.exe" (
-            set "PYTHON_CMD=C:\Program Files\Python311\python.exe"
+        if exist "C:\Program Files\Python312\python.exe" (
+            set "PYTHON_CMD=C:\Program Files\Python312\python.exe"
         ) else (
-            if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
-                set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+            if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" (
+                set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
             ) else (
-                if exist "C:\Program Files\Python312\python.exe" (
-                    set "PYTHON_CMD=C:\Program Files\Python312\python.exe"
+                py -c "import sys" >nul 2>&1
+                if !errorlevel! equ 0 (
+                    set "PYTHON_CMD=py"
                 ) else (
-                    if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" (
-                        set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
-                    ) else (
-                        echo [NOTICE] Real Python not found in standard paths. Cloud AI fallback will be used.
-                    )
+                    echo [NOTICE] Python runtime skipped. Cloud AI fallback will be used.
                 )
             )
         )

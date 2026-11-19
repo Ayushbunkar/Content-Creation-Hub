@@ -49,31 +49,21 @@ $nodeCheck = Get-Command node -ErrorAction SilentlyContinue
 if (-not $nodeCheck) {
     Write-Host "  -> Node.js not detected in PATH. Attempting automatic installation..." -ForegroundColor Magenta
 
-    # Try winget first if available
-    $winget = Get-Command winget -ErrorAction SilentlyContinue
     $installed = $false
-    if ($winget) {
-        Write-Host "  -> Installing Node.js LTS via winget..." -ForegroundColor Gray
-        Start-Process winget -ArgumentList "install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements --silent" -Wait -NoNewWindow
+    Write-Host "  -> Downloading official Node.js v20 LTS MSI installer..." -ForegroundColor Gray
+    $msiUrl = "https://nodejs.org/dist/v20.18.0/node-v20.18.0-x64.msi"
+    $msiFile = Join-Path $env:TEMP "node_setup.msi"
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+        Invoke-WebRequest -Uri $msiUrl -OutFile $msiFile -UseBasicParsing
+        Write-Host "  -> Running silent MSI installation..." -ForegroundColor Gray
+        $proc = Start-Process msiexec.exe -ArgumentList "/i `"$msiFile`" /qn /norestart" -PassThru
+        $proc.WaitForExit(90000) | Out-Null
+        Remove-Item $msiFile -Force -ErrorAction SilentlyContinue
         Refresh-Path
-        if (Get-Command node -ErrorAction SilentlyContinue) { $installed = $true }
-    }
-
-    if (-not $installed) {
-        Write-Host "  -> Downloading official Node.js v20 LTS MSI installer..." -ForegroundColor Gray
-        $msiUrl = "https://nodejs.org/dist/v20.18.0/node-v20.18.0-x64.msi"
-        $msiFile = Join-Path $env:TEMP "node_setup.msi"
-        try {
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
-            Invoke-WebRequest -Uri $msiUrl -OutFile $msiFile -UseBasicParsing
-            Write-Host "  -> Running silent MSI installation..." -ForegroundColor Gray
-            Start-Process msiexec.exe -ArgumentList "/i `"$msiFile`" /qn /norestart" -Wait
-            Remove-Item $msiFile -Force -ErrorAction SilentlyContinue
-            Refresh-Path
-            Add-To-User-Path "C:\Program Files\nodejs"
-        } catch {
-            Write-Host "  -> Automatic Node.js download failed: $_" -ForegroundColor Red
-        }
+        Add-To-User-Path "C:\Program Files\nodejs"
+    } catch {
+        Write-Host "  -> Automatic Node.js download failed: $_" -ForegroundColor Red
     }
 }
 
@@ -95,7 +85,23 @@ Write-Host "`n[2/4] Checking Python 3.10+ runtime..." -ForegroundColor Yellow
 function Test-RealPython($cmdPath) {
     if (-not $cmdPath) { return $false }
     try {
-        $p = Start-Process -FilePath $cmdPath -ArgumentList "-c `"import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)`"" -PassThru -Wait -WindowStyle Hidden -ErrorAction Stop
+        $resolved = $cmdPath
+        if (-not (Test-Path $cmdPath)) {
+            $cmd = Get-Command $cmdPath -ErrorAction SilentlyContinue
+            if ($cmd) { $resolved = $cmd.Source }
+        }
+        # Explicitly skip Microsoft Store dummy execution aliases
+        if ($resolved -like "*\Microsoft\WindowsApps\*" -or $resolved -like "*\WindowsApps\*") {
+            return $false
+        }
+        if (-not (Test-Path $resolved)) { return $false }
+
+        $p = Start-Process -FilePath $resolved -ArgumentList "-c `"import sys`"" -PassThru -WindowStyle Hidden -ErrorAction Stop
+        $exited = $p.WaitForExit(3000)
+        if (-not $exited) {
+            try { $p.Kill() } catch {}
+            return $false
+        }
         return ($p.ExitCode -eq 0)
     } catch {
         return $false
@@ -104,14 +110,14 @@ function Test-RealPython($cmdPath) {
 
 function Find-RealPython {
     $candidates = @(
-        "python",
-        "py",
         "C:\Program Files\Python311\python.exe",
         "C:\Program Files\Python312\python.exe",
         "C:\Program Files\Python310\python.exe",
         (Join-Path $env:LOCALAPPDATA "Programs\Python\Python311\python.exe"),
         (Join-Path $env:LOCALAPPDATA "Programs\Python\Python312\python.exe"),
-        (Join-Path $env:LOCALAPPDATA "Programs\Python\Python310\python.exe")
+        (Join-Path $env:LOCALAPPDATA "Programs\Python\Python310\python.exe"),
+        "py",
+        "python"
     )
     foreach ($c in $candidates) {
         if (Test-RealPython $c) { return $c }
@@ -122,40 +128,30 @@ function Find-RealPython {
 $activePy = Find-RealPython
 
 if (-not $activePy) {
-    Write-Host "  -> Functional Python 3 not detected. Attempting automatic installation..." -ForegroundColor Magenta
+    Write-Host "  -> Real Python not detected. Downloading official Python 3.11 installer..." -ForegroundColor Magenta
 
-    $winget = Get-Command winget -ErrorAction SilentlyContinue
-    $installed = $false
-    if ($winget) {
-        Write-Host "  -> Installing Python 3.11 via winget..." -ForegroundColor Gray
-        Start-Process winget -ArgumentList "install Python.Python.3.11 --accept-package-agreements --accept-source-agreements --silent" -Wait -NoNewWindow
+    $pyUrl = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe"
+    $pyFile = Join-Path $env:TEMP "python_setup.exe"
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+        Invoke-WebRequest -Uri $pyUrl -OutFile $pyFile -UseBasicParsing
+        Write-Host "  -> Running silent Python installation (takes ~25 seconds)..." -ForegroundColor Gray
+        $proc = Start-Process $pyFile -ArgumentList "/quiet InstallAllUsers=0 PrependPath=1 Include_pip=1 Shortcuts=0" -PassThru
+        $completed = $proc.WaitForExit(90000)
+        if (-not $completed) {
+            try { $proc.Kill() } catch {}
+            Write-Host "  [NOTICE] Python installer timed out. Cloud AI fallback will be used." -ForegroundColor Yellow
+        }
+        Remove-Item $pyFile -Force -ErrorAction SilentlyContinue
         Refresh-Path
         $activePy = Find-RealPython
-        if ($activePy) { $installed = $true }
-    }
-
-    if (-not $installed) {
-        Write-Host "  -> Downloading official Python 3.11 installer..." -ForegroundColor Gray
-        $pyUrl = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe"
-        $pyFile = Join-Path $env:TEMP "python_setup.exe"
-        try {
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
-            Invoke-WebRequest -Uri $pyUrl -OutFile $pyFile -UseBasicParsing
-            Write-Host "  -> Running silent Python installation (this takes ~30 seconds)..." -ForegroundColor Gray
-            $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-            $installArgs = if ($isAdmin) { "/quiet InstallAllUsers=1 PrependPath=1 Include_pip=1 Shortcuts=0" } else { "/quiet InstallAllUsers=0 PrependPath=1 Include_pip=1 Shortcuts=0" }
-            Start-Process $pyFile -ArgumentList $installArgs -Wait
-            Remove-Item $pyFile -Force -ErrorAction SilentlyContinue
-            Refresh-Path
-            $activePy = Find-RealPython
-            if ($activePy) {
-                $pyDir = Split-Path $activePy -Parent
-                Add-To-User-Path $pyDir
-                Add-To-User-Path (Join-Path $pyDir "Scripts")
-            }
-        } catch {
-            Write-Host "  -> Automatic Python download failed: $_" -ForegroundColor Red
+        if ($activePy) {
+            $pyDir = Split-Path $activePy -Parent
+            Add-To-User-Path $pyDir
+            Add-To-User-Path (Join-Path $pyDir "Scripts")
         }
+    } catch {
+        Write-Host "  [NOTICE] Python auto-install notice: $_" -ForegroundColor Yellow
     }
 }
 
@@ -165,7 +161,7 @@ if ($activePy) {
     $pyVer = & $activePy --version 2>&1
     Write-Host "  [OK] Python ready: $pyVer ($activePy)" -ForegroundColor Green
 } else {
-    Write-Host "  [!] Real Python was not found. Please install Python 3.11 from https://python.org/" -ForegroundColor Yellow
+    Write-Host "  [NOTICE] Python runtime skipped. Studio will use high-speed cloud voiceover & transcription fallbacks." -ForegroundColor Cyan
 }
 
 # ==========================================
@@ -177,14 +173,16 @@ $localFfmpeg = Join-Path $binDir "ffmpeg.exe"
 
 $ffmpegOk = $false
 try {
-    $p = Start-Process -FilePath "ffmpeg" -ArgumentList "-version" -PassThru -Wait -WindowStyle Hidden -ErrorAction Stop
-    if ($p.ExitCode -eq 0) { $ffmpegOk = $true }
+    $p = Start-Process -FilePath "ffmpeg" -ArgumentList "-version" -PassThru -WindowStyle Hidden -ErrorAction Stop
+    $done = $p.WaitForExit(3000)
+    if ($done -and $p.ExitCode -eq 0) { $ffmpegOk = $true }
 } catch {}
 
 if (-not $ffmpegOk -and (Test-Path $localFfmpeg)) {
     try {
-        $p = Start-Process -FilePath $localFfmpeg -ArgumentList "-version" -PassThru -Wait -WindowStyle Hidden -ErrorAction Stop
-        if ($p.ExitCode -eq 0) { $ffmpegOk = $true }
+        $p = Start-Process -FilePath $localFfmpeg -ArgumentList "-version" -PassThru -WindowStyle Hidden -ErrorAction Stop
+        $done = $p.WaitForExit(3000)
+        if ($done -and $p.ExitCode -eq 0) { $ffmpegOk = $true }
     } catch {}
 }
 
@@ -212,9 +210,6 @@ if (-not $ffmpegOk) {
         $ffmpegOk = $true
     } catch {
         Write-Host "  -> Portable FFmpeg download failed: $_" -ForegroundColor Yellow
-        Write-Host "  -> Trying winget fallback..." -ForegroundColor Gray
-        Start-Process winget -ArgumentList "install -e --id Gyan.FFmpeg --accept-package-agreements --accept-source-agreements --silent" -Wait -NoNewWindow
-        Refresh-Path
     }
 } else {
     Write-Host "  [OK] FFmpeg engine is ready." -ForegroundColor Green
@@ -269,7 +264,7 @@ try {
         try {
             $testRes = Invoke-WebRequest -Uri "http://127.0.0.1:3000" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
         } catch {
-            Write-Host "  [AUTO-HEAL] Unresponsive process (PID $ownerPid) detected on port 3000. Freeing port..." -ForegroundColor Yellow
+            Write-Host "  [AUTO-HEAL] Freeing port 3000 from stale process (PID $ownerPid)..." -ForegroundColor Yellow
             Stop-Process -Id $ownerPid -Force -ErrorAction SilentlyContinue
         }
     }
