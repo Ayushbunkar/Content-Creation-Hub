@@ -2730,26 +2730,47 @@ app.get('/api/social/history', async (req, res) => {
   }
 });
 
-// Start server
+// Start server with dynamic port fallback
 async function main() {
   await initDatabase();
   await SocialPublishingService.init();
 
-  server.on('error', (err: any) => {
-    if (err.code === 'EADDRINUSE') {
-      console.warn(`[PORT] Port ${PORT} was busy. Retrying after releasing socket...`);
-    } else {
-      console.error('[Server Error]', err);
-    }
-  });
+  const basePort = parseInt(process.env.PORT || '3000', 10);
 
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log(`=======================================================`);
-    console.log(` LOCAL AI VIDEO STUDIO — PRODUCTION SERVER RUNNING`);
-    console.log(` URL: http://127.0.0.1:${PORT} (and http://localhost:${PORT})`);
-    console.log(` WebSocket: ws://127.0.0.1:${PORT}`);
-    console.log(`=======================================================`);
-  });
+  function tryListen(portToTry: number, attemptsLeft = 10) {
+    server.removeAllListeners('error');
+    server.once('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        console.warn(`[PORT] Port ${portToTry} is already occupied.`);
+        if (attemptsLeft > 0) {
+          const nextPort = portToTry + 1;
+          console.log(`[AUTO-HEAL] Gracefully falling back to port ${nextPort}...`);
+          tryListen(nextPort, attemptsLeft - 1);
+        } else {
+          console.error('[FATAL] All attempted ports are blocked.');
+        }
+      } else {
+        console.error('[Server Error]', err);
+      }
+    });
+
+    server.listen(portToTry, '0.0.0.0', () => {
+      console.log(`=======================================================`);
+      console.log(` LOCAL AI VIDEO STUDIO — PRODUCTION SERVER RUNNING`);
+      console.log(` URL: http://127.0.0.1:${portToTry} (and http://localhost:${portToTry})`);
+      console.log(` WebSocket: ws://127.0.0.1:${portToTry}`);
+      console.log(`=======================================================`);
+      try {
+        const storageDir = path.join(process.cwd(), 'storage');
+        if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
+        fs.writeFileSync(path.join(storageDir, 'active_port.txt'), portToTry.toString(), 'utf-8');
+      } catch (e) {
+        console.warn('[STORAGE] Could not write active_port.txt:', e);
+      }
+    });
+  }
+
+  tryListen(basePort);
 }
 
 main().catch(console.error);
