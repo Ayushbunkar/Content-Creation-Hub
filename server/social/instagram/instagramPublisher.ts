@@ -58,7 +58,14 @@ export class InstagramPublisher {
     onProgress?: (percent: number) => void;
   }): Promise<PlatformPublishResult> {
     const startTime = Date.now();
-    const { videoPath, caption, hashtags = [], shareToFeed = true } = options;
+    let { videoPath, caption, hashtags = [], shareToFeed = true } = options;
+
+    if (!fs.existsSync(videoPath)) {
+      const relCandidate = path.join(process.cwd(), videoPath.replace(/^[\\\/]+/, ''));
+      if (fs.existsSync(relCandidate)) {
+        videoPath = relCandidate;
+      }
+    }
 
     if (!fs.existsSync(videoPath)) {
       return {

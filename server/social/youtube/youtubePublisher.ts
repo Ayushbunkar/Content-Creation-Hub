@@ -63,7 +63,14 @@ export class YouTubePublisher {
     onProgress?: (percent: number) => void;
   }): Promise<PlatformPublishResult> {
     const startTime = Date.now();
-    const { videoPath, title, description, tags = [], category = '20', privacy = 'public' } = options;
+    let { videoPath, title, description, tags = [], category = '20', privacy = 'public' } = options;
+
+    if (!fs.existsSync(videoPath)) {
+      const relCandidate = path.join(process.cwd(), videoPath.replace(/^[\\\/]+/, ''));
+      if (fs.existsSync(relCandidate)) {
+        videoPath = relCandidate;
+      }
+    }
 
     if (!fs.existsSync(videoPath)) {
       return {

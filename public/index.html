@@ -1178,7 +1178,14 @@
 
       const openSocialPublishModal = async (clipData) => {
         const streamerName = clipData.streamer || 'Creator';
-        const rawTitle = clipData.clipTitle || clipData.hook || 'Viral Stream Highlight';
+        let rawHook = clipData.hook || clipData.headline_hook || clipData.clipTitle || 'Viral Stream Highlight';
+        rawHook = String(rawHook).replace(/\bundefined\b/gi, '').replace(/^\s*-\s*|\s*-\s*$/g, '').trim();
+        if (!rawHook) rawHook = 'Viral Stream Moment';
+
+        let rawTitle = clipData.clipTitle ? String(clipData.clipTitle).replace(/\bundefined\b/gi, '').replace(/^\s*-\s*|\s*-\s*$/g, '').trim() : '';
+        if (!rawTitle || rawTitle === streamerName || rawTitle.endsWith('-')) {
+          rawTitle = `${streamerName} - ${rawHook}`;
+        }
         const targetClipId = clipData.clipId || (clipData.clipUrl ? clipData.clipUrl.split('/').pop().replace(/\.[^/.]+$/, '') : (`clip_${Date.now()}`));
         const chosenPlatform = clipData.preferredPlatform || 'both';
 
@@ -1188,7 +1195,7 @@
           sourcePage: clipData.sourcePage || 'Video Studio',
           clipUrl: clipData.clipUrl || '',
           clipTitle: rawTitle,
-          hook: clipData.hook || rawTitle,
+          hook: rawHook,
           streamer: streamerName,
           streamerHandle: clipData.streamerHandle || `@${streamerName.toLowerCase().replace(/\s+/g, '')}`,
           topic: clipData.topic || 'Gaming Stream Highlight',
@@ -1197,9 +1204,9 @@
           privacyStatus: 'public',
           isGeneratingMetadata: true,
           metadata: {
-            youtubeTitle: `${streamerName} ${rawTitle} 😂🔥 #shorts`.slice(0, 95),
+            youtubeTitle: `${streamerName} - ${rawHook} 😂🔥 #shorts`.slice(0, 95),
             youtubeDescription: `${streamerName} has an unreal reaction live on stream! 😂🔥\n\n🎮 Game / Stream: ${clipData.topic || 'Gaming'}\n🎙️ Creator: ${streamerName}\n\nSubscribe for more daily shorts!\n#shorts #viral #trending`,
-            instagramCaption: `${rawTitle} 🔥💀\n\n${streamerName} being legendary as always! Tag a friend who needs to see this 😂👇\n.\n.\n#reels #viral #explore`,
+            instagramCaption: `${rawHook} 🔥💀\n\n${streamerName} being legendary as always! Tag a friend who needs to see this 😂👇\n.\n.\n#reels #viral #explore`,
             trendingHashtags: ['#shorts', '#viral', '#trending', '#gaming', '#reels'],
             suggestedTagsString: '#shorts #viral #trending #gaming #reels',
             alternativeTitles: []
@@ -4813,8 +4820,8 @@
                                           preferredPlatform: 'both',
                                           sourcePage: 'Stream Chat Clipper',
                                           clipUrl: renderedData.clipUrl,
-                                          clipTitle: `${streamAnalysisResult?.streamerName || 'Streamer'} - ${moment.title}`,
-                                          hook: moment.title,
+                                          clipTitle: `${streamAnalysisResult?.streamerName || 'Streamer'} - ${moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment'}`,
+                                          hook: moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment',
                                           streamer: streamAnalysisResult?.streamerName || 'Streamer',
                                           topic: 'Gaming Stream Highlight',
                                           transcript: (renderedData.transcript || []).map(t => t.text).join(' ')
@@ -4830,8 +4837,8 @@
                                           preferredPlatform: 'youtube',
                                           sourcePage: 'Stream Chat Clipper',
                                           clipUrl: renderedData.clipUrl,
-                                          clipTitle: `${streamAnalysisResult?.streamerName || 'Streamer'} - ${moment.title}`,
-                                          hook: moment.title,
+                                          clipTitle: `${streamAnalysisResult?.streamerName || 'Streamer'} - ${moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment'}`,
+                                          hook: moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment',
                                           streamer: streamAnalysisResult?.streamerName || 'Streamer',
                                           topic: 'Gaming Stream Highlight',
                                           transcript: (renderedData.transcript || []).map(t => t.text).join(' ')
@@ -4847,8 +4854,8 @@
                                           preferredPlatform: 'instagram',
                                           sourcePage: 'Stream Chat Clipper',
                                           clipUrl: renderedData.clipUrl,
-                                          clipTitle: `${streamAnalysisResult?.streamerName || 'Streamer'} - ${moment.title}`,
-                                          hook: moment.title,
+                                          clipTitle: `${streamAnalysisResult?.streamerName || 'Streamer'} - ${moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment'}`,
+                                          hook: moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment',
                                           streamer: streamAnalysisResult?.streamerName || 'Streamer',
                                           topic: 'Gaming Stream Highlight',
                                           transcript: (renderedData.transcript || []).map(t => t.text).join(' ')
@@ -4864,8 +4871,8 @@
                                           preferredPlatform: 'both',
                                           sourcePage: 'Stream Chat Clipper',
                                           clipUrl: renderedData.clipUrl,
-                                          clipTitle: `${streamAnalysisResult?.streamerName || 'Streamer'} - ${moment.title}`,
-                                          hook: moment.title,
+                                          clipTitle: `${streamAnalysisResult?.streamerName || 'Streamer'} - ${moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment'}`,
+                                          hook: moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment',
                                           streamer: streamAnalysisResult?.streamerName || 'Streamer',
                                           topic: 'Gaming Stream Highlight',
                                           transcript: (renderedData.transcript || []).map(t => t.text).join(' ')
@@ -11542,35 +11549,94 @@
                           </button>
 
                           {/* Publishing Results & Links */}
-                          {socialPublishModal.publishResults && (
-                            <div class="p-4 bg-emerald-950/40 border border-emerald-800 rounded-xl space-y-2">
-                              <div class="flex items-center space-x-2 text-emerald-400 font-bold text-xs">
-                                <span>✅ Published Successfully!</span>
-                              </div>
-                              <div class="space-y-1 text-xs">
-                                {socialPublishModal.publishResults.map((res, rIdx) => (
-                                  <div key={rIdx} class="flex items-center justify-between p-2 bg-slate-950 rounded-lg border border-slate-800">
-                                    <span class="font-bold text-slate-200 uppercase">{res.platform}</span>
-                                    {res.publishedUrl ? (
+                          {socialPublishModal.publishResults && (() => {
+                            const hasError = socialPublishModal.publishResults.some(r => !r.success && r.status !== 'published');
+                            const hasQuotaError = socialPublishModal.publishResults.some(r => {
+                              const msg = (r.error || r.errorMessage || '').toLowerCase();
+                              return msg.includes('exceeded') || msg.includes('quota') || msg.includes('limit');
+                            });
+
+                            return (
+                              <div class={`p-4 rounded-xl space-y-2.5 border ${
+                                !hasError
+                                  ? 'bg-emerald-950/40 border-emerald-800'
+                                  : hasQuotaError
+                                    ? 'bg-amber-950/40 border-amber-700/60'
+                                    : 'bg-rose-950/40 border-rose-800/60'
+                              }`}>
+                                <div class="flex items-center justify-between">
+                                  <span class={`text-xs font-bold flex items-center space-x-1.5 ${
+                                    !hasError ? 'text-emerald-400' : hasQuotaError ? 'text-amber-400' : 'text-rose-400'
+                                  }`}>
+                                    <span>{!hasError ? '✅ Published Successfully!' : hasQuotaError ? '⚠️ Publication Completed (YouTube API Quota Notice)' : '⚠️ Publishing Status'}</span>
+                                  </span>
+                                </div>
+
+                                {hasQuotaError && (
+                                  <div class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs space-y-2">
+                                    <div class="font-bold text-amber-300 flex items-center space-x-1.5">
+                                      <span>⚠️</span>
+                                      <span>YouTube Daily Upload Limit Reached on Channel</span>
+                                    </div>
+                                    <p class="text-slate-300 text-[11px] leading-relaxed">
+                                      Google limits automated API video uploads per day on this channel.
+                                      <strong class="text-white block mt-0.5">Your video is saved in 1080p HD. You can upload directly via YouTube Studio web!</strong>
+                                    </p>
+                                    <div class="flex flex-wrap items-center gap-2 pt-1">
                                       <a
-                                        href={res.publishedUrl}
+                                        href="https://studio.youtube.com/channel/upload"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        class="text-indigo-400 hover:underline font-mono text-[11px] flex items-center space-x-1"
+                                        class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] rounded-lg transition inline-flex items-center space-x-1 shadow"
                                       >
-                                        <span>View Published Video</span>
-                                        <span>↗</span>
+                                        <span>Upload via YouTube Studio Web ↗</span>
                                       </a>
-                                    ) : res.error ? (
-                                      <span class="text-red-400 font-mono text-[11px]" title={res.error}>⚠️ {res.error}</span>
-                                    ) : (
-                                      <span class="text-emerald-400 font-mono text-[11px]">Ready on Local Device</span>
-                                    )}
+                                      {socialPublishModal.clipUrl && (
+                                        <a
+                                          href={socialPublishModal.clipUrl}
+                                          download
+                                          class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] rounded-lg transition inline-flex items-center space-x-1 border border-slate-700"
+                                        >
+                                          <span>⬇️ Download MP4 File</span>
+                                        </a>
+                                      )}
+                                    </div>
                                   </div>
-                                ))}
+                                )}
+
+                                <div class="space-y-1.5 text-xs">
+                                  {socialPublishModal.publishResults.map((res, rIdx) => {
+                                    const isErr = !res.success && res.status !== 'published';
+                                    const errMsg = res.error || res.errorMessage;
+                                    return (
+                                      <div key={rIdx} class="flex items-center justify-between p-2.5 bg-slate-950 rounded-lg border border-slate-800">
+                                        <span class="font-bold text-slate-200 uppercase flex items-center space-x-1.5">
+                                          <span>{res.platform === 'youtube' ? '▶' : '📷'}</span>
+                                          <span>{res.platform}</span>
+                                        </span>
+                                        {res.publishedUrl ? (
+                                          <a
+                                            href={res.publishedUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="text-emerald-400 hover:underline font-bold text-xs flex items-center space-x-1"
+                                          >
+                                            <span>View Published Reel ↗</span>
+                                          </a>
+                                        ) : isErr ? (
+                                          <span class="text-rose-400 text-[11px] font-semibold max-w-[280px] truncate" title={errMsg || 'Failed'}>
+                                            ⚠️ {errMsg || 'Upload Failed'}
+                                          </span>
+                                        ) : (
+                                          <span class="text-emerald-400 font-mono text-[11px]">Saved to Local Queue</span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -13039,25 +13105,94 @@
                         <span>{socialPublishModal.isPublishing ? '⏳ Publishing Now...' : '🚀 1-Click Publish Now'}</span>
                       </button>
 
-                      {socialPublishModal.publishResults && (
-                        <div class="p-3 bg-emerald-950/40 border border-emerald-800 rounded-xl space-y-1.5">
-                          <span class="text-xs font-bold text-emerald-400 block">✓ Published to Social Pipeline!</span>
-                          {socialPublishModal.publishResults.map((res, rIdx) => (
-                            <div key={rIdx} class="flex items-center justify-between text-xs">
-                              <span class="text-slate-300 font-bold uppercase">{res.platform}</span>
-                              {res.publishedUrl ? (
-                                <a href={res.publishedUrl} target="_blank" rel="noopener noreferrer" class="text-indigo-400 hover:underline font-mono text-[11px]">
-                                  Open Link ↗
-                                </a>
-                              ) : res.error ? (
-                                <span class="text-red-400 text-[11px] truncate max-w-[220px]" title={res.error}>⚠️ {res.error}</span>
-                              ) : (
-                                <span class="text-emerald-400 text-[11px]">Saved to Local Queue</span>
-                              )}
+                      {socialPublishModal.publishResults && (() => {
+                        const hasError = socialPublishModal.publishResults.some(r => !r.success && r.status !== 'published');
+                        const hasQuotaError = socialPublishModal.publishResults.some(r => {
+                          const msg = (r.error || r.errorMessage || '').toLowerCase();
+                          return msg.includes('exceeded') || msg.includes('quota') || msg.includes('limit');
+                        });
+
+                        return (
+                          <div class={`p-3.5 rounded-xl space-y-2 border ${
+                            !hasError
+                              ? 'bg-emerald-950/40 border-emerald-800'
+                              : hasQuotaError
+                                ? 'bg-amber-950/40 border-amber-700/60'
+                                : 'bg-rose-950/40 border-rose-800/60'
+                          }`}>
+                            <div class="flex items-center justify-between">
+                              <span class={`text-xs font-bold flex items-center space-x-1.5 ${
+                                !hasError ? 'text-emerald-400' : hasQuotaError ? 'text-amber-400' : 'text-rose-400'
+                              }`}>
+                                <span>{!hasError ? '✅ Published Successfully!' : hasQuotaError ? '⚠️ Publication Completed (YouTube API Quota Notice)' : '⚠️ Publishing Status'}</span>
+                              </span>
                             </div>
-                          ))}
-                        </div>
-                      )}
+
+                            {hasQuotaError && (
+                              <div class="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs space-y-2">
+                                <div class="font-bold text-amber-300 flex items-center space-x-1.5">
+                                  <span>⚠️</span>
+                                  <span>YouTube Daily Upload Limit Reached on Channel</span>
+                                </div>
+                                <p class="text-slate-300 text-[11px] leading-relaxed">
+                                  Google restricts newly connected / unverified YouTube channels to a daily automated API upload quota.
+                                  <strong class="text-white block mt-0.5">Your video is saved in 1080p HD. You can upload directly via YouTube Studio web!</strong>
+                                </p>
+                                <div class="flex flex-wrap items-center gap-2 pt-1">
+                                  <a
+                                    href="https://studio.youtube.com/channel/upload"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] rounded-lg transition inline-flex items-center space-x-1 shadow"
+                                  >
+                                    <span>Upload via YouTube Studio Web ↗</span>
+                                  </a>
+                                  {socialPublishModal.clipUrl && (
+                                    <a
+                                      href={socialPublishModal.clipUrl}
+                                      download
+                                      class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] rounded-lg transition inline-flex items-center space-x-1 border border-slate-700"
+                                    >
+                                      <span>⬇️ Download MP4 File</span>
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            <div class="space-y-1.5 text-xs">
+                              {socialPublishModal.publishResults.map((res, rIdx) => {
+                                const isErr = !res.success && res.status !== 'published';
+                                const errMsg = res.error || res.errorMessage;
+                                return (
+                                  <div key={rIdx} class="flex items-center justify-between p-2 bg-slate-950/80 rounded-lg border border-slate-800">
+                                    <span class="font-bold text-slate-200 uppercase flex items-center space-x-1.5">
+                                      <span>{res.platform === 'youtube' ? '▶' : '📷'}</span>
+                                      <span>{res.platform}</span>
+                                    </span>
+                                    {res.publishedUrl ? (
+                                      <a
+                                        href={res.publishedUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="text-emerald-400 hover:underline font-bold text-xs flex items-center space-x-1"
+                                      >
+                                        <span>Open Link ↗</span>
+                                      </a>
+                                    ) : isErr ? (
+                                      <span class="text-rose-400 text-[11px] font-semibold max-w-[280px] truncate" title={errMsg || 'Failed'}>
+                                        ⚠️ {errMsg || 'Upload Failed'}
+                                      </span>
+                                    ) : (
+                                      <span class="text-emerald-400 text-[11px]">Saved to Local Queue</span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
