@@ -396,17 +396,6 @@ export class StreamClipFinderService {
       if (info.channel) streamerName = info.channel;
     }
 
-    // Pre-Stream Waiting Screen Filter (only if not using cached raw clip)
-    if (!usedRawCache && isRealVideo && moment.clip_start_sec < 200 && !url.includes('/shorts/') && !url.includes('/clip/')) {
-      console.log(`[streamClipper] Clip #${moment.rank} was scheduled in intro countdown (${moment.clip_start_formatted}). Advancing past waiting screen into active stream...`);
-      moment.clip_start_sec = 270;
-      moment.clip_start_formatted = '00:04:30';
-      moment.clip_end_sec = 270 + Math.max(15, moment.duration || 30);
-      const m = Math.floor(moment.clip_end_sec / 60);
-      const s = Math.floor(moment.clip_end_sec % 60);
-      moment.clip_end_formatted = `00:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-    }
-
     const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
 
     // Step 1: Download actual stream video chunk directly using fast HLS/m3u8 slicing (if not using cached raw clip)
@@ -462,7 +451,7 @@ export class StreamClipFinderService {
       }
 
       if (streamUrls.length > 0) {
-        console.log(`[streamClipper] Direct stream URL acquired (${streamUrls.length} tracks). Slicing directly via FFmpeg...`);
+        console.log(`[streamClipper] Direct stream URL acquired (${streamUrls.length} tracks). Slicing directly via FFmpeg at ${moment.clip_start_formatted}...`);
         const durSec = Math.max(5, moment.duration || 30);
         const ffmpegArgs = [
           '-y',
@@ -528,71 +517,16 @@ export class StreamClipFinderService {
         });
       }
 
-      // Check if direct stream slice is valid; if not, check if this is an active live stream and capture from live edge directly!
+      // Check if direct stream slice succeeded
       let directValid = await this.isValidVideo(tempRawPath);
-      if (!directValid && streamUrls.length > 0) {
-        try { if (fs.existsSync(tempRawPath)) fs.unlinkSync(tempRawPath); } catch (e) {}
-        console.log(`[streamClipper] DVR seek missed; capturing real stream chunk directly from live edge...`);
-        const durSec = Math.max(5, moment.duration || 30);
-        const liveEdgeArgs = [
-          '-y',
-          '-reconnect', '1',
-          '-reconnect_streamed', '1',
-          '-reconnect_delay_max', '5',
-          '-i', streamUrls[0]
-        ];
-        if (streamUrls.length >= 2) {
-          liveEdgeArgs.push(
-            '-reconnect', '1',
-            '-reconnect_streamed', '1',
-            '-reconnect_delay_max', '5',
-            '-i', streamUrls[1],
-            '-map', '0:v:0',
-            '-map', '1:a:0'
-          );
-        }
-        liveEdgeArgs.push(
-          '-t', String(durSec),
-          '-c:v', 'libx264',
-          '-preset', 'ultrafast',
-          '-crf', '22',
-          '-af', 'aresample=async=1:first_pts=0',
-          '-c:a', 'aac',
-          '-b:a', '128k',
-          '-avoid_negative_ts', 'make_zero',
-          '-movflags', '+faststart',
-          tempRawPath
-        );
 
-        await new Promise<void>((res) => {
-          let finished = false;
-          const liveProc = spawn('ffmpeg', liveEdgeArgs);
-          const t = setTimeout(() => {
-            if (!finished) {
-              finished = true;
-              try { liveProc.kill(); } catch (e) {}
-              res();
-            }
-          }, 35000);
-          liveProc.on('close', () => {
-            clearTimeout(t);
-            res();
-          });
-          liveProc.on('error', () => {
-            clearTimeout(t);
-            res();
-          });
-        });
-        directValid = await this.isValidVideo(tempRawPath);
-      }
-
-      // If still not valid and not an active stream, fallback to yt-dlp download-sections
+      // If direct FFmpeg slice was unreadable or missed, use yt-dlp --download-sections with EXACT moment timestamp!
       if (!directValid) {
         try { if (fs.existsSync(tempRawPath)) fs.unlinkSync(tempRawPath); } catch (e) {}
-        console.log(`[streamClipper] Direct slice fallback to yt-dlp download-sections with node runtime...`);
+        console.log(`[streamClipper] Slicing exact segment (${moment.clip_start_formatted} - ${moment.clip_end_formatted}) via yt-dlp download-sections...`);
         let timeSpec = `*${moment.clip_start_formatted}-${moment.clip_end_formatted}`;
         if (moment.duration <= 0 || moment.clip_start_formatted === moment.clip_end_formatted) {
-          timeSpec = '*00:00:00-00:00:25';
+          timeSpec = `*${moment.clip_start_formatted}-*${Math.floor(moment.clip_start_sec + 30)}`;
         }
 
         await new Promise<void>((resolve) => {
@@ -604,7 +538,7 @@ export class StreamClipFinderService {
             '--download-sections', timeSpec,
             '--force-keyframes-at-cuts',
             '--no-playlist',
-            '--socket-timeout', '15',
+            '--socket-timeout', '20',
             '-f', '134+140/230+234/bestvideo[height<=720]+bestaudio/best[height<=720]/best',
             '--merge-output-format', 'mp4',
             '-o', tempRawPath,
@@ -624,9 +558,9 @@ export class StreamClipFinderService {
               console.warn(`[streamClipper] yt-dlp timeout, falling back. Log tail:`, ytdlpLog.slice(-300));
               resolve();
             }
-          }, 35000);
+          }, 45000);
 
-          ytdlp.on('close', (code) => {
+          ytdlp.on('close', () => {
             clearTimeout(killTimer);
             if (!hasResolved) {
               hasResolved = true;
@@ -650,6 +584,7 @@ export class StreamClipFinderService {
             }
           });
         });
+        directValid = await this.isValidVideo(tempRawPath);
       }
     }
 

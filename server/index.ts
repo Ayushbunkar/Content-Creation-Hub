@@ -2677,9 +2677,13 @@ app.post('/api/social/publish', async (req, res) => {
           userInput: { streamerName: streamerName || 'Creator' }
         });
 
-    const fullPath = path.isAbsolute(targetVideo)
-      ? targetVideo
-      : path.join(process.cwd(), targetVideo.replace(/^\//, ''));
+    let fullPath = targetVideo;
+    if (!fs.existsSync(fullPath)) {
+      const relCandidate = path.join(process.cwd(), targetVideo.replace(/^[\\\/]+/, ''));
+      if (fs.existsSync(relCandidate)) {
+        fullPath = relCandidate;
+      }
+    }
 
     const result = await SocialPublishingService.publishVideo({
       clipId: clipId || `clip_${Date.now()}`,

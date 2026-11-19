@@ -11523,6 +11523,8 @@
                                         <span>View Published Video</span>
                                         <span>↗</span>
                                       </a>
+                                    ) : res.error ? (
+                                      <span class="text-red-400 font-mono text-[11px]" title={res.error}>⚠️ {res.error}</span>
                                     ) : (
                                       <span class="text-emerald-400 font-mono text-[11px]">Ready on Local Device</span>
                                     )}
@@ -13009,6 +13011,8 @@
                                 <a href={res.publishedUrl} target="_blank" rel="noopener noreferrer" class="text-indigo-400 hover:underline font-mono text-[11px]">
                                   Open Link ↗
                                 </a>
+                              ) : res.error ? (
+                                <span class="text-red-400 text-[11px] truncate max-w-[220px]" title={res.error}>⚠️ {res.error}</span>
                               ) : (
                                 <span class="text-emerald-400 text-[11px]">Saved to Local Queue</span>
                               )}

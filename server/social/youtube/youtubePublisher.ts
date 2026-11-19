@@ -105,16 +105,35 @@ export class YouTubePublisher {
           }
         };
 
-        const initRes = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status', {
+        let activeToken = token;
+        let initRes = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status', {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${activeToken}`,
             'Content-Type': 'application/json; charset=UTF-8',
             'X-Upload-Content-Length': String(fileSize),
             'X-Upload-Content-Type': 'video/mp4'
           },
           body: JSON.stringify(metadata)
         });
+
+        // If access token expired (401), automatically refresh and retry
+        if (initRes.status === 401 && options.encryptedRefreshToken) {
+          const refreshed = await OAuthService.refreshGoogleToken(options.encryptedRefreshToken);
+          if (refreshed.accessToken) {
+            activeToken = refreshed.accessToken;
+            initRes = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${activeToken}`,
+                'Content-Type': 'application/json; charset=UTF-8',
+                'X-Upload-Content-Length': String(fileSize),
+                'X-Upload-Content-Type': 'video/mp4'
+              },
+              body: JSON.stringify(metadata)
+            });
+          }
+        }
 
         if (!initRes.ok) {
           const errData = await initRes.json().catch(() => ({}));
