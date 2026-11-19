@@ -35,6 +35,15 @@ if not exist "node_modules\express" (
 )
 echo [OK] Dependencies verified.
 
+:: Step 3.5: Ensure Python AI packages (yt-dlp) are ready via signed python.exe
+if exist ".venv-tts\Scripts\python.exe" (
+    .venv-tts\Scripts\python.exe -c "import yt_dlp" >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo [AUTO-HEAL] Installing yt-dlp multimedia engine into Python...
+        call .venv-tts\Scripts\python.exe -m pip install yt-dlp requests soundfile numpy --quiet >nul 2>&1
+    )
+)
+
 :: Step 4: Ensure vital folders exist
 if not exist "storage\database" mkdir "storage\database" >nul 2>&1
 if not exist "output\stream_clips" mkdir "output\stream_clips" >nul 2>&1

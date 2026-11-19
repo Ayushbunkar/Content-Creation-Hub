@@ -45,6 +45,14 @@ try {
   console.warn('[ENV] Note loading .env:', e);
 }
 
+// Auto-inject local ffmpeg and python into process PATH
+try {
+  const localFfmpeg = path.join(process.cwd(), 'bin', 'ffmpeg');
+  const venvScripts = path.join(process.cwd(), '.venv-tts', 'Scripts');
+  const pathParts = [localFfmpeg, venvScripts, process.env.PATH || ''].filter(Boolean);
+  process.env.PATH = pathParts.join(path.delimiter);
+} catch (e) {}
+
 const app = express();
 const server = http.createServer(app);
 

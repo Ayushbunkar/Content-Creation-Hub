@@ -50,6 +50,42 @@ export interface StreamAnalysisResult {
 }
 
 export class StreamClipFinderService {
+  static getPythonCmd(): string {
+    const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
+    if (fs.existsSync(venvPy)) return venvPy;
+    const localAppData = process.env.LOCALAPPDATA || '';
+    const pyCandidates = [
+      path.join(localAppData, 'Programs', 'Python', 'Python311', 'python.exe'),
+      path.join(localAppData, 'Programs', 'Python', 'Python312', 'python.exe'),
+      'C:\\Program Files\\Python311\\python.exe',
+      'C:\\Program Files\\Python312\\python.exe',
+      'python'
+    ];
+    for (const cand of pyCandidates) {
+      if (cand !== 'python' && fs.existsSync(cand)) return cand;
+    }
+    return 'python';
+  }
+
+  static async ensureYtDlp(): Promise<void> {
+    const py = this.getPythonCmd();
+    return new Promise((resolve) => {
+      const check = spawn(py, ['-c', 'import yt_dlp']);
+      check.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          console.log('[streamClipper] Auto-installing yt-dlp into Python environment...');
+          const inst = spawn(py, ['-m', 'pip', 'install', 'yt-dlp', '--quiet']);
+          const t = setTimeout(() => { try { inst.kill(); } catch (e) {} resolve(); }, 30000);
+          inst.on('close', () => { clearTimeout(t); resolve(); });
+          inst.on('error', () => { clearTimeout(t); resolve(); });
+        }
+      });
+      check.on('error', () => resolve());
+    });
+  }
+
   /**
    * Pre-configured streamer radar for Indian and Foreign communities (Top 10 sorted by views & live status)
    */
@@ -66,7 +102,7 @@ export class StreamClipFinderService {
     }
 
     // Run python radar scanner
-    const pythonExe = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
+    const pythonExe = this.getPythonCmd();
     const scriptPath = path.join(process.cwd(), 'scripts', 'streamer_radar.py');
 
     return new Promise((resolve, reject) => {
@@ -396,7 +432,9 @@ export class StreamClipFinderService {
       if (info.channel) streamerName = info.channel;
     }
 
-    const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
+    // Ensure yt-dlp is available in Python runtime
+    await this.ensureYtDlp();
+    const venvPy = this.getPythonCmd();
 
     // Step 1: Download actual stream video chunk directly using fast HLS/m3u8 slicing (if not using cached raw clip)
     if (isRealVideo && !usedRawCache) {
@@ -407,16 +445,17 @@ export class StreamClipFinderService {
       try {
         const getUrlProc = spawn(venvPy, [
           '-m', 'yt_dlp',
+          '--extractor-args', 'youtube:player_client=android,web',
           '--js-runtimes', nodeRuntime,
           '-g',
           '-f', '312+234/303+140/299+140/137+140/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
           '--no-playlist',
-          '--socket-timeout', '10',
+          '--socket-timeout', '15',
           url
         ]);
         let urlOut = '';
         await new Promise<void>((res) => {
-          const t = setTimeout(() => { try { getUrlProc.kill(); } catch (e) {} res(); }, 12000);
+          const t = setTimeout(() => { try { getUrlProc.kill(); } catch (e) {} res(); }, 25000);
           getUrlProc.stdout.on('data', d => { urlOut += d.toString(); });
           getUrlProc.on('close', () => { clearTimeout(t); res(); });
           getUrlProc.on('error', () => { clearTimeout(t); res(); });
@@ -427,16 +466,17 @@ export class StreamClipFinderService {
         if (streamUrls.length === 1) {
           const getAudioProc = spawn(venvPy, [
             '-m', 'yt_dlp',
+            '--extractor-args', 'youtube:player_client=android,web',
             '--js-runtimes', nodeRuntime,
             '-g',
             '-f', '234/bestaudio/bestaudio[ext=m4a]',
             '--no-playlist',
-            '--socket-timeout', '10',
+            '--socket-timeout', '15',
             url
           ]);
           let aOut = '';
           await new Promise<void>((res) => {
-            const t = setTimeout(() => { try { getAudioProc.kill(); } catch (e) {} res(); }, 8000);
+            const t = setTimeout(() => { try { getAudioProc.kill(); } catch (e) {} res(); }, 12000);
             getAudioProc.stdout.on('data', d => { aOut += d.toString(); });
             getAudioProc.on('close', () => { clearTimeout(t); res(); });
             getAudioProc.on('error', () => { clearTimeout(t); res(); });
@@ -533,6 +573,7 @@ export class StreamClipFinderService {
           const nodeRuntime = process.execPath ? `node:${process.execPath}` : 'node';
           const ytdlp = spawn(venvPy, [
             '-m', 'yt_dlp',
+            '--extractor-args', 'youtube:player_client=android,web',
             '--js-runtimes', nodeRuntime,
             '--remote-components', 'ejs:github',
             '--download-sections', timeSpec,
@@ -665,7 +706,7 @@ export class StreamClipFinderService {
       return cached;
     }
 
-    const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
+    const venvPy = this.getPythonCmd();
     const scriptPath = path.join(process.cwd(), 'scripts', 'detect_streamer_facecam.py');
 
     if (!fs.existsSync(scriptPath) || !fs.existsSync(videoPath)) {
@@ -687,14 +728,14 @@ export class StreamClipFinderService {
 
       const timer = setTimeout(() => {
         try { proc.kill(); } catch (e) {}
-        console.warn('[FacecamDetector] Timed out after 45s, using safe tight center-left');
+        console.warn('[FacecamDetector] Timed out after 12s, using safe tight center-left');
         resolve({
           success: false,
           face_detected: false,
           position_label: 'center_left',
           ffmpeg_cam_crop: 'crop=iw*0.24:ih*0.30:0:ih*0.38'
         });
-      }, 45000);
+      }, 12000);
 
       proc.on('close', () => {
         clearTimeout(timer);
@@ -741,7 +782,7 @@ export class StreamClipFinderService {
     captionStyle: string = 'speed_center',
     dividerY: number = 768
   ): Promise<{ cues: any[]; hasSpeech: boolean }> {
-    const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
+    const venvPy = this.getPythonCmd();
     const scriptPath = path.join(process.cwd(), 'scripts', 'generate_clip_captions.py');
 
     const args = [
@@ -768,9 +809,9 @@ export class StreamClipFinderService {
 
       const timer = setTimeout(() => {
         try { proc.kill(); } catch (e) {}
-        console.warn('[streamClipper] Caption generation timed out after 120s');
+        console.warn('[streamClipper] Caption generation timed out after 25s');
         resolve({ cues: [], hasSpeech: false });
-      }, 120000);
+      }, 25000);
 
       proc.on('close', () => {
         clearTimeout(timer);

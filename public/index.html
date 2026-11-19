@@ -1550,6 +1550,7 @@
       const [renderedStreamClips, setRenderedStreamClips] = useState({});
       const [isStreamBatchRendering, setIsStreamBatchRendering] = useState(false);
       const [batchStreamersStatus, setBatchStreamersStatus] = useState(null);
+      const [streamRenderErrors, setStreamRenderErrors] = useState({});
 
       const fetchStreamPresets = async (forceRefresh = false) => {
         setIsRefreshingRadar(true);
@@ -1738,6 +1739,7 @@
 
       const handleRenderStreamClip = async (moment, customAnalysis = null) => {
         setStreamRenderingRank(moment.rank);
+        setStreamRenderErrors(prev => ({ ...prev, [moment.rank]: null }));
         const override = momentFramingOverrides[moment.rank] || {};
         const chosenCropMode = override.cropMode || streamCropMode;
         const chosenBlur = override.blurIntensity || streamBlurIntensity;
@@ -1794,6 +1796,7 @@
           return data;
         } catch (e) {
           console.error(`Clip Render Error on rank ${moment.rank}:`, e);
+          setStreamRenderErrors(prev => ({ ...prev, [moment.rank]: e.message || 'Render failed. Check terminal logs.' }));
           return null;
         } finally {
           setStreamRenderingRank(null);
@@ -4917,6 +4920,13 @@
                                 >
                                   <span>{isRenderingThis ? '⏳ Downloading & Cropping 9:16 Reel...' : isStreamBatchRendering ? '⏳ In Auto-Render Queue (Waiting)...' : '🎬 Render & Download 9:16 Reel (MP4)'}</span>
                                 </button>
+                              )}
+
+                              {streamRenderErrors[moment.rank] && (
+                                <div class="mt-2 text-[11px] text-red-300 bg-red-950/70 border border-red-700/60 rounded-xl p-2.5 flex items-start space-x-2">
+                                  <span class="text-sm shrink-0">⚠️</span>
+                                  <span class="leading-relaxed font-sans">{streamRenderErrors[moment.rank]}</span>
+                                </div>
                               )}
                             </div>
                           );
