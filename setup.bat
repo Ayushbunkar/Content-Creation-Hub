@@ -21,27 +21,37 @@ set "PATH=%~dp0bin\ffmpeg;C:\Program Files\nodejs;C:\Program Files\Python311;%LO
 where node >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] Node.js is not available in PATH.
-    echo Please install Node.js (v20 or v22) from https://nodejs.org/ and re-run setup.bat
+    echo Please install Node.js from https://nodejs.org/ and re-run setup.bat
     pause
     exit /b 1
 )
 
 :: 4. Verify Python
-set PYTHON_CMD=python
-where python >nul 2>&1
-if %errorlevel% neq 0 (
-    where py >nul 2>&1
+set "PYTHON_CMD="
+python -c "import sys" >nul 2>&1
+if %errorlevel% equ 0 (
+    set "PYTHON_CMD=python"
+) else (
+    py -c "import sys" >nul 2>&1
     if %errorlevel% equ 0 (
-        set PYTHON_CMD=py
+        set "PYTHON_CMD=py"
     ) else (
-        echo [WARNING] Python was not found in system PATH.
-        echo Some AI features (Kokoro TTS / Whisper) may use cloud fallbacks.
+        if exist "C:\Program Files\Python311\python.exe" (
+            set "PYTHON_CMD=C:\Program Files\Python311\python.exe"
+        ) else (
+            if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
+                set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+            ) else (
+                echo [WARNING] Real Python was not found in system PATH.
+                echo Some AI features like local Whisper and Kokoro TTS may use cloud fallbacks.
+            )
+        )
     )
 )
 
 :: 5. Install Node Dependencies
 echo.
-echo [STEP 2/5] Installing Node.js packages (Remotion, Express, SQLite, TSX)...
+echo [STEP 2/5] Installing Node.js packages: Remotion, Express, SQLite, TSX...
 call npm install
 if %errorlevel% neq 0 (
     echo [RETRY] Retrying npm install with --legacy-peer-deps...
@@ -56,15 +66,19 @@ if %errorlevel% neq 0 (
 :: 6. Python Virtual Environment Setup (AI Engines: Whisper, Kokoro, yt-dlp)
 echo.
 echo [STEP 3/5] Setting up local Python AI environment...
-if not exist ".venv-tts\Scripts\python.exe" (
-    echo Creating virtual environment .venv-tts...
-    !PYTHON_CMD! -m venv .venv-tts >nul 2>&1
-)
-if exist ".venv-tts\Scripts\python.exe" (
-    echo Installing AI packages (Torch, Kokoro TTS, Whisper, yt-dlp)...
-    call .venv-tts\Scripts\python.exe -m pip install --upgrade pip --quiet
-    call .venv-tts\Scripts\pip.exe install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu --quiet
-    echo [OK] Python AI environment ready.
+if defined PYTHON_CMD (
+    if not exist ".venv-tts\Scripts\python.exe" (
+        echo Creating virtual environment .venv-tts...
+        "%PYTHON_CMD%" -m venv .venv-tts >nul 2>&1
+    )
+    if exist ".venv-tts\Scripts\python.exe" (
+        echo Installing AI packages: Torch, Kokoro TTS, Whisper, yt-dlp...
+        call .venv-tts\Scripts\python.exe -m pip install --upgrade pip --quiet
+        call .venv-tts\Scripts\pip.exe install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu --quiet
+        echo [OK] Python AI environment ready.
+    ) else (
+        echo [NOTICE] Python virtual environment creation skipped.
+    )
 ) else (
     echo [NOTICE] Python virtual environment skipped.
 )

@@ -74,18 +74,29 @@ if ($nodeCheck) {
 # 2. PYTHON CHECK & AUTO-INSTALL
 # ==========================================
 Write-Host "`n[2/3] Checking Python 3.10+ runtime..." -ForegroundColor Yellow
-$pyCmd = Get-Command python -ErrorAction SilentlyContinue
-if (-not $pyCmd) { $pyCmd = Get-Command py -ErrorAction SilentlyContinue }
 
-if (-not $pyCmd) {
-    Write-Host "  -> Python not detected in PATH. Attempting automatic installation..." -ForegroundColor Magenta
+function Test-RealPython($cmdName) {
+    if (-not $cmdName) { return $false }
+    try {
+        $p = Start-Process -FilePath $cmdName -ArgumentList "-c `"import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)`"" -PassThru -Wait -WindowStyle Hidden -ErrorAction Stop
+        return ($p.ExitCode -eq 0)
+    } catch {
+        return $false
+    }
+}
+
+$hasPython = (Test-RealPython "python") -or (Test-RealPython "py") -or (Test-RealPython "C:\Program Files\Python311\python.exe") -or (Test-RealPython "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe")
+
+if (-not $hasPython) {
+    Write-Host "  -> Functional Python 3 not detected. Attempting automatic installation..." -ForegroundColor Magenta
     $winget = Get-Command winget -ErrorAction SilentlyContinue
     $installed = $false
     if ($winget) {
         Write-Host "  -> Installing Python 3.11 via winget..." -ForegroundColor Gray
         Start-Process winget -ArgumentList "install Python.Python.3.11 --accept-package-agreements --accept-source-agreements --silent" -Wait -NoNewWindow
         Refresh-Path
-        if (Get-Command python -ErrorAction SilentlyContinue) { $installed = $true }
+        $hasPython = (Test-RealPython "python") -or (Test-RealPython "py")
+        if ($hasPython) { $installed = $true }
     }
 
     if (-not $installed) {
@@ -95,8 +106,10 @@ if (-not $pyCmd) {
         try {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
             Invoke-WebRequest -Uri $pyUrl -OutFile $pyFile -UseBasicParsing
-            Write-Host "  -> Running silent Python installation..." -ForegroundColor Gray
-            Start-Process $pyFile -ArgumentList "/quiet InstallAllUsers=1 PrependPath=1 Include_pip=1" -Wait
+            Write-Host "  -> Running silent Python installation (this takes ~30 seconds)..." -ForegroundColor Gray
+            $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+            $installArgs = if ($isAdmin) { "/quiet InstallAllUsers=1 PrependPath=1 Include_pip=1" } else { "/quiet InstallAllUsers=0 PrependPath=1 Include_pip=1" }
+            Start-Process $pyFile -ArgumentList $installArgs -Wait
             Remove-Item $pyFile -Force -ErrorAction SilentlyContinue
             Refresh-Path
         } catch {
@@ -106,14 +119,18 @@ if (-not $pyCmd) {
 }
 
 Refresh-Path
-$pyCheck = Get-Command python -ErrorAction SilentlyContinue
-if (-not $pyCheck) { $pyCheck = Get-Command py -ErrorAction SilentlyContinue }
+$activePy = $null
+if (Test-RealPython "python") { $activePy = "python" }
+elseif (Test-RealPython "py") { $activePy = "py" }
+elseif (Test-RealPython "C:\Program Files\Python311\python.exe") { $activePy = "C:\Program Files\Python311\python.exe" }
+elseif (Test-RealPython "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe") { $activePy = "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe" }
 
-if ($pyCheck) {
-    $pyVer = & $pyCheck.Name --version
-    Write-Host "  [OK] Python ready: $pyVer" -ForegroundColor Green
+if ($activePy) {
+    $pyVer = & $activePy --version 2>&1
+    Write-Host "  [OK] Python ready: $pyVer ($activePy)" -ForegroundColor Green
 } else {
-    Write-Host "  [!] Python not found. Please install Python 3.10+ from https://python.org/ (Check 'Add Python to PATH')" -ForegroundColor Red
+    Write-Host "  [!] Real Python was not found. Please download & install Python 3.11 from: https://python.org/" -ForegroundColor Yellow
+    Write-Host "      (Make sure to check 'Add python.exe to PATH' during installation)" -ForegroundColor Yellow
 }
 
 # ==========================================
