@@ -39,7 +39,8 @@ if (-not (Test-Path $targetDir)) {
     Set-Location $targetDir
     $gitCmd = Get-Command git -ErrorAction SilentlyContinue
     if ($gitCmd -and (Test-Path ".git")) {
-        git pull --rebase
+        git fetch origin main
+        git reset --hard origin/main
     }
 }
 
