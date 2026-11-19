@@ -50,6 +50,12 @@ export interface StreamAnalysisResult {
 }
 
 export class StreamClipFinderService {
+  static getFfmpegCmd(): string {
+    const local = path.join(process.cwd(), 'bin', 'ffmpeg', 'ffmpeg.exe');
+    if (fs.existsSync(local)) return local;
+    return 'ffmpeg';
+  }
+
   static getPythonCmd(): string {
     const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
     if (fs.existsSync(venvPy)) return venvPy;
@@ -446,9 +452,10 @@ export class StreamClipFinderService {
         const getUrlProc = spawn(venvPy, [
           '-m', 'yt_dlp',
           '--extractor-args', 'youtube:player_client=android,web',
+          '--ffmpeg-location', path.dirname(this.getFfmpegCmd()),
           '--js-runtimes', nodeRuntime,
           '-g',
-          '-f', '312+234/303+140/299+140/137+140/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+          '-f', 'best[height<=1080]/bestvideo[height<=1080]+bestaudio/best',
           '--no-playlist',
           '--socket-timeout', '15',
           url
@@ -527,7 +534,7 @@ export class StreamClipFinderService {
 
         await new Promise<void>((res) => {
           let finished = false;
-          const cutProc = spawn('ffmpeg', ffmpegArgs);
+          const cutProc = spawn(this.getFfmpegCmd(), ffmpegArgs);
           const t = setTimeout(() => {
             if (!finished) {
               finished = true;
@@ -574,13 +581,14 @@ export class StreamClipFinderService {
           const ytdlp = spawn(venvPy, [
             '-m', 'yt_dlp',
             '--extractor-args', 'youtube:player_client=android,web',
+            '--ffmpeg-location', path.dirname(this.getFfmpegCmd()),
             '--js-runtimes', nodeRuntime,
             '--remote-components', 'ejs:github',
             '--download-sections', timeSpec,
             '--force-keyframes-at-cuts',
             '--no-playlist',
             '--socket-timeout', '20',
-            '-f', '312+234/303+140/299+140/137+140/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+            '-f', 'best[height<=1080]/bestvideo[height<=1080]+bestaudio/best',
             '--merge-output-format', 'mp4',
             '-o', tempRawPath,
             url
@@ -966,7 +974,7 @@ export class StreamClipFinderService {
         outputPath
       ];
 
-      const ffmpeg = spawn('ffmpeg', args);
+      const ffmpeg = spawn(this.getFfmpegCmd(), args);
       let errStr = '';
       ffmpeg.stderr.on('data', (d) => { errStr += d.toString(); });
       ffmpeg.on('close', (code) => {
@@ -988,26 +996,16 @@ export class StreamClipFinderService {
     streamerName: string
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      const dur = Math.max(10, Math.min(45, moment.duration || 30));
-      const cleanStreamer = (streamerName || 'CREATOR').replace(/['"\\%:]/g, '').toUpperCase();
-      const cleanHook = (moment.headline_hook || 'CHAT EXPLODED').replace(/['"\\%:]/g, '');
-      const cleanMult = (moment.multiplier_text || '10x normal').replace(/['"\\%:]/g, '');
-      const cleanVelocity = (moment.message_velocity || '100 msgs / 10s').replace(/['"\\%:]/g, '');
+      const dur = Math.max(5, Math.min(45, moment.duration || 30));
+      const ffmpegExe = this.getFfmpegCmd();
 
-      // Generate clean colored gradient background with animated tone
+      // Ultra-robust pure color generator: works on 100% of FFmpeg builds without font or gradient dependencies
       const args = [
         '-y',
         '-f', 'lavfi',
-        '-i', `gradients=s=1920x1080:c0=#0f172a:c1=#1e1b4b:d=${dur}:speed=0.5`,
+        '-i', `color=c=0x0f172a:s=1920x1080:d=${dur}:r=30`,
         '-f', 'lavfi',
         '-i', `sine=frequency=440:duration=${dur}`,
-        '-filter_complex',
-        `[0:v]drawtext=text='${cleanStreamer}':fontsize=64:fontcolor=white:x=(w-text_w)/2:y=200:box=1:boxcolor=black@0.6:boxborderw=10,` +
-        `drawtext=text='${cleanHook}':fontsize=48:fontcolor=yellow:x=(w-text_w)/2:y=320:box=1:boxcolor=black@0.6:boxborderw=8,` +
-        `drawtext=text='CHAT EXPLODED (${cleanMult})':fontsize=40:fontcolor=white:x=(w-text_w)/2:y=420,` +
-        `drawtext=text='${cleanVelocity}':fontsize=36:fontcolor=0x38bdf8:x=(w-text_w)/2:y=490[v]`,
-        '-map', '[v]',
-        '-map', '1:a',
         '-c:v', 'libx264',
         '-pix_fmt', 'yuv420p',
         '-preset', 'ultrafast',
@@ -1015,10 +1013,20 @@ export class StreamClipFinderService {
         outputPath
       ];
 
-      const proc = spawn('ffmpeg', args);
+      const proc = spawn(ffmpegExe, args);
+      let errStr = '';
+      proc.stderr?.on('data', (d) => { errStr += d.toString(); });
       proc.on('close', (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(`Failed to generate sample video`));
+        if (code === 0 && fs.existsSync(outputPath)) {
+          resolve();
+        } else {
+          console.error(`[generateSampleStreamVideo] Failed with code ${code}:`, errStr);
+          reject(new Error(`Failed to generate sample video: ${errStr.slice(-200)}`));
+        }
+      });
+      proc.on('error', (err) => {
+        console.error('[generateSampleStreamVideo] Spawn error:', err);
+        reject(err);
       });
     });
   }
