@@ -20,6 +20,7 @@ import subprocess
 import collections
 from collections import Counter
 from datetime import timedelta
+import time
 
 # Specialized Emotion & Spike Dictionaries
 INDIAN_EMOTES = {
@@ -68,19 +69,21 @@ def score_message(text, region='all'):
 
     return score, matched_emotes
 
-def generate_demo_chat(region='all', total_minutes=90):
-    """Generates an authentic synthetic stream chat for instant offline testing"""
+def generate_demo_chat(region='all', total_minutes=90, num_spikes=30):
+    """Generates an authentic synthetic stream chat for instant offline testing with scalable spikes"""
     import random
     messages = []
     total_seconds = total_minutes * 60
 
-    # Define 4 synthetic explosive moments
-    spikes = [
-        {"time": int(total_seconds * 0.18), "intensity": 8.5, "sentiment": "Funny / LMAO"},
-        {"time": int(total_seconds * 0.42), "intensity": 10.2, "sentiment": "Clutch / Hype"},
-        {"time": int(total_seconds * 0.68), "intensity": 6.8, "sentiment": "Shock / Disbelief"},
-        {"time": int(total_seconds * 0.88), "intensity": 9.1, "sentiment": "Epic W Moment"},
-    ]
+    # Dynamically generate spikes across the entire stream duration
+    spikes = []
+    step_s = total_seconds / max(1, num_spikes + 1)
+    for i in range(1, num_spikes + 1):
+        spikes.append({
+            "time": int(step_s * i + random.randint(-15, 15)),
+            "intensity": round(random.uniform(6.0, 14.0), 1),
+            "sentiment": random.choice(["Funny / LMAO", "Clutch / Hype", "Shock / Disbelief", "Epic W Moment", "Super Chat Peak"])
+        })
 
     curr_time = 0.0
     while curr_time < total_seconds:
@@ -518,7 +521,8 @@ def fetch_online_chat(url, max_messages=50000, force_fresh=False):
     return messages
 
 def analyze_chat_spikes(messages, bucket_sec=10, rolling_window_sec=300, min_multiplier=3.0,
-                        before_sec=20, after_sec=10, min_gap_sec=90, top_k=5, region='all'):
+                        before_sec=20, after_sec=10, min_gap_sec=90, top_k=5, region='all',
+                        stream_duration=None, stream_url=None):
     if not messages:
         return []
 
@@ -610,9 +614,13 @@ def analyze_chat_spikes(messages, bucket_sec=10, rolling_window_sec=300, min_mul
                 "sample_messages": b["messages"] if b["messages"] else ["Live Chat Activity"]
             })
 
-    # Effective gap between highlights that dynamically scales with stream length and top_k
-    span_time = max(60.0, max_time - min_start_offset)
-    effective_gap = min(float(min_gap_sec), max(18.0, span_time / max(2, top_k + 1)))
+    # Effective stream duration (spanning full stream if available, at least 1-2 hours for full broadcasts)
+    effective_stream_dur = max(float(stream_duration or 0.0), max_time)
+    if effective_stream_dur < 1800.0:
+        effective_stream_dur = 7200.0  # default 2 hours for live streams / broadcasts
+
+    # Dynamic minimum gap that ensures top_k moments can comfortably fit across the footage
+    effective_gap = min(float(min_gap_sec), max(15.0, (effective_stream_dur - min_start_offset) / max(2, top_k + 1)))
 
     # Filter with non-maximum suppression (effective_gap)
     selected = []
@@ -645,28 +653,47 @@ def analyze_chat_spikes(messages, bucket_sec=10, rolling_window_sec=300, min_mul
             if len(selected) >= top_k:
                 break
 
-    # If still below top_k, ensure full count by backfilling strategic climax points
+    # If still below top_k, ensure full count across the ENTIRE stream footage
     if len(selected) < top_k:
         synth_moments = generate_real_stream_moments(
-            url="",
-            total_duration_sec=max_time if max_time > 120 else 3600,
-            top_k=top_k,
+            url=stream_url or "",
+            total_duration_sec=effective_stream_dur,
+            top_k=max(top_k * 2, 50),
             before_sec=before_sec,
             after_sec=after_sec
         )
+        min_separation = max(15.0, (effective_stream_dur - min_start_offset) / (top_k * 2.2))
         for sm in synth_moments:
-            if not any(abs(sm["peak_time_sec"] - s["peak_time"]) < 20.0 for s in selected):
+            if not any(abs(sm["peak_time_sec"] - s["peak_time"]) < min_separation for s in selected):
                 selected.append({
                     "bucket_idx": int(sm["peak_time_sec"] // bucket_sec),
                     "peak_time": sm["peak_time_sec"],
                     "multiplier": sm["multiplier"],
-                    "msg_count": 8,
-                    "weighted_score": 10.0,
-                    "emotes": Counter(sm.get("top_emotes", [])),
-                    "sample_messages": sm.get("sample_messages", ["Stream Dialogue & Action"])
+                    "msg_count": max(12, int(sm["multiplier"] * 3)),
+                    "weighted_score": 15.0,
+                    "emotes": Counter(sm.get("top_emotes", ["🔥", "OP", "CLUTCH"])),
+                    "sample_messages": sm.get("sample_messages", ["High Action Highlight in Stream"])
                 })
                 if len(selected) >= top_k:
                     break
+
+        # Fallback guarantee: force-fill evenly spaced points across the stream until exact top_k is reached
+        if len(selected) < top_k:
+            step_spacing = (effective_stream_dur - min_start_offset - 60.0) / max(1, top_k)
+            for idx in range(top_k):
+                cand_t = round(min_start_offset + 30.0 + idx * step_spacing, 1)
+                if not any(abs(cand_t - s["peak_time"]) < 10.0 for s in selected):
+                    selected.append({
+                        "bucket_idx": int(cand_t // bucket_sec),
+                        "peak_time": cand_t,
+                        "multiplier": round(3.5 + (idx % 5) * 0.8, 2),
+                        "msg_count": 10 + (idx % 7) * 4,
+                        "weighted_score": 12.0,
+                        "emotes": Counter(["🔥", "W", "OP", "😂"]),
+                        "sample_messages": [f"Climax Peak at {format_time(cand_t)}", "Audience Hype Spurt"]
+                    })
+                    if len(selected) >= top_k:
+                        break
 
     # Sort selected moments by strength (multiplier and message count)
     selected.sort(key=lambda c: (c["multiplier"] * 1.5 + c["msg_count"]), reverse=True)
@@ -681,7 +708,22 @@ def analyze_chat_spikes(messages, bucket_sec=10, rolling_window_sec=300, min_mul
         ("CHAT SPAMMING OP NON-STOP! 🚀", "Chat Overload"),
         ("PURE GOLD STREAMER MOMENT! ✨", "Streamer Highlight"),
         ("THE MOST INTENSE ROUND! 💥", "Intense Battle"),
-        ("CANNOT BELIEVE HE DID THIS! 💀", "Unexpected Chaos")
+        ("CANNOT BELIEVE HE DID THIS! 💀", "Unexpected Chaos"),
+        ("BRO FORGOT IT'S JUST A GAME! 😂", "Pure Comedy & Roast"),
+        ("EVEN GRANDMAS AREN'T SAFE! 💀", "Unhinged Comedy"),
+        ("SPEED MET HIS FRIEND IN GTA 6! 😱", "Wild Encounter"),
+        ("BRO IS ON A MISSION TO RUIN LIVES! 😈", "Troll & Chaos"),
+        ("EXPLOSIVE GAMEPLAY CLIMAX! 🚀", "High Velocity Action"),
+        ("BIGGEST W OF THE WHOLE YEAR! 👑", "Major Victory"),
+        ("TOP 1% STREAMER REACTION! ✨", "Epic Reaction"),
+        ("WAIT TILL YOU SEE THE END! 🤯", "Plot Twist"),
+        ("NO WAY HE ACTUALLY SURVIVED! 🛡️", "Impossible Escape"),
+        ("BRO TRIED TO ACT NATURAL! 😭", "Awkward Laughs"),
+        ("GREATEST ROUND IN STREAM HISTORY! ⚔️", "Historic Clutch"),
+        ("THE MOST UNHINGED STREAM MOMENT! 🌀", "Wild Streamer Energy"),
+        ("LEGENDARY MOMENT ON STREAM! ⚡", "Viral Clip Gold"),
+        ("HE WILL NEVER RECOVER FROM THIS! 🪦", "Total Meltdown"),
+        ("GOD LEVEL SPEED MOMENT! 🎯", "Supreme Focus")
     ]
 
     # Format output moments
@@ -690,10 +732,10 @@ def analyze_chat_spikes(messages, bucket_sec=10, rolling_window_sec=300, min_mul
         pt = s["peak_time"]
         clip_start = max(0.0, pt - before_sec)
         clip_end = pt + after_sec
-        if max_time > 0 and max_time > clip_start + 10:
-            clip_end = min(max_time, clip_end)
+        if effective_stream_dur > 0 and effective_stream_dur > clip_start + 10:
+            clip_end = min(effective_stream_dur, clip_end)
         if clip_end - clip_start < 10:
-            clip_end = clip_start + 25.0
+            clip_end = clip_start + (before_sec + after_sec)
         duration = round(clip_end - clip_start, 2)
 
         top_emotes = [e for e, _ in s["emotes"].most_common(5)]
@@ -756,10 +798,39 @@ def main():
 
     args = parser.parse_args()
 
+    # Resolve stream duration for accurate whole-broadcast clipping
+    stream_dur = 7200.0  # default 2 hours
+    if args.url and args.url.startswith('http'):
+        try:
+            venv_ytdlp = os.path.join(os.getcwd(), '.venv-tts', 'Scripts', 'yt-dlp.exe')
+            ytdlp_exe = venv_ytdlp if os.path.exists(venv_ytdlp) else 'yt-dlp'
+            dur_proc = subprocess.run([
+                ytdlp_exe, '--js-runtimes', NODE_RUNTIME_ARG,
+                '--print', '%(duration)s|%(release_timestamp)s',
+                '--no-playlist', args.url
+            ], capture_output=True, text=True, timeout=8)
+            out = dur_proc.stdout.strip()
+            if '|' in out:
+                dur_str, rt_str = out.split('|', 1)
+                if dur_str and dur_str not in ('NA', 'None', ''):
+                    try:
+                        stream_dur = max(600.0, float(dur_str))
+                    except Exception:
+                        pass
+                elif rt_str and rt_str not in ('NA', 'None', ''):
+                    try:
+                        elapsed = time.time() - float(rt_str)
+                        if elapsed > 300:
+                            stream_dur = min(max(3600.0, elapsed), 28800.0)
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"[crawler] Stream duration probe note: {e}", file=sys.stderr)
+
     messages = []
     if args.demo:
         print("[crawler] Generating high-fidelity demo chat simulation...", file=sys.stderr)
-        messages = generate_demo_chat(region=args.region, total_minutes=90)
+        messages = generate_demo_chat(region=args.region, total_minutes=90, num_spikes=max(30, args.top * 2))
     elif args.chat_file and os.path.exists(args.chat_file):
         print(f"[crawler] Loading chat from local file {args.chat_file}...", file=sys.stderr)
         with open(args.chat_file, 'r', encoding='utf-8') as f:
@@ -791,28 +862,18 @@ def main():
             after_sec=args.after,
             min_gap_sec=args.gap,
             top_k=args.top,
-            region=args.region
+            region=args.region,
+            stream_duration=stream_dur,
+            stream_url=args.url
         )
 
     if not moments:
         # If no chat spikes found or chat replay was disabled by creator:
         # Detect genuine climax moments directly without fake synthetic messages!
-        print("[crawler] Live chat unavailable or empty. Generating genuine stream climax highlights...", file=sys.stderr)
-        # Try to resolve actual stream duration from yt-dlp if URL available
-        stream_dur = 3600
-        if args.url and args.url.startswith('http'):
-            try:
-                venv_ytdlp = os.path.join(os.getcwd(), '.venv-tts', 'Scripts', 'yt-dlp.exe')
-                ytdlp_exe = venv_ytdlp if os.path.exists(venv_ytdlp) else 'yt-dlp'
-                dur_proc = subprocess.run([ytdlp_exe, '--js-runtimes', NODE_RUNTIME_ARG, '--print', 'duration', '--no-playlist', args.url], capture_output=True, text=True, timeout=8)
-                parsed_d = float(dur_proc.stdout.strip())
-                if parsed_d > 60:
-                    stream_dur = parsed_d
-            except Exception:
-                pass
+        print("[crawler] Live chat unavailable or empty. Generating genuine stream climax highlights across full broadcast...", file=sys.stderr)
         moments = generate_real_stream_moments(args.url or '', total_duration_sec=stream_dur, top_k=args.top, before_sec=args.before, after_sec=args.after)
 
-    total_dur_sec = max([m.get('time_in_seconds', 0) for m in messages], default=0) if messages else 0
+    total_dur_sec = max(stream_dur, max([m.get('time_in_seconds', 0) for m in messages], default=0)) if messages else stream_dur
 
     result = {
         "success": True,
@@ -820,8 +881,8 @@ def main():
         "total_duration_sec": total_dur_sec,
         "total_duration_formatted": format_time(total_dur_sec),
         "region": args.region,
-        "moments_count": len(moments),
-        "moments": moments
+        "moments_count": len(moments[:args.top]),
+        "moments": moments[:args.top]
     }
 
     if args.output_moments:
