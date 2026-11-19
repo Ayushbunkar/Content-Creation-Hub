@@ -41,9 +41,9 @@ if not exist "node_modules" (
 :: 4. Start background server in a dedicated process
 echo [STARTING] Starting AI Video Studio server on port 3000...
 if exist "node_modules\.bin\tsx.cmd" (
-    start "AI-Video-Studio-Server" cmd /c "node_modules\.bin\tsx.cmd server/index.ts"
+    start "AI-Video-Studio-Server" cmd /k "node_modules\.bin\tsx.cmd server/index.ts"
 ) else (
-    start "AI-Video-Studio-Server" cmd /c "npx -y tsx server/index.ts"
+    start "AI-Video-Studio-Server" cmd /k "npx -y tsx server/index.ts"
 )
 
 :: 5. Wait up to 35 seconds with real HTTP GET health check

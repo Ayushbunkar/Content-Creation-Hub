@@ -85,13 +85,12 @@ if defined PYTHON_CMD (
         "%PYTHON_CMD%" -m venv .venv-tts >nul 2>&1
     )
     if exist ".venv-tts\Scripts\python.exe" (
-        echo Installing AI packages: Torch, Kokoro TTS, Whisper, yt-dlp...
+        echo Installing AI packages: yt-dlp, requests, soundfile, numpy...
         call .venv-tts\Scripts\python.exe -m pip install --upgrade pip --quiet >nul 2>&1
-        call .venv-tts\Scripts\pip.exe install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu --quiet
-        if !errorlevel! neq 0 (
-            echo [AUTO-HEAL] Installing lightweight core AI fallback packages...
-            call .venv-tts\Scripts\pip.exe install yt-dlp requests soundfile numpy --quiet >nul 2>&1
-        )
+        call .venv-tts\Scripts\pip.exe install yt-dlp requests soundfile numpy --quiet >nul 2>&1
+        echo Installing local Torch and Whisper voice engines...
+        call .venv-tts\Scripts\pip.exe install torch --extra-index-url https://download.pytorch.org/whl/cpu --no-warn-script-location --quiet
+        call .venv-tts\Scripts\pip.exe install -r requirements.txt --quiet >nul 2>&1
         echo [OK] Python AI environment ready.
     ) else (
         echo [NOTICE] Python virtual environment creation skipped.
