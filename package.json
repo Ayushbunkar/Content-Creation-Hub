@@ -40,6 +40,7 @@
     "typescript": "5.9.3"
   },
   "scripts": {
+    "start": "tsx server/index.ts",
     "setup": "setup.bat",
     "desktop": "AI-Video-Studio.bat",
     "dev": "remotion studio --port=3333",
@@ -47,8 +48,5 @@
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc"
-  },
-  "allowScripts": {
-    "esbuild": false
   }
 }

@@ -213,6 +213,7 @@ export class OAuthService {
       redirect_uri: creds.redirectUri,
       scope: scopes.join(','),
       response_type: 'code',
+      auth_type: 'rerequest',
       state: state || 'instagram_connect'
     });
 
@@ -252,6 +253,7 @@ export class OAuthService {
       // 3. Get connected Facebook Pages and their linked Instagram Business / Creator accounts
       const pagesRes = await fetch(`https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,instagram_business_account&access_token=${userAccessToken}`);
       const pagesData = await pagesRes.json();
+      console.log('[OAuthService] Meta /me/accounts response:', JSON.stringify(pagesData, null, 2));
 
       let igAccountId = '';
       let pageAccessToken = userAccessToken;
