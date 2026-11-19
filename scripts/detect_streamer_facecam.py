@@ -30,14 +30,11 @@ def detect_facecam(video_path: str, target_cam_h: int = 768, target_cam_w: int =
             "message": "OpenCV not available or video file missing"
         }
 
-    # Load multi-cascade classifiers for maximum recall (frontal, alt, profile, upper-body)
+    # Load high-accuracy face cascade classifiers (frontal and angled profile)
     cascades = []
     cascade_names = [
         'haarcascade_frontalface_alt2.xml',
-        'haarcascade_frontalface_alt.xml',
-        'haarcascade_profileface.xml',
-        'haarcascade_frontalface_default.xml',
-        'haarcascade_upperbody.xml'
+        'haarcascade_profileface.xml'
     ]
     for cname in cascade_names:
         cpath = os.path.join(cv2.data.haarcascades, cname)
@@ -67,16 +64,12 @@ def detect_facecam(video_path: str, target_cam_h: int = 768, target_cam_w: int =
     video_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 1920)
     video_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 1080)
 
-    # Sample 8 keyframes evenly across the video duration for ultra-reliable detection
+    # Sample 4 keyframes evenly across the video duration for ultra-fast, accurate detection (< 4s)
     sample_indices = [
-        int(total_frames * 0.10),
-        int(total_frames * 0.22),
-        int(total_frames * 0.35),
-        int(total_frames * 0.50),
+        int(total_frames * 0.15),
+        int(total_frames * 0.40),
         int(total_frames * 0.65),
-        int(total_frames * 0.78),
-        int(total_frames * 0.88),
-        int(total_frames * 0.95)
+        int(total_frames * 0.85)
     ]
 
     all_faces = []
@@ -95,14 +88,14 @@ def detect_facecam(video_path: str, target_cam_h: int = 768, target_cam_w: int =
         small_gray = cv2.resize(gray, (0, 0), fx=scale_factor, fy=scale_factor)
         small_gray = clahe.apply(small_gray)
 
-        # Detect faces: min size 18x18 in downsampled space (= 36x36 in 1080p, catches small webcams)
+        # Detect faces with minNeighbors=5 to strictly eliminate in-game texture noise
         frame_faces = []
         for cascade in cascades:
             dets = cascade.detectMultiScale(
                 small_gray,
-                scaleFactor=1.12,
-                minNeighbors=3,
-                minSize=(18, 18)
+                scaleFactor=1.15,
+                minNeighbors=5,
+                minSize=(25, 25)
             )
             for (x, y, w, h) in dets:
                 orig_x = int(x / scale_factor)
@@ -118,8 +111,6 @@ def detect_facecam(video_path: str, target_cam_h: int = 768, target_cam_w: int =
                     "cy": int(orig_y + orig_h / 2),
                     "frame": int(f_idx)
                 })
-            if len(dets) > 0:
-                break  # Got high-confidence detections on this frame
 
         all_faces.extend(frame_faces)
 
@@ -135,12 +126,12 @@ def detect_facecam(video_path: str, target_cam_h: int = 768, target_cam_w: int =
             "message": "No clear face detected, using safe center-left streamer layout"
         }
 
-    # Group faces by spatial proximity to find the persistent streamer webcam box
+    # Group faces by spatial proximity to find the stationary streamer webcam box (< 80px variance)
     clusters = []
     for f in all_faces:
         matched = False
         for c in clusters:
-            if abs(f["cx"] - c["cx"]) < 140 and abs(f["cy"] - c["cy"]) < 140:
+            if abs(f["cx"] - c["cx"]) < 80 and abs(f["cy"] - c["cy"]) < 80:
                 c["faces"].append(f)
                 c["cx"] = int(sum(x["cx"] for x in c["faces"]) // len(c["faces"]))
                 c["cy"] = int(sum(y["cy"] for y in c["faces"]) // len(c["faces"]))
