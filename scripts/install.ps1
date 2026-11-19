@@ -10,6 +10,13 @@ Write-Host "====================================================================
 Write-Host "Setting up production studio workspace on your computer..." -ForegroundColor Gray
 
 $targetDir = Join-Path $HOME "Content-Creation-Hub"
+
+# Auto-cleanup any stale git lock files from previous interrupted runs
+$gitLock = Join-Path $targetDir ".git\index.lock"
+if (Test-Path $gitLock) {
+    Remove-Item $gitLock -Force -ErrorAction SilentlyContinue
+}
+
 Write-Host "`n[1/3] Preparing workspace directory: $targetDir" -ForegroundColor Yellow
 
 if (-not (Test-Path $targetDir)) {
@@ -35,7 +42,7 @@ if (-not (Test-Path $targetDir)) {
         Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 } else {
-    Write-Host "  -> Existing project directory found. Updating to latest version..." -ForegroundColor Green
+    Write-Host "  -> Existing project directory found. Auto-healing & updating..." -ForegroundColor Green
     Set-Location $targetDir
     $gitCmd = Get-Command git -ErrorAction SilentlyContinue
     if ($gitCmd -and (Test-Path ".git")) {

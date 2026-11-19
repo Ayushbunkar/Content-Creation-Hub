@@ -2734,6 +2734,15 @@ app.get('/api/social/history', async (req, res) => {
 async function main() {
   await initDatabase();
   await SocialPublishingService.init();
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`[PORT] Port ${PORT} was busy. Retrying after releasing socket...`);
+    } else {
+      console.error('[Server Error]', err);
+    }
+  });
+
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`=======================================================`);
     console.log(` LOCAL AI VIDEO STUDIO — PRODUCTION SERVER RUNNING`);
