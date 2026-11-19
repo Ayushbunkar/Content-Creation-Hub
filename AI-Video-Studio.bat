@@ -75,22 +75,41 @@ if !SERVER_READY! equ 0 (
 echo.
 echo [LAUNCHING] Opening AI Video Studio in your browser...
 
-:: Check Edge standalone mode
-if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" (
-    start "" "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" --app="http://127.0.0.1:3000" --window-size=1440,900
-    goto Done
-)
-if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" (
-    start "" "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" --app="http://127.0.0.1:3000" --window-size=1440,900
-    goto Done
-)
-:: Check Chrome standalone mode
+:: 1. Priority: Google Chrome (App Window Mode)
 if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" (
     start "" "%ProgramFiles%\Google\Chrome\Application\chrome.exe" --app="http://127.0.0.1:3000" --window-size=1440,900
     goto Done
 )
 if exist "%LocalAppData%\Google\Chrome\Application\chrome.exe" (
     start "" "%LocalAppData%\Google\Chrome\Application\chrome.exe" --app="http://127.0.0.1:3000" --window-size=1440,900
+    goto Done
+)
+if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" (
+    start "" "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" --app="http://127.0.0.1:3000" --window-size=1440,900
+    goto Done
+)
+
+:: 2. Priority: Brave Browser (App Window Mode)
+if exist "%ProgramFiles%\BraveSoftware\Brave-Browser\Application\brave.exe" (
+    start "" "%ProgramFiles%\BraveSoftware\Brave-Browser\Application\brave.exe" --app="http://127.0.0.1:3000" --window-size=1440,900
+    goto Done
+)
+if exist "%LocalAppData%\BraveSoftware\Brave-Browser\Application\brave.exe" (
+    start "" "%LocalAppData%\BraveSoftware\Brave-Browser\Application\brave.exe" --app="http://127.0.0.1:3000" --window-size=1440,900
+    goto Done
+)
+if exist "%ProgramFiles(x86)%\BraveSoftware\Brave-Browser\Application\brave.exe" (
+    start "" "%ProgramFiles(x86)%\BraveSoftware\Brave-Browser\Application\brave.exe" --app="http://127.0.0.1:3000" --window-size=1440,900
+    goto Done
+)
+
+:: 3. Fallback: Edge
+if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" (
+    start "" "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" --app="http://127.0.0.1:3000" --window-size=1440,900
+    goto Done
+)
+if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" (
+    start "" "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" --app="http://127.0.0.1:3000" --window-size=1440,900
     goto Done
 )
 

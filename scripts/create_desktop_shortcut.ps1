@@ -12,21 +12,29 @@ try {
     $shortcut.WorkingDirectory = $repoPath
     $shortcut.Description = "AI Video Studio - Local Autonomous Video Creation Platform"
 
-    # Choose best available icon (Edge or Chrome or System icon)
+    # Priority icons: Chrome -> Brave -> Edge
     $pfX86 = [System.Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
     $pf = [System.Environment]::GetEnvironmentVariable('ProgramFiles')
     $localApp = [System.Environment]::GetEnvironmentVariable('LocalAppData')
 
-    $edgePath = if ($pfX86) { Join-Path $pfX86 "Microsoft\Edge\Application\msedge.exe" } else { $null }
-    $chromePath = if ($pf) { Join-Path $pf "Google\Chrome\Application\chrome.exe" } else { $null }
-    $chromeUser = if ($localApp) { Join-Path $localApp "Google\Chrome\Application\chrome.exe" } else { $null }
+    $iconCandidates = @(
+        (if ($pf) { Join-Path $pf "Google\Chrome\Application\chrome.exe" } else { $null }),
+        (if ($localApp) { Join-Path $localApp "Google\Chrome\Application\chrome.exe" } else { $null }),
+        (if ($pf) { Join-Path $pf "BraveSoftware\Brave-Browser\Application\brave.exe" } else { $null }),
+        (if ($localApp) { Join-Path $localApp "BraveSoftware\Brave-Browser\Application\brave.exe" } else { $null }),
+        (if ($pfX86) { Join-Path $pfX86 "Microsoft\Edge\Application\msedge.exe" } else { $null })
+    )
 
-    if ($edgePath -and (Test-Path $edgePath)) {
-        $shortcut.IconLocation = "$edgePath,0"
-    } elseif ($chromePath -and (Test-Path $chromePath)) {
-        $shortcut.IconLocation = "$chromePath,0"
-    } elseif ($chromeUser -and (Test-Path $chromeUser)) {
-        $shortcut.IconLocation = "$chromeUser,0"
+    $chosenIcon = $null
+    foreach ($ic in $iconCandidates) {
+        if ($ic -and (Test-Path $ic)) {
+            $chosenIcon = "$ic,0"
+            break
+        }
+    }
+
+    if ($chosenIcon) {
+        $shortcut.IconLocation = $chosenIcon
     } else {
         $shortcut.IconLocation = "$env:SystemRoot\System32\shell32.dll,14"
     }

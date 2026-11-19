@@ -41,10 +41,10 @@ if not exist ".env" (
     if exist ".env.example" copy ".env.example" ".env" >nul 2>&1
 )
 
-:: Step 5: Background browser opener (opens once server responds with HTTP 200)
+:: Step 5: Background browser opener (prioritizes Chrome and Brave directly)
 echo.
-echo [LAUNCHER] Background browser trigger armed for http://127.0.0.1:3000 ...
-start "" powershell -NoProfile -Command "$opened = $false; for ($i=0; $i -lt 40; $i++) { Start-Sleep -Seconds 1; try { $res = (Invoke-WebRequest -Uri 'http://127.0.0.1:3000' -UseBasicParsing -TimeoutSec 1).StatusCode; if ($res -eq 200) { $opened = $true; break } } catch {} }; if ($opened) { Start-Process 'http://127.0.0.1:3000' }"
+echo [LAUNCHER] Launching Chrome or Brave for http://127.0.0.1:3000 once ready...
+start "" powershell -NoProfile -Command "$opened = $false; for ($i=0; $i -lt 45; $i++) { Start-Sleep -Seconds 1; try { $res = (Invoke-WebRequest -Uri 'http://127.0.0.1:3000' -UseBasicParsing -TimeoutSec 1).StatusCode; if ($res -eq 200) { $opened = $true; break } } catch {} }; if ($opened) { $browsers = @('C:\Program Files\Google\Chrome\Application\chrome.exe', (Join-Path $env:LOCALAPPDATA 'Google\Chrome\Application\chrome.exe'), 'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe', 'C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe', (Join-Path $env:LOCALAPPDATA 'BraveSoftware\Brave-Browser\Application\brave.exe'), 'C:\Program Files (x86)\BraveSoftware\Brave-Browser\Application\brave.exe', 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe', 'C:\Program Files\Microsoft\Edge\Application\msedge.exe'); $target = $null; foreach ($b in $browsers) { if (Test-Path $b) { $target = $b; break } }; if ($target) { Start-Process -FilePath $target -ArgumentList '--app=http://127.0.0.1:3000 --window-size=1440,900' } else { Start-Process 'http://127.0.0.1:3000' } }"
 
 :: Step 6: Start Server in foreground with full live logs
 echo ====================================================================
