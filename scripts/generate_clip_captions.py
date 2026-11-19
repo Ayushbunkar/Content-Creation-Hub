@@ -299,7 +299,31 @@ def main():
         print("[captionGen] No speech detected in segment; leaving captions clean without chat fallback.", file=sys.stderr)
 
     # Generate ASS with Center Hook Banner and Spoken Voice Word-Highlight
-    active_hook = args.center_hook or args.hook
+    active_hook = (args.center_hook or args.hook or '').strip()
+    active_hook = re.sub(r'\s*\(\s*#\d+\s*\)\s*$', '', active_hook).strip()
+
+    # Intelligent Gen-Z Moment-Matching Hook derived from speech and dialogue
+    spoken_text = " ".join(c.get('text', '') for c in cues).lower()
+    if spoken_text:
+        if any(k in spoken_text for k in ['die', 'dying', 'dead', 'kill', 'killed', 'rip', 'survive']):
+            active_hook = "HE WAS FIGHTING FOR HIS LIFE 😭💀"
+        elif any(k in spoken_text for k in ['calm', 'fine', 'chill', 'relax']):
+            active_hook = "BRO FORGOT IT'S JUST A GAME 😂"
+        elif any(k in spoken_text for k in ['car', 'drive', 'cops', 'police', 'crash', 'driving']):
+            active_hook = "BRO WAS DRIVING FOR HIS LIFE 😭🚔"
+        elif any(k in spoken_text for k in ['money', 'dono', 'paid', 'dollar', 'superchat', 'rich']):
+            active_hook = "BRO'S REACTION TO THIS DONO 😭💰"
+        elif any(k in spoken_text for k in ['no way', 'nah', 'bro what', 'wait wait']):
+            active_hook = "NO WAY HE ACTUALLY DID THIS 😭"
+        elif any(k in spoken_text for k in ['stop', 'shut up', 'mad', 'scream', 'help']):
+            active_hook = "BRO ALMOST CRASHED OUT LIVE 💀🔥"
+        elif any(k in spoken_text for k in ['win', 'won', 'lose', 'lost', 'choke']):
+            active_hook = "HE REALLY THOUGHT HE WAS SAFE 😭"
+        elif not active_hook or "MASSIVE W" in active_hook or "UNREAL MOMENT" in active_hook or "CHAT EXPLODED" in active_hook:
+            active_hook = "WAIT TILL YOU SEE HIS REACTION 💀"
+    elif not active_hook or "MASSIVE W" in active_hook or "UNREAL MOMENT" in active_hook or "CHAT EXPLODED" in active_hook:
+        active_hook = "BRO FORGOT HE WAS LIVE 💀"
+
     ass_text = build_ass_content(
         cues,
         target_width=1080,

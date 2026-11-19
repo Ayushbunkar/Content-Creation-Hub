@@ -288,31 +288,31 @@ def generate_real_stream_moments(url, total_duration_sec=3600, top_k=4, before_s
     moments = []
     
     hooks_pool = [
-        "BRO FORGOT IT'S JUST A GAME! 😂",
-        "EVEN GRANDMAS AREN'T SAFE! 💀",
-        "SPEED MET HIS FRIEND IN GTA 6! 😱",
-        "BRO IS ON A MISSION TO RUIN RELATIONSHIPS! 😈",
-        "UNREAL CLUTCH MOMENT! 🔥",
-        "INSANE PLAY OF THE STREAM! 🏆",
-        "HE DID NOT SEE THIS COMING! 💀",
-        "EXPLOSIVE GAMEPLAY CLIMAX! 🚀",
-        "CHAT LOST IT COMPLETELY! 🤣",
-        "WHEN THE RAGE TAKES OVER! 💥",
-        "BIGGEST W OF THE WHOLE YEAR! 👑",
-        "TOP 1% STREAMER REACTION! ✨",
-        "WAIT TILL YOU SEE THE END! 🤯",
-        "NO WAY HE ACTUALLY SURVIVED! 🛡️",
-        "SUPER CHAT CHAOS BROKE LOOSE! 💰",
-        "BRO TRIED TO ACT NATURAL! 😭",
-        "GREATEST ROUND IN STREAM HISTORY! ⚔️",
-        "PURE COMEDY GOLD FROM CHAT! 🎭",
-        "THE MOST UNHINGED STREAM MOMENT! 🌀",
-        "LEGENDARY SPEED MOMENT! ⚡",
-        "HE WILL NEVER RECOVER FROM THIS! 🪦",
-        "GOD LEVEL REACTION LIVE! 🎯",
-        "WHEN THE STREAM GETS WAY TOO REAL! 📺",
-        "INSTANT KARMA HITS HARD! ⚡",
-        "THE WHOLE LOBBY WAS SHOCKED! 😲"
+        "BRO FORGOT HE WAS LIVE 💀",
+        "HE REALLY THOUGHT HE WAS SAFE 😭",
+        "BRO ALMOST CRASHED OUT LIVE 💀🔥",
+        "WAIT TILL YOU SEE HIS REACTION 💀",
+        "NO WAY HE ACTUALLY DID THIS 😭",
+        "BRO FORGOT IT'S JUST A GAME 😂",
+        "NAHH BRO'S FACE SAYS IT ALL 💀",
+        "HE WAS FIGHTING FOR HIS LIFE 😭🔥",
+        "BRO THOUGHT NOBODY NOTICED 💀",
+        "HE ACTUALLY CANNOT BE SERIOUS 😭",
+        "BRO'S CONTROLLER IS IN DANGER 💀🔥",
+        "NO WAY BRO JUST SURVIVED THAT 🤯",
+        "BRO REALLY COOKED HIMSELF 😭💀",
+        "HE WAS NOT READY FOR THIS AT ALL 💀",
+        "BRO'S BRAIN COMPLETELY FROZE 😭",
+        "HE REALLY TRIED TO ACT NATURAL 💀",
+        "BRO THOUGHT HE WAS HIM 😭",
+        "LOOK AT HIS REACTION AT THE END 💀🔥",
+        "NAHH HE IS DEFINITELY LOGGING OFF 😭💀",
+        "BRO GOT CAUGHT IN 4K 📸💀",
+        "HE LOST HIS ENTIRE MIND HERE 😭",
+        "BRO ALMOST BROKE HIS SETUP 💀🔥",
+        "HE COULD NOT BELIEVE HIS EYES 🤯",
+        "BRO TOOK IT WAY TOO PERSONALLY 😭💀",
+        "HE REALIZED HE MESSED UP BIG TIME 💀"
     ]
     sentiments_pool = [
         "Funny / LMAO Spurt",
@@ -349,7 +349,7 @@ def generate_real_stream_moments(url, total_duration_sec=3600, top_k=4, before_s
             "message_velocity": f"{20 + (rank % 7) * 8} events / 10s",
             "top_emotes": ["🔥", "CLUTCH", "OP", "W", "😂"],
             "dominant_sentiment": sentiment,
-            "headline_hook": f"{hook} (#{rank})",
+            "headline_hook": hook,
             "sample_messages": [
                 f"[Broadcast Analysis: Climax Moment #{rank} detected at {format_time(pt)}]",
                 f"[High Action Density Segment in Stream]",
@@ -699,31 +699,31 @@ def analyze_chat_spikes(messages, bucket_sec=10, rolling_window_sec=300, min_mul
     selected.sort(key=lambda c: (c["multiplier"] * 1.5 + c["msg_count"]), reverse=True)
 
     VIRAL_HOOK_TEMPLATES = [
-        ("CHAT WENT COMPLETELY CRAZY! 🔥", "High Hype Moment"),
-        ("UNREAL LAUGHTER & ROAST 😂💀", "Funny / LMAO Spurt"),
-        ("INSANE GOD CLUTCH PLAY! ⚡", "Unreal Clutch Play"),
-        ("HE DID NOT SEE THIS COMING! 🤯", "Instant Shock"),
-        ("SUPER CHAT & DONO EXPLOSION! 💰", "Super Chat Peak"),
-        ("BRO LOST HIS MIND LIVE! 😱", "Rage & Reaction"),
-        ("CHAT SPAMMING OP NON-STOP! 🚀", "Chat Overload"),
-        ("PURE GOLD STREAMER MOMENT! ✨", "Streamer Highlight"),
-        ("THE MOST INTENSE ROUND! 💥", "Intense Battle"),
-        ("CANNOT BELIEVE HE DID THIS! 💀", "Unexpected Chaos"),
-        ("BRO FORGOT IT'S JUST A GAME! 😂", "Pure Comedy & Roast"),
-        ("EVEN GRANDMAS AREN'T SAFE! 💀", "Unhinged Comedy"),
-        ("SPEED MET HIS FRIEND IN GTA 6! 😱", "Wild Encounter"),
-        ("BRO IS ON A MISSION TO RUIN LIVES! 😈", "Troll & Chaos"),
-        ("EXPLOSIVE GAMEPLAY CLIMAX! 🚀", "High Velocity Action"),
-        ("BIGGEST W OF THE WHOLE YEAR! 👑", "Major Victory"),
-        ("TOP 1% STREAMER REACTION! ✨", "Epic Reaction"),
-        ("WAIT TILL YOU SEE THE END! 🤯", "Plot Twist"),
-        ("NO WAY HE ACTUALLY SURVIVED! 🛡️", "Impossible Escape"),
-        ("BRO TRIED TO ACT NATURAL! 😭", "Awkward Laughs"),
-        ("GREATEST ROUND IN STREAM HISTORY! ⚔️", "Historic Clutch"),
-        ("THE MOST UNHINGED STREAM MOMENT! 🌀", "Wild Streamer Energy"),
-        ("LEGENDARY MOMENT ON STREAM! ⚡", "Viral Clip Gold"),
-        ("HE WILL NEVER RECOVER FROM THIS! 🪦", "Total Meltdown"),
-        ("GOD LEVEL SPEED MOMENT! 🎯", "Supreme Focus")
+        ("BRO FORGOT HE WAS LIVE 💀", "Unhinged Streamer Moment"),
+        ("HE REALLY THOUGHT HE WAS SAFE 😭", "Instant Plot Twist"),
+        ("BRO ALMOST CRASHED OUT LIVE 💀🔥", "Maximum Rage & Shock"),
+        ("WAIT TILL YOU SEE HIS REACTION 💀", "Viral Ending"),
+        ("NO WAY HE ACTUALLY DID THIS 😭", "Pure Chaos"),
+        ("BRO FORGOT IT'S JUST A GAME 😂", "Comedy Gold"),
+        ("NAHH BRO'S FACE SAYS IT ALL 💀", "Hilarious Realization"),
+        ("HE WAS FIGHTING FOR HIS LIFE 😭🔥", "High Stakes Clutch"),
+        ("BRO THOUGHT NOBODY NOTICED 💀", "Caught In 4K"),
+        ("HE ACTUALLY CANNOT BE SERIOUS 😭", "Shocking Revelation"),
+        ("BRO'S CONTROLLER IS IN DANGER 💀🔥", "Setup Threatening Meltdown"),
+        ("NO WAY BRO JUST SURVIVED THAT 🤯", "Impossible Escape"),
+        ("BRO REALLY COOKED HIMSELF 😭💀", "Self Destruction"),
+        ("HE WAS NOT READY FOR THIS AT ALL 💀", "Instant Regret"),
+        ("BRO'S BRAIN COMPLETELY FROZE 😭", "Mental Shutdown"),
+        ("HE REALLY TRIED TO ACT NATURAL 💀", "Awkward Encounter"),
+        ("BRO THOUGHT HE WAS HIM 😭", "Humbling Moment"),
+        ("LOOK AT HIS REACTION AT THE END 💀🔥", "Top Tier Expression"),
+        ("NAHH HE IS DEFINITELY LOGGING OFF 😭💀", "Game Over Ragequit"),
+        ("BRO GOT CAUGHT IN 4K 📸💀", "Exposed On Stream"),
+        ("HE LOST HIS ENTIRE MIND HERE 😭", "Uncontrollable Meltdown"),
+        ("BRO ALMOST BROKE HIS SETUP 💀🔥", "Physical Crashout"),
+        ("HE COULD NOT BELIEVE HIS EYES 🤯", "Mind Blown"),
+        ("BRO TOOK IT WAY TOO PERSONALLY 😭💀", "Ego Check"),
+        ("HE REALIZED HE MESSED UP BIG TIME 💀", "Point Of No Return")
     ]
 
     # Format output moments
@@ -739,24 +739,36 @@ def analyze_chat_spikes(messages, bucket_sec=10, rolling_window_sec=300, min_mul
         duration = round(clip_end - clip_start, 2)
 
         top_emotes = [e for e, _ in s["emotes"].most_common(5)]
+        emotes_str = " ".join(top_emotes).lower()
+        messages_text = " ".join(s.get("sample_messages", [])).lower()
+        combined_context = f"{emotes_str} {messages_text}"
         
-        # Determine sentiment & catchy hook
-        emotes_str = " ".join(top_emotes)
         hook_tpl = VIRAL_HOOK_TEMPLATES[(rank - 1) % len(VIRAL_HOOK_TEMPLATES)]
-        if any(k in emotes_str for k in ['😂', '🤣', 'lmao', 'kekw', 'omegalul', 'lol', 'icant']):
-            sentiment = "Funny / LMAO Spurt"
-            hook = f"CHAT LOST IT HERE! 😂💀 (#{rank})"
-        elif any(k in emotes_str for k in ['clutch', 'op', 'baap', 'fire', '🔥', 'god']):
-            sentiment = "Unreal Clutch / God Play"
-            hook = f"UNREAL CLUTCH MOMENT! 🔥 (#{rank})"
-        elif any(k in emotes_str for k in ['wtf', 'dead', 'nahh', '💀', 'khatam', 'choke']):
-            sentiment = "Instant Shock / Disaster"
-            hook = f"HE DID NOT SEE THIS COMING! 💀 (#{rank})"
-        elif any(k in emotes_str for k in ['w', 'sheesh', 'pog', 'poggers', 'goat']):
-            sentiment = "Massive W / Hype Reaction"
-            hook = f"MASSIVE W IN THE CHAT! 🏆 (#{rank})"
+        
+        # Context-aware Gen-Z viral hook based on what chat was screaming about
+        if any(k in combined_context for k in ['car', 'drive', 'cops', 'police', 'crash', 'driving', 'road', 'gta']):
+            sentiment = "High Speed Chase / Driving Action"
+            hook = "BRO WAS DRIVING FOR HIS LIFE 😭🚔"
+        elif any(k in combined_context for k in ['die', 'dead', 'khatam', 'kill', 'rip', 'killed', 'wasted']):
+            sentiment = "Instant Disaster / Death"
+            hook = "HE DID NOT SEE THIS COMING! 💀"
+        elif any(k in combined_context for k in ['😂', '🤣', 'lmao', 'kekw', 'omegalul', 'lol', 'icant', 'haha', 'roast']):
+            sentiment = "Pure Comedy / LMAO Spurt"
+            hook = "BRO FORGOT IT'S JUST A GAME 😂"
+        elif any(k in combined_context for k in ['rage', 'mad', 'cheat', 'smash', 'scream', 'crashout', 'angry']):
+            sentiment = "Streamer Crashout"
+            hook = "BRO ALMOST CRASHED OUT LIVE 💀🔥"
+        elif any(k in combined_context for k in ['wtf', 'caught', '4k', 'nahh', 'cheating', 'exposed']):
+            sentiment = "Caught In 4K / Shock"
+            hook = "BRO GOT CAUGHT IN 4K 📸💀"
+        elif any(k in combined_context for k in ['clutch', 'god', 'goat', 'insane', 'op', 'fire', '🔥']):
+            sentiment = "Unreal Clutch Play"
+            hook = "NO WAY BRO JUST SURVIVED THAT 🤯"
+        elif any(k in combined_context for k in ['dono', 'superchat', 'money', 'gift', 'donation']):
+            sentiment = "Donation / Superchat Peak"
+            hook = "BRO'S REACTION TO THIS DONO 😭💰"
         else:
-            hook = f"{hook_tpl[0]}"
+            hook = hook_tpl[0]
             sentiment = hook_tpl[1]
 
         moments.append({

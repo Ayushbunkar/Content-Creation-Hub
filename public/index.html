@@ -4541,14 +4541,52 @@
                               </div>
 
                               {/* Title Hook & Timestamp */}
-                              <div>
-                                <h4 class="text-sm font-bold text-slate-100 flex items-center justify-between">
-                                  <span>{moment.headline_hook}</span>
-                                  <span class="text-xs text-slate-400 font-mono font-normal">
-                                    {moment.clip_start_formatted} ➔ {moment.clip_end_formatted} ({moment.duration}s)
-                                  </span>
-                                </h4>
-                                <p class="text-xs text-indigo-400 font-medium mt-0.5">
+                              <div class="space-y-1.5">
+                                <div class="flex items-center justify-between text-xs text-slate-400 font-mono">
+                                  <span class="font-bold text-amber-400 font-sans flex items-center gap-1">🎯 Viral Center Hook (Gen-Z):</span>
+                                  <span>{moment.clip_start_formatted} ➔ {moment.clip_end_formatted} ({moment.duration}s)</span>
+                                </div>
+                                <input
+                                  type="text"
+                                  value={moment.headline_hook}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setStreamAnalysisResult(prev => {
+                                      if (!prev) return prev;
+                                      const updated = prev.moments.map(m => m.rank === moment.rank ? { ...m, headline_hook: val } : m);
+                                      return { ...prev, moments: updated };
+                                    });
+                                  }}
+                                  class="bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1 text-xs text-amber-300 font-black tracking-wide w-full focus:outline-none focus:ring-1 focus:ring-amber-400"
+                                  placeholder="Enter viral Gen-Z hook (e.g. BRO FORGOT HE WAS LIVE 💀)"
+                                  title="Click to customize this center hook text"
+                                />
+                                <div class="flex flex-wrap gap-1">
+                                  {[
+                                    "BRO FORGOT HE WAS LIVE 💀",
+                                    "HE DID NOT SEE THIS COMING! 💀",
+                                    "BRO FORGOT IT'S JUST A GAME 😂",
+                                    "HE WAS FIGHTING FOR HIS LIFE 😭🔥",
+                                    "BRO GOT CAUGHT IN 4K 📸💀",
+                                    "NO WAY BRO SURVIVED THAT 🤯"
+                                  ].map(h => (
+                                    <button
+                                      key={h}
+                                      type="button"
+                                      onClick={() => {
+                                        setStreamAnalysisResult(prev => {
+                                          if (!prev) return prev;
+                                          const updated = prev.moments.map(m => m.rank === moment.rank ? { ...m, headline_hook: h } : m);
+                                          return { ...prev, moments: updated };
+                                        });
+                                      }}
+                                      class={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${moment.headline_hook === h ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 font-bold' : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700/60'}`}
+                                    >
+                                      {h}
+                                    </button>
+                                  ))}
+                                </div>
+                                <p class="text-[11px] text-indigo-400 font-medium">
                                   Sentiment: {moment.dominant_sentiment}
                                 </p>
                               </div>
