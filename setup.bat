@@ -90,13 +90,8 @@ echo ====================================================================
 echo                    SETUP COMPLETED SUCCESSFULLY!
 echo ====================================================================
 echo  - A desktop shortcut 'AI Video Studio' is now on your Desktop!
-echo  - You can also run 'npm start' or double-click 'run.bat' anytime.
+echo  - Launching AI Video Studio automatically right now...
 echo ====================================================================
 echo.
 
-set /p RUNNOW="Would you like to launch AI Video Studio right now? (Y/N) [Y]: "
-if /i "%RUNNOW%"=="" set RUNNOW=Y
-if /i "%RUNNOW%"=="Y" (
-    echo Starting Studio Desktop...
-    call AI-Video-Studio.bat
-)
+call AI-Video-Studio.bat
