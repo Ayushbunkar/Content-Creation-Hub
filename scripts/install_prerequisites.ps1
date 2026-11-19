@@ -1,4 +1,4 @@
-# scripts/install_prerequisites.ps1 - Automated Prerequisite Installer for AI Video Studio
+# scripts/install_prerequisites.ps1 - Automated Prerequisite Installer & Self-Healing Validator
 [CmdletBinding()]
 param()
 
@@ -17,10 +17,25 @@ function Refresh-Path {
     $localBin = Join-Path $repoRoot "bin\ffmpeg"
     $nodeDefault = "C:\Program Files\nodejs"
     $pyDefault = "C:\Program Files\Python311"
+    $pyDefault12 = "C:\Program Files\Python312"
     $pyUser = Join-Path $env:LOCALAPPDATA "Programs\Python\Python311"
     $pyUserScripts = Join-Path $env:LOCALAPPDATA "Programs\Python\Python311\Scripts"
+    $pyUser12 = Join-Path $env:LOCALAPPDATA "Programs\Python\Python312"
+    $pyUser12Scripts = Join-Path $env:LOCALAPPDATA "Programs\Python\Python312\Scripts"
 
-    $env:Path = "$localBin;$nodeDefault;$pyDefault;$pyUser;$pyUserScripts;$usrPath;$sysPath"
+    $env:Path = "$localBin;$nodeDefault;$pyDefault;$pyDefault12;$pyUser;$pyUserScripts;$pyUser12;$pyUser12Scripts;$usrPath;$sysPath"
+}
+
+function Add-To-User-Path($newDir) {
+    if (-not (Test-Path $newDir)) { return }
+    try {
+        $curr = [System.Environment]::GetEnvironmentVariable('Path', [System.EnvironmentVariableTarget]::User)
+        $parts = $curr -split ';' | Where-Object { $_ -ne '' }
+        if ($parts -notcontains $newDir) {
+            $updated = "$newDir;" + $curr
+            [System.Environment]::SetEnvironmentVariable('Path', $updated, [System.EnvironmentVariableTarget]::User)
+        }
+    } catch {}
 }
 
 Refresh-Path
@@ -28,9 +43,10 @@ Refresh-Path
 # ==========================================
 # 1. NODE.JS CHECK & AUTO-INSTALL
 # ==========================================
-Write-Host "`n[1/3] Checking Node.js runtime..." -ForegroundColor Yellow
-$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
-if (-not $nodeCmd) {
+Write-Host "`n[1/4] Checking Node.js runtime..." -ForegroundColor Yellow
+$nodeCheck = Get-Command node -ErrorAction SilentlyContinue
+
+if (-not $nodeCheck) {
     Write-Host "  -> Node.js not detected in PATH. Attempting automatic installation..." -ForegroundColor Magenta
 
     # Try winget first if available
@@ -44,7 +60,7 @@ if (-not $nodeCmd) {
     }
 
     if (-not $installed) {
-        Write-Host "  -> Downloading official Node.js v20 LTS MSI..." -ForegroundColor Gray
+        Write-Host "  -> Downloading official Node.js v20 LTS MSI installer..." -ForegroundColor Gray
         $msiUrl = "https://nodejs.org/dist/v20.18.0/node-v20.18.0-x64.msi"
         $msiFile = Join-Path $env:TEMP "node_setup.msi"
         try {
@@ -54,6 +70,7 @@ if (-not $nodeCmd) {
             Start-Process msiexec.exe -ArgumentList "/i `"$msiFile`" /qn /norestart" -Wait
             Remove-Item $msiFile -Force -ErrorAction SilentlyContinue
             Refresh-Path
+            Add-To-User-Path "C:\Program Files\nodejs"
         } catch {
             Write-Host "  -> Automatic Node.js download failed: $_" -ForegroundColor Red
         }
@@ -67,36 +84,54 @@ if ($nodeCheck) {
     Write-Host "  [OK] Node.js ready: $ver ($($nodeCheck.Source))" -ForegroundColor Green
 } else {
     Write-Host "  [!] Node.js could not be installed automatically." -ForegroundColor Red
-    Write-Host "      Please download & install Node.js (v20 or v22) from: https://nodejs.org/" -ForegroundColor Yellow
+    Write-Host "      Please install Node.js from https://nodejs.org/" -ForegroundColor Yellow
 }
 
 # ==========================================
-# 2. PYTHON CHECK & AUTO-INSTALL
+# 2. PYTHON CHECK & AUTO-INSTALL (BYPASS DUMMY ALIASES)
 # ==========================================
-Write-Host "`n[2/3] Checking Python 3.10+ runtime..." -ForegroundColor Yellow
+Write-Host "`n[2/4] Checking Python 3.10+ runtime..." -ForegroundColor Yellow
 
-function Test-RealPython($cmdName) {
-    if (-not $cmdName) { return $false }
+function Test-RealPython($cmdPath) {
+    if (-not $cmdPath) { return $false }
     try {
-        $p = Start-Process -FilePath $cmdName -ArgumentList "-c `"import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)`"" -PassThru -Wait -WindowStyle Hidden -ErrorAction Stop
+        $p = Start-Process -FilePath $cmdPath -ArgumentList "-c `"import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)`"" -PassThru -Wait -WindowStyle Hidden -ErrorAction Stop
         return ($p.ExitCode -eq 0)
     } catch {
         return $false
     }
 }
 
-$hasPython = (Test-RealPython "python") -or (Test-RealPython "py") -or (Test-RealPython "C:\Program Files\Python311\python.exe") -or (Test-RealPython "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe")
+function Find-RealPython {
+    $candidates = @(
+        "python",
+        "py",
+        "C:\Program Files\Python311\python.exe",
+        "C:\Program Files\Python312\python.exe",
+        "C:\Program Files\Python310\python.exe",
+        (Join-Path $env:LOCALAPPDATA "Programs\Python\Python311\python.exe"),
+        (Join-Path $env:LOCALAPPDATA "Programs\Python\Python312\python.exe"),
+        (Join-Path $env:LOCALAPPDATA "Programs\Python\Python310\python.exe")
+    )
+    foreach ($c in $candidates) {
+        if (Test-RealPython $c) { return $c }
+    }
+    return $null
+}
 
-if (-not $hasPython) {
+$activePy = Find-RealPython
+
+if (-not $activePy) {
     Write-Host "  -> Functional Python 3 not detected. Attempting automatic installation..." -ForegroundColor Magenta
+
     $winget = Get-Command winget -ErrorAction SilentlyContinue
     $installed = $false
     if ($winget) {
         Write-Host "  -> Installing Python 3.11 via winget..." -ForegroundColor Gray
         Start-Process winget -ArgumentList "install Python.Python.3.11 --accept-package-agreements --accept-source-agreements --silent" -Wait -NoNewWindow
         Refresh-Path
-        $hasPython = (Test-RealPython "python") -or (Test-RealPython "py")
-        if ($hasPython) { $installed = $true }
+        $activePy = Find-RealPython
+        if ($activePy) { $installed = $true }
     }
 
     if (-not $installed) {
@@ -108,10 +143,16 @@ if (-not $hasPython) {
             Invoke-WebRequest -Uri $pyUrl -OutFile $pyFile -UseBasicParsing
             Write-Host "  -> Running silent Python installation (this takes ~30 seconds)..." -ForegroundColor Gray
             $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-            $installArgs = if ($isAdmin) { "/quiet InstallAllUsers=1 PrependPath=1 Include_pip=1" } else { "/quiet InstallAllUsers=0 PrependPath=1 Include_pip=1" }
+            $installArgs = if ($isAdmin) { "/quiet InstallAllUsers=1 PrependPath=1 Include_pip=1 Shortcuts=0" } else { "/quiet InstallAllUsers=0 PrependPath=1 Include_pip=1 Shortcuts=0" }
             Start-Process $pyFile -ArgumentList $installArgs -Wait
             Remove-Item $pyFile -Force -ErrorAction SilentlyContinue
             Refresh-Path
+            $activePy = Find-RealPython
+            if ($activePy) {
+                $pyDir = Split-Path $activePy -Parent
+                Add-To-User-Path $pyDir
+                Add-To-User-Path (Join-Path $pyDir "Scripts")
+            }
         } catch {
             Write-Host "  -> Automatic Python download failed: $_" -ForegroundColor Red
         }
@@ -119,68 +160,70 @@ if (-not $hasPython) {
 }
 
 Refresh-Path
-$activePy = $null
-if (Test-RealPython "python") { $activePy = "python" }
-elseif (Test-RealPython "py") { $activePy = "py" }
-elseif (Test-RealPython "C:\Program Files\Python311\python.exe") { $activePy = "C:\Program Files\Python311\python.exe" }
-elseif (Test-RealPython "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe") { $activePy = "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe" }
-
+$activePy = Find-RealPython
 if ($activePy) {
     $pyVer = & $activePy --version 2>&1
     Write-Host "  [OK] Python ready: $pyVer ($activePy)" -ForegroundColor Green
 } else {
-    Write-Host "  [!] Real Python was not found. Please download & install Python 3.11 from: https://python.org/" -ForegroundColor Yellow
-    Write-Host "      (Make sure to check 'Add python.exe to PATH' during installation)" -ForegroundColor Yellow
+    Write-Host "  [!] Real Python was not found. Please install Python 3.11 from https://python.org/" -ForegroundColor Yellow
 }
 
 # ==========================================
 # 3. FFMPEG CHECK & ZERO-ADMIN PORTABLE INSTALL
 # ==========================================
-Write-Host "`n[3/3] Checking FFmpeg multimedia engine..." -ForegroundColor Yellow
-$ffmpegCmd = Get-Command ffmpeg -ErrorAction SilentlyContinue
+Write-Host "`n[3/4] Checking FFmpeg multimedia engine..." -ForegroundColor Yellow
+$binDir = Join-Path $repoRoot "bin\ffmpeg"
+$localFfmpeg = Join-Path $binDir "ffmpeg.exe"
 
-if (-not $ffmpegCmd) {
-    $binDir = Join-Path $repoRoot "bin\ffmpeg"
-    $localFfmpeg = Join-Path $binDir "ffmpeg.exe"
+$ffmpegOk = $false
+try {
+    $p = Start-Process -FilePath "ffmpeg" -ArgumentList "-version" -PassThru -Wait -WindowStyle Hidden -ErrorAction Stop
+    if ($p.ExitCode -eq 0) { $ffmpegOk = $true }
+} catch {}
 
-    if (Test-Path $localFfmpeg) {
-        Write-Host "  [OK] Local portable FFmpeg found at $binDir" -ForegroundColor Green
-        $ffmpegCmd = $localFfmpeg
-    } else {
-        Write-Host "  -> FFmpeg missing. Downloading zero-admin portable FFmpeg binary..." -ForegroundColor Magenta
-        New-Item -ItemType Directory -Path $binDir -Force | Out-Null
-        $ffmpegZip = Join-Path $env:TEMP "ffmpeg_portable.zip"
-        $zipUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+if (-not $ffmpegOk -and (Test-Path $localFfmpeg)) {
+    try {
+        $p = Start-Process -FilePath $localFfmpeg -ArgumentList "-version" -PassThru -Wait -WindowStyle Hidden -ErrorAction Stop
+        if ($p.ExitCode -eq 0) { $ffmpegOk = $true }
+    } catch {}
+}
 
-        try {
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
-            Invoke-WebRequest -Uri $zipUrl -OutFile $ffmpegZip -UseBasicParsing
-            Write-Host "  -> Extracting FFmpeg binaries..." -ForegroundColor Gray
-            $extractDir = Join-Path $env:TEMP "ffmpeg_extract"
-            Expand-Archive -Path $ffmpegZip -DestinationPath $extractDir -Force
-            $foundExe = Get-ChildItem -Path $extractDir -Filter "ffmpeg.exe" -Recurse | Select-Object -First 1
-            $foundProbe = Get-ChildItem -Path $extractDir -Filter "ffprobe.exe" -Recurse | Select-Object -First 1
-            if ($foundExe) { Copy-Item $foundExe.FullName -Destination (Join-Path $binDir "ffmpeg.exe") -Force }
-            if ($foundProbe) { Copy-Item $foundProbe.FullName -Destination (Join-Path $binDir "ffprobe.exe") -Force }
-            Remove-Item $ffmpegZip -Force -ErrorAction SilentlyContinue
-            Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
-            Refresh-Path
-            Write-Host "  [OK] Portable FFmpeg installed into $binDir" -ForegroundColor Green
-        } catch {
-            Write-Host "  -> Portable FFmpeg download failed: $_" -ForegroundColor Yellow
-            Write-Host "  -> Trying winget fallback..." -ForegroundColor Gray
-            Start-Process winget -ArgumentList "install -e --id Gyan.FFmpeg --accept-package-agreements --accept-source-agreements --silent" -Wait -NoNewWindow
-            Refresh-Path
-        }
+if (-not $ffmpegOk) {
+    Write-Host "  -> FFmpeg missing. Downloading zero-admin portable FFmpeg binary..." -ForegroundColor Magenta
+    New-Item -ItemType Directory -Path $binDir -Force | Out-Null
+    $ffmpegZip = Join-Path $env:TEMP "ffmpeg_portable.zip"
+    $zipUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+        Invoke-WebRequest -Uri $zipUrl -OutFile $ffmpegZip -UseBasicParsing
+        Write-Host "  -> Extracting FFmpeg binaries..." -ForegroundColor Gray
+        $extractDir = Join-Path $env:TEMP "ffmpeg_extract"
+        Expand-Archive -Path $ffmpegZip -DestinationPath $extractDir -Force
+        $foundExe = Get-ChildItem -Path $extractDir -Filter "ffmpeg.exe" -Recurse | Select-Object -First 1
+        $foundProbe = Get-ChildItem -Path $extractDir -Filter "ffprobe.exe" -Recurse | Select-Object -First 1
+        if ($foundExe) { Copy-Item $foundExe.FullName -Destination (Join-Path $binDir "ffmpeg.exe") -Force }
+        if ($foundProbe) { Copy-Item $foundProbe.FullName -Destination (Join-Path $binDir "ffprobe.exe") -Force }
+        Remove-Item $ffmpegZip -Force -ErrorAction SilentlyContinue
+        Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+        Refresh-Path
+        Add-To-User-Path $binDir
+        Write-Host "  [OK] Portable FFmpeg installed into $binDir" -ForegroundColor Green
+        $ffmpegOk = $true
+    } catch {
+        Write-Host "  -> Portable FFmpeg download failed: $_" -ForegroundColor Yellow
+        Write-Host "  -> Trying winget fallback..." -ForegroundColor Gray
+        Start-Process winget -ArgumentList "install -e --id Gyan.FFmpeg --accept-package-agreements --accept-source-agreements --silent" -Wait -NoNewWindow
+        Refresh-Path
     }
 } else {
-    Write-Host "  [OK] FFmpeg detected in system PATH." -ForegroundColor Green
+    Write-Host "  [OK] FFmpeg engine is ready." -ForegroundColor Green
 }
 
 # ==========================================
-# 4. INITIALIZE DIRECTORIES & .ENV
+# 4. INITIALIZE DIRECTORIES, .ENV & SELF-HEAL PORT 3000
 # ==========================================
-Write-Host "`n[4/4] Verifying project directories and configuration..." -ForegroundColor Yellow
+Write-Host "`n[4/4] Verifying project directories, configuration & ports..." -ForegroundColor Yellow
 $dirs = @(
     "storage",
     "storage\database",
@@ -215,7 +258,21 @@ APP_BASE_URL=http://127.0.0.1:3000
         Write-Host "  [OK] Generated default .env file." -ForegroundColor Green
     }
 } else {
-    Write-Host "  [OK] .env file present." -ForegroundColor Green
+    Write-Host "  [OK] .env configuration verified." -ForegroundColor Green
 }
 
-Write-Host "`n[SUCCESS] Prerequisites check complete!" -ForegroundColor Cyan
+# Auto-free port 3000 if occupied by an unresponsive zombie process
+try {
+    $portConn = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($portConn) {
+        $ownerPid = $portConn.OwningProcess
+        try {
+            $testRes = Invoke-WebRequest -Uri "http://127.0.0.1:3000" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
+        } catch {
+            Write-Host "  [AUTO-HEAL] Unresponsive process (PID $ownerPid) detected on port 3000. Freeing port..." -ForegroundColor Yellow
+            Stop-Process -Id $ownerPid -Force -ErrorAction SilentlyContinue
+        }
+    }
+} catch {}
+
+Write-Host "`n[SUCCESS] Prerequisites check and auto-provisioning complete!" -ForegroundColor Cyan

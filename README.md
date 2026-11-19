@@ -1,21 +1,33 @@
 # Content-Creation-Hub — Local AI Video Production Studio
 
-> **⚡ 1-COMMAND FULL AUTOMATED SETUP (Fresh Laptop / Any Windows PC):**
+> **⚡ 1-COMMAND UNIVERSAL SETUP (Zero Prerequisites Needed — Any Windows 10/11 Laptop):**
 >
-> Open **PowerShell** or **Command Prompt** and paste this single command:
+> Open **PowerShell** (Normal user or Admin) and paste this single command:
 > 
+> ```powershell
+> irm https://raw.githubusercontent.com/Ayushbunkar/Content-Creation-Hub/main/scripts/install.ps1 | iex
+> ```
+>
+> *(Or if you prefer traditional **Git Clone**):*
 > ```powershell
 > cd $HOME; git clone https://github.com/Ayushbunkar/Content-Creation-Hub.git; cd Content-Creation-Hub; .\setup.bat
 > ```
-> *(Or to install directly on your **Desktop**:)*
-> ```powershell
-> cd $HOME\Desktop; git clone https://github.com/Ayushbunkar/Content-Creation-Hub.git; cd Content-Creation-Hub; .\setup.bat
-> ```
-> *Or in standard Command Prompt (cmd.exe):*
+> *(Or in standard **Command Prompt (cmd.exe)**):*
 > ```cmd
 > cd /d %USERPROFILE% && git clone https://github.com/Ayushbunkar/Content-Creation-Hub.git && cd Content-Creation-Hub && .\setup.bat
 > ```
-> *(Zero manual prerequisite installations needed — `setup.bat` automatically detects and installs Node.js, Python, portable FFmpeg, AI virtual environments, default configuration, and launches the Studio on http://127.0.0.1:3000)*
+> *(Already cloned on your laptop? Just pull updates and run):*
+> ```cmd
+> git pull && .\setup.bat
+> ```
+>
+> 🛡️ **Self-Healing Automation Guarantee**:
+> - **No Node.js?** Auto-downloads and installs official Node.js LTS silently.
+> - **No Python?** Auto-bypasses Windows dummy Store aliases and installs official Python 3.11 with pip.
+> - **No FFmpeg?** Auto-provisions portable zero-admin static FFmpeg binaries.
+> - **Port 3000 busy or dead?** Auto-kills unresponsive zombie processes and binds cleanly.
+> - **Dependency issues?** Auto-retries `npm install` with `--legacy-peer-deps` and cache repair.
+> - **Auto-Launch**: Desktop shortcut icon created on your Desktop and opens `http://127.0.0.1:3000` automatically!
 >
 > 💡 *Note: The `cd $HOME` part is essential because Windows restricts cloning inside `C:\Windows\System32` (Permission Denied).*
 
