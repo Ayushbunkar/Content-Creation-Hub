@@ -1606,25 +1606,9 @@
           if (!res.ok || data.error) throw new Error(data.error || 'Chat analysis failed');
           setStreamAnalysisResult(data);
 
-          // Automatically start rendering the #1 best clip immediately!
+          // Automatically render ALL moments sequentially in the background!
           if (data.moments && data.moments.length > 0) {
-            const bestMoment = data.moments[0];
-            setStreamRenderingRank(bestMoment.rank);
-            const rRes = await fetch('/api/stream-clipper/render-clip', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                url: data.url || targetUrl,
-                moment: bestMoment,
-                streamerName: streamer.name,
-                cropMode: streamCropMode,
-                isDemo: Boolean(data.isDemo || data.url === 'Demo Stream Simulation')
-              })
-            });
-            const rData = await rRes.json();
-            if (rData.success) {
-              setRenderedStreamClips({ [bestMoment.rank]: rData });
-            }
+            autoRenderAllMoments(data.moments, data);
           }
         } catch (e) {
           showAppModal({
@@ -1727,26 +1711,11 @@
             });
           }
           setStreamAnalysisResult(data);
+          setIsStreamAnalyzing(false);
 
-          // Automatically start rendering the #1 best clip immediately
+          // Automatically render ALL moments sequentially in the background!
           if (data.moments && data.moments.length > 0) {
-            const bestMoment = data.moments[0];
-            setStreamRenderingRank(bestMoment.rank);
-            const rRes = await fetch('/api/stream-clipper/render-clip', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                url: data.url || targetUrl,
-                moment: bestMoment,
-                streamerName: data.streamerName || selectedStreamer?.name || 'Creator',
-                cropMode: streamCropMode,
-                isDemo: Boolean(data.isDemo || data.url === 'Demo Stream Simulation')
-              })
-            });
-            const rData = await rRes.json();
-            if (rData.success) {
-              setRenderedStreamClips({ [bestMoment.rank]: rData });
-            }
+            autoRenderAllMoments(data.moments, data);
           }
         } catch (e) {
           showAppModal({
@@ -1760,13 +1729,18 @@
         }
       };
 
-      const handleRenderStreamClip = async (moment) => {
+      const handleRenderStreamClip = async (moment, customAnalysis = null) => {
         setStreamRenderingRank(moment.rank);
         const override = momentFramingOverrides[moment.rank] || {};
         const chosenCropMode = override.cropMode || streamCropMode;
         const chosenBlur = override.blurIntensity || streamBlurIntensity;
         const chosenCam = override.camPosition || streamCamPosition;
         const chosenCaptionStyle = override.captionStyle || streamCaptionStyle;
+
+        const effectiveAnalysis = customAnalysis || streamAnalysisResult;
+        const targetUrl = effectiveAnalysis?.url || streamUrlInput.trim() || '';
+        const streamerName = effectiveAnalysis?.streamerName || selectedStreamer?.name || 'Creator';
+        const isDemo = Boolean(effectiveAnalysis?.isDemo || targetUrl === 'Demo Stream Simulation' || !targetUrl.includes('http'));
 
         try {
           let res;
@@ -1776,14 +1750,14 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  url: streamAnalysisResult?.url || streamUrlInput.trim() || '',
+                  url: targetUrl,
                   moment,
-                  streamerName: streamAnalysisResult?.streamerName || selectedStreamer?.name || 'Creator',
+                  streamerName,
                   cropMode: chosenCropMode,
                   blurIntensity: chosenBlur,
                   camPosition: chosenCam,
                   captionStyle: chosenCaptionStyle,
-                  isDemo: Boolean(streamAnalysisResult?.isDemo || streamAnalysisResult?.url === 'Demo Stream Simulation')
+                  isDemo
                 })
               });
               if (res.ok) break;
@@ -1812,21 +1786,40 @@
           }));
           return data;
         } catch (e) {
-          showAppModal({
-            title: 'Clip Render Error',
-            message: e.message || 'Failed to extract and render 9:16 vertical clip.',
-            type: 'error'
-          });
+          console.error(`Clip Render Error on rank ${moment.rank}:`, e);
           return null;
         } finally {
           setStreamRenderingRank(null);
         }
       };
 
-      const handleRenderAllStreamClips = async () => {
-        if (!streamAnalysisResult?.moments?.length) return;
+      const autoRenderAllMoments = async (momentsList, analysisData) => {
+        if (!momentsList || momentsList.length === 0) return;
         setIsStreamBatchRendering(true);
-        const moments = streamAnalysisResult.moments;
+        try {
+          for (let i = 0; i < momentsList.length; i++) {
+            const m = momentsList[i];
+            setBatchRenderProgress({
+              current: i + 1,
+              total: momentsList.length,
+              title: m.headline_hook || `Moment #${m.rank}`
+            });
+            await handleRenderStreamClip(m, analysisData);
+          }
+        } catch (err) {
+          console.warn('[StreamClipper] Auto-render all moments encountered error:', err);
+        } finally {
+          setIsStreamBatchRendering(false);
+          setBatchRenderProgress(null);
+          setStreamRenderingRank(null);
+        }
+      };
+
+      const handleRenderAllStreamClips = async (momentsList = null, analysisData = null) => {
+        const moments = momentsList || streamAnalysisResult?.moments;
+        const analysis = analysisData || streamAnalysisResult;
+        if (!moments?.length) return;
+        setIsStreamBatchRendering(true);
         const newlyRendered = [];
         
         try {
@@ -1834,7 +1827,7 @@
             const m = moments[i];
             setBatchRenderProgress({ current: i + 1, total: moments.length, title: m.headline_hook });
             if (!renderedStreamClips[m.rank]) {
-              const res = await handleRenderStreamClip(m);
+              const res = await handleRenderStreamClip(m, analysis);
               if (res && res.clipUrl) {
                 newlyRendered.push({ rank: m.rank, url: res.clipUrl });
               }
@@ -4877,7 +4870,7 @@
                                   disabled={isRenderingThis || isStreamBatchRendering}
                                   class="w-full py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-red-600 to-indigo-600 hover:from-red-500 hover:to-indigo-500 text-white transition flex items-center justify-center space-x-2 shadow-lg shadow-indigo-600/20 disabled:opacity-50"
                                 >
-                                  <span>{isRenderingThis ? '⏳ Downloading & Cropping 9:16 Reel...' : '🎬 Render & Download 9:16 Reel (MP4)'}</span>
+                                  <span>{isRenderingThis ? '⏳ Downloading & Cropping 9:16 Reel...' : isStreamBatchRendering ? '⏳ In Auto-Render Queue (Waiting)...' : '🎬 Render & Download 9:16 Reel (MP4)'}</span>
                                 </button>
                               )}
                             </div>
