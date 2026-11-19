@@ -363,6 +363,11 @@ export class StreamClipFinderService {
     const tempRawPath = path.join(process.cwd(), 'storage', 'stream_clips', `raw_${clipId}.mp4`);
     fs.mkdirSync(path.dirname(tempRawPath), { recursive: true });
 
+    // Deterministic persistent cache paths so user can re-render different framings in 2-3 seconds without re-downloading!
+    const urlHash = Buffer.from(url || 'demo').toString('base64url').substring(0, 16);
+    const cachedRawPath = path.join(process.cwd(), 'storage', 'stream_clips', `raw_cache_${urlHash}_rank${moment.rank}.mp4`);
+    const cachedTranscriptPath = path.join(process.cwd(), 'storage', 'stream_clips', `transcript_cache_${urlHash}_rank${moment.rank}.json`);
+
     const isChannelPage = url.includes('/@') || url.includes('/channel/') || url.includes('/streams');
     const isRealVideo = !isDemo && !isChannelPage && (
       url.includes('watch?v=') ||
@@ -373,17 +378,26 @@ export class StreamClipFinderService {
       url.includes('/clip/')
     );
 
+    // If a cached raw clip already exists for this moment, reuse it instantly (0s download)
+    let usedRawCache = false;
+    if (fs.existsSync(cachedRawPath) && (await this.isValidVideo(cachedRawPath))) {
+      console.log(`[streamClipper] ⚡ FAST RE-RENDER: Using cached raw video for Moment #${moment.rank}! (0s download)`);
+      try {
+        fs.copyFileSync(cachedRawPath, tempRawPath);
+        usedRawCache = true;
+      } catch (e) {
+        usedRawCache = false;
+      }
+    }
+
     // If streamerName is generic or default, resolve it from URL
     if ((!streamerName || streamerName === 'Creator' || streamerName === 'Streamer') && isRealVideo) {
       const info = await this.resolveStreamerInfo(url);
       if (info.channel) streamerName = info.channel;
     }
 
-    // Pre-Stream Waiting Screen Filter:
-    // If the clip start is in the first 3 minutes (<200s) on a full stream,
-    // streamers are on a static "Starting Soon / Countdown / Coming Soon" screen.
-    // Automatically advance into active broadcast so real gameplay and commentary are clipped!
-    if (isRealVideo && moment.clip_start_sec < 200 && !url.includes('/shorts/') && !url.includes('/clip/')) {
+    // Pre-Stream Waiting Screen Filter (only if not using cached raw clip)
+    if (!usedRawCache && isRealVideo && moment.clip_start_sec < 200 && !url.includes('/shorts/') && !url.includes('/clip/')) {
       console.log(`[streamClipper] Clip #${moment.rank} was scheduled in intro countdown (${moment.clip_start_formatted}). Advancing past waiting screen into active stream...`);
       moment.clip_start_sec = 270;
       moment.clip_start_formatted = '00:04:30';
@@ -395,8 +409,8 @@ export class StreamClipFinderService {
 
     const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
 
-    // Step 1: Download actual stream video chunk directly using fast HLS/m3u8 slicing
-    if (isRealVideo) {
+    // Step 1: Download actual stream video chunk directly using fast HLS/m3u8 slicing (if not using cached raw clip)
+    if (isRealVideo && !usedRawCache) {
       console.log(`[streamClipper] Resolving direct stream URL for fast cut (${moment.clip_start_formatted} - ${moment.clip_end_formatted})...`);
       
       let streamUrls: string[] = [];
@@ -645,6 +659,9 @@ export class StreamClipFinderService {
       try { if (fs.existsSync(tempRawPath)) fs.unlinkSync(tempRawPath); } catch (e) {}
       console.log(`[streamClipper] Raw stream unreadable or missing moov atom. Generating guaranteed clean sample clip for #${moment.rank}...`);
       await this.generateSampleStreamVideo(tempRawPath, moment, streamerName);
+    } else if (!usedRawCache && !fs.existsSync(cachedRawPath)) {
+      // Save pristine raw clip to persistent cache for instant 2-second re-renders!
+      try { fs.copyFileSync(tempRawPath, cachedRawPath); } catch (e) {}
     }
 
     // Step 2: Calculate split divider Y and generate Center Hook + Spoken captions

@@ -1803,7 +1803,12 @@
           }
           setRenderedStreamClips(prev => ({
             ...prev,
-            [moment.rank]: data
+            [moment.rank]: {
+              ...data,
+              appliedCropMode: chosenCropMode,
+              appliedCamPosition: chosenCam,
+              appliedBlur: chosenBlur
+            }
           }));
           return data;
         } catch (e) {
@@ -4576,82 +4581,161 @@
                               </div>
 
                               {/* Custom Moment Framing & Blur Controls */}
-                              <div class="bg-slate-950/60 rounded-xl p-3 border border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
-                                <div class="flex items-center space-x-2">
-                                  <span class="text-[11px] font-bold text-slate-400">Framing:</span>
-                                  <select
-                                    value={(momentFramingOverrides[moment.rank]?.cropMode) || streamCropMode}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setMomentFramingOverrides(prev => ({
-                                        ...prev,
-                                        [moment.rank]: { ...(prev[moment.rank] || {}), cropMode: val }
-                                      }));
-                                    }}
-                                    class="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-200"
-                                  >
-                                    <option value="split_speed_60_40">🔥 Split 40/60 (Speed Style)</option>
-                                    <option value="split_50_50">⚖️ Split 50/50 Equal</option>
-                                    <option value="split_30_70">🎮 Split 30/70 (Max Game)</option>
-                                    <option value="split_70_30">🎙️ Split 70/30 (Max Cam)</option>
-                                    <option value="blur_pad">🪟 Gaussian Blur Pad</option>
-                                    <option value="smart_zoom">🔍 Smart Speaker Zoom</option>
-                                    <option value="center_crop">✂️ Direct Center Crop</option>
-                                    <option value="square_1_1">⬛ 1:1 Square</option>
-                                    <option value="source_16_9">📺 16:9 Original</option>
-                                  </select>
-                                </div>
+                              {(() => {
+                                const currentCrop = (momentFramingOverrides[moment.rank]?.cropMode) || streamCropMode;
+                                const currentCam = (momentFramingOverrides[moment.rank]?.camPosition) || streamCamPosition;
+                                const hasFramingChanged = renderedData && (
+                                  currentCrop !== (renderedData.appliedCropMode || streamCropMode) ||
+                                  currentCam !== (renderedData.appliedCamPosition || streamCamPosition)
+                                );
 
-                                <div class="flex items-center space-x-2">
-                                  <span class="text-[11px] font-bold text-slate-400">Webcam:</span>
-                                  <select
-                                    value={(momentFramingOverrides[moment.rank]?.camPosition) || streamCamPosition}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setMomentFramingOverrides(prev => ({
-                                        ...prev,
-                                        [moment.rank]: { ...(prev[moment.rank] || {}), camPosition: val }
-                                      }));
-                                    }}
-                                    class="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs text-slate-200"
-                                  >
-                                    <option value="auto_detect">🤖 AI Auto-Detect (Auto-frame Facecam)</option>
-                                    <option value="center_left">📍 Middle-Left (Speed live)</option>
-                                    <option value="top_left">📍 Top-Left</option>
-                                    <option value="bottom_left">📍 Bottom-Left</option>
-                                    <option value="top_right">📍 Top-Right</option>
-                                    <option value="bottom_right">📍 Bottom-Right</option>
-                                    <option value="auto_center">🎯 Center</option>
-                                  </select>
-                                </div>
+                                return (
+                                  <div class="space-y-2.5">
+                                    {/* 1-Click Framing Preset Quick Pills */}
+                                    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] font-bold">
+                                      <span class="text-slate-500 uppercase tracking-wider text-[10px] mr-1 shrink-0">Presets:</span>
+                                      {[
+                                        { id: 'split_speed_60_40', label: '🔥 40/60 (Speed)' },
+                                        { id: 'split_50_50', label: '⚖️ 50/50 Equal' },
+                                        { id: 'split_30_70', label: '🎮 30/70 Max Game' },
+                                        { id: 'split_70_30', label: '🎙️ 70/30 Max Cam' },
+                                        { id: 'blur_pad', label: '🪟 Blur Pad' },
+                                        { id: 'center_crop', label: '✂️ Center Crop' }
+                                      ].map(p => {
+                                        const isSelected = currentCrop === p.id;
+                                        return (
+                                          <button
+                                            key={p.id}
+                                            onClick={() => {
+                                              setMomentFramingOverrides(prev => ({
+                                                ...prev,
+                                                [moment.rank]: { ...(prev[moment.rank] || {}), cropMode: p.id }
+                                              }));
+                                            }}
+                                            class={`px-2.5 py-1 rounded-lg border transition shrink-0 cursor-pointer ${
+                                              isSelected
+                                                ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
+                                                : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800'
+                                            }`}
+                                          >
+                                            {p.label}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
 
-                                {((momentFramingOverrides[moment.rank]?.cropMode) || streamCropMode) === 'blur_pad' && (
-                                  <div class="flex items-center space-x-2">
-                                    <span class="text-[11px] font-bold text-slate-400">Blur:</span>
-                                    <select
-                                      value={(momentFramingOverrides[moment.rank]?.blurIntensity) || streamBlurIntensity}
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        setMomentFramingOverrides(prev => ({
-                                          ...prev,
-                                          [moment.rank]: { ...(prev[moment.rank] || {}), blurIntensity: val }
-                                        }));
-                                      }}
-                                      class="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs font-semibold text-indigo-300"
-                                    >
-                                      <option value="subtle">Subtle (10px)</option>
-                                      <option value="medium">Medium (25px)</option>
-                                      <option value="heavy">Deep Heavy (45px)</option>
-                                    </select>
+                                    {/* Detailed Framing & Webcam Dropdowns */}
+                                    <div class="bg-slate-950/60 rounded-xl p-3 border border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
+                                      <div class="flex items-center space-x-2">
+                                        <span class="text-[11px] font-bold text-slate-400">Framing:</span>
+                                        <select
+                                          value={currentCrop}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            setMomentFramingOverrides(prev => ({
+                                              ...prev,
+                                              [moment.rank]: { ...(prev[moment.rank] || {}), cropMode: val }
+                                            }));
+                                          }}
+                                          class="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-200"
+                                        >
+                                          <option value="split_speed_60_40">🔥 Split 40/60 (Speed Style)</option>
+                                          <option value="split_50_50">⚖️ Split 50/50 Equal</option>
+                                          <option value="split_30_70">🎮 Split 30/70 (Max Game)</option>
+                                          <option value="split_70_30">🎙️ Split 70/30 (Max Cam)</option>
+                                          <option value="blur_pad">🪟 Gaussian Blur Pad</option>
+                                          <option value="smart_zoom">🔍 Smart Speaker Zoom</option>
+                                          <option value="center_crop">✂️ Direct Center Crop</option>
+                                          <option value="square_1_1">⬛ 1:1 Square</option>
+                                          <option value="source_16_9">📺 16:9 Original</option>
+                                        </select>
+                                      </div>
+
+                                      <div class="flex items-center space-x-2">
+                                        <span class="text-[11px] font-bold text-slate-400">Webcam:</span>
+                                        <select
+                                          value={currentCam}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            setMomentFramingOverrides(prev => ({
+                                              ...prev,
+                                              [moment.rank]: { ...(prev[moment.rank] || {}), camPosition: val }
+                                            }));
+                                          }}
+                                          class="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs text-slate-200"
+                                        >
+                                          <option value="auto_detect">🤖 AI Auto-Detect (Auto-frame Facecam)</option>
+                                          <option value="center_left">📍 Middle-Left (Speed live)</option>
+                                          <option value="top_left">📍 Top-Left</option>
+                                          <option value="bottom_left">📍 Bottom-Left</option>
+                                          <option value="top_right">📍 Top-Right</option>
+                                          <option value="bottom_right">📍 Bottom-Right</option>
+                                          <option value="auto_center">🎯 Center</option>
+                                        </select>
+                                      </div>
+
+                                      {currentCrop === 'blur_pad' && (
+                                        <div class="flex items-center space-x-2">
+                                          <span class="text-[11px] font-bold text-slate-400">Blur:</span>
+                                          <select
+                                            value={(momentFramingOverrides[moment.rank]?.blurIntensity) || streamBlurIntensity}
+                                            onChange={(e) => {
+                                              const val = e.target.value;
+                                              setMomentFramingOverrides(prev => ({
+                                                ...prev,
+                                                [moment.rank]: { ...(prev[moment.rank] || {}), blurIntensity: val }
+                                              }));
+                                            }}
+                                            class="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs font-semibold text-indigo-300"
+                                          >
+                                            <option value="subtle">Subtle (10px)</option>
+                                            <option value="medium">Medium (25px)</option>
+                                            <option value="heavy">Deep Heavy (45px)</option>
+                                          </select>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Instant Re-Generate Banner when framing or webcam is changed after render */}
+                                    {hasFramingChanged && (
+                                      <div class="p-3 rounded-xl bg-gradient-to-r from-amber-950/60 via-orange-950/40 to-slate-900 border border-amber-500/60 flex items-center justify-between gap-3 shadow-lg shadow-amber-950/40">
+                                        <div class="flex items-center space-x-2">
+                                          <span class="text-base">⚡</span>
+                                          <div>
+                                            <div class="text-xs font-bold text-amber-300 flex items-center space-x-1">
+                                              <span>New Framing Selected:</span>
+                                              <span class="text-white bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/40 uppercase font-mono text-[11px]">
+                                                {currentCrop.replace('split_', '').replace('_', '/')}
+                                              </span>
+                                            </div>
+                                            <div class="text-[10px] text-amber-400/80">Uses cached stream — renders in 2 seconds without re-downloading!</div>
+                                          </div>
+                                        </div>
+                                        <button
+                                          onClick={() => handleRenderStreamClip(moment)}
+                                          disabled={isRenderingThis}
+                                          class="px-4 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 shadow-lg shadow-amber-500/30 flex items-center space-x-1.5 cursor-pointer transition active:scale-95 shrink-0"
+                                        >
+                                          <span>{isRenderingThis ? '⏳ Generating in 2s...' : '⚡ Apply & Re-Generate (2s)'}</span>
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
-                                )}
-                              </div>
+                                );
+                              })()}
 
-                              {/* Rendered Preview Player OR Render Button */}
+                              {/* Rendered Preview Player OR Initial Render Button */}
                               {renderedData ? (
                                 <div class="space-y-3 pt-2 border-t border-slate-800">
-                                  <div class="w-full rounded-xl overflow-hidden border border-slate-800 bg-black aspect-[9/16] max-h-72 flex items-center justify-center">
+                                  <div class="relative w-full rounded-xl overflow-hidden border border-slate-800 bg-black aspect-[9/16] max-h-80 flex items-center justify-center group">
                                     <video src={renderedData.clipUrl} controls class="w-full h-full object-contain"></video>
+
+                                    {/* Visual Split Overlay Indicator showing framing layout */}
+                                    <div class="absolute top-2 left-2 z-10 pointer-events-none">
+                                      <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-black/70 text-indigo-300 border border-indigo-500/40 backdrop-blur-sm">
+                                        {(renderedData.appliedCropMode || 'split_speed_60_40').replace('split_', '').replace('_', '/').toUpperCase()} REEL
+                                      </span>
+                                    </div>
                                   </div>
 
                                   {/* Publication Badges if already published */}
@@ -4683,6 +4767,15 @@
                                       {renderedData.fileSizeMb} MB • 9:16 Vertical Reel
                                     </span>
                                     <div class="flex items-center gap-1.5 flex-wrap">
+                                      {/* Re-Render with current options button */}
+                                      <button
+                                        onClick={() => handleRenderStreamClip(moment)}
+                                        disabled={isRenderingThis}
+                                        class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition flex items-center space-x-1 cursor-pointer"
+                                        title="Re-generate video using cached clip in 2s"
+                                      >
+                                        <span>{isRenderingThis ? '⏳' : '🔄'} Re-Render</span>
+                                      </button>
                                       <button
                                         onClick={() => openSocialPublishModal({
                                           clipId: `stream_moment_${moment.rank || (idx + 1)}`,
