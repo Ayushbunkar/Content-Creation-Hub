@@ -173,8 +173,10 @@ def detect_facecam(video_path: str, target_cam_h: int = 768, target_cam_w: int =
     # Calculate optimal camera crop window tightly zoomed on the streamer's face
     desired_ratio = 1080.0 / float(target_cam_h)  # e.g. 1080/768 = 1.406
 
-    # Tight punch-in zoom: 2.25x face width so streamer's face, expressions & chest fill the top reel frame
-    crop_w = int(max(fw * 2.25, 160))
+    # Optimal framing: ~2.6x face width (or min 24% of stream width in 1080p) so streamer's face,
+    # reactions, headphones and room background are captured in crisp high definition
+    min_w = int(video_w * 0.24) if video_w >= 1280 else 160
+    crop_w = int(max(fw * 2.6, min_w))
     crop_h = int(crop_w / desired_ratio)
 
     # Ensure crop doesn't exceed video dimensions

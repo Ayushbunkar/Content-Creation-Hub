@@ -409,7 +409,7 @@ export class StreamClipFinderService {
           '-m', 'yt_dlp',
           '--js-runtimes', nodeRuntime,
           '-g',
-          '-f', '231+234/230+234/311+234/bestvideo[height<=720]+bestaudio/best[height<=720]/best',
+          '-f', '312+234/303+140/299+140/137+140/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
           '--no-playlist',
           '--socket-timeout', '10',
           url
@@ -475,11 +475,11 @@ export class StreamClipFinderService {
         ffmpegArgs.push(
           '-t', String(durSec),
           '-c:v', 'libx264',
-          '-preset', 'ultrafast',
-          '-crf', '22',
+          '-preset', 'veryfast',
+          '-crf', '18',
           '-af', 'aresample=async=1:first_pts=0',
           '-c:a', 'aac',
-          '-b:a', '128k',
+          '-b:a', '192k',
           '-avoid_negative_ts', 'make_zero',
           '-movflags', '+faststart',
           tempRawPath
@@ -539,7 +539,7 @@ export class StreamClipFinderService {
             '--force-keyframes-at-cuts',
             '--no-playlist',
             '--socket-timeout', '20',
-            '-f', '134+140/230+234/bestvideo[height<=720]+bestaudio/best[height<=720]/best',
+            '-f', '312+234/303+140/299+140/137+140/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
             '--merge-output-format', 'mp4',
             '-o', tempRawPath,
             url
@@ -852,7 +852,7 @@ export class StreamClipFinderService {
         const stackFilter =
           `[0:v]split=2[in_cam][in_game];` +
           `[in_cam]${camCrop},scale=1080:${camH}:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:${camH}[cam];` +
-          `[in_game]crop=iw*0.72:ih:iw*0.14:0,scale=1080:${gameH}:force_original_aspect_ratio=increase,crop=1080:${gameH}[game];` +
+          `[in_game]crop=iw*0.72:ih:iw*0.14:0,scale=1080:${gameH}:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:${gameH}[game];` +
           `[cam][game]vstack=inputs=2[v_stacked]`;
 
         if (hasAss) {
@@ -863,41 +863,41 @@ export class StreamClipFinderService {
       } else if (mode === 'center_crop') {
         // Direct punch-in 9:16 vertical crop
         if (hasAss) {
-          filterComplex = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v0];[v0]subtitles='${escapedAss}'[v]`;
+          filterComplex = `[0:v]scale=1080:1920:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:1920[v0];[v0]subtitles='${escapedAss}'[v]`;
         } else {
-          filterComplex = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v]`;
+          filterComplex = `[0:v]scale=1080:1920:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:1920[v]`;
         }
       } else if (mode === 'smart_zoom') {
         // Smart Speaker Zoom & Face Tracking: Punch in 1.35x centered on the active focal region
         if (hasAss) {
-          filterComplex = `[0:v]scale=1440:2560:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2[v0];[v0]subtitles='${escapedAss}'[v]`;
+          filterComplex = `[0:v]scale=1440:2560:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2[v0];[v0]subtitles='${escapedAss}'[v]`;
         } else {
-          filterComplex = `[0:v]scale=1440:2560:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2[v]`;
+          filterComplex = `[0:v]scale=1440:2560:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2[v]`;
         }
       } else if (mode === 'square_1_1') {
         // 1:1 Square Feed format
         if (hasAss) {
-          filterComplex = `[0:v]scale=1080:1080:force_original_aspect_ratio=increase,crop=1080:1080[v0];[v0]subtitles='${escapedAss}'[v]`;
+          filterComplex = `[0:v]scale=1080:1080:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:1080[v0];[v0]subtitles='${escapedAss}'[v]`;
         } else {
-          filterComplex = `[0:v]scale=1080:1080:force_original_aspect_ratio=increase,crop=1080:1080[v]`;
+          filterComplex = `[0:v]scale=1080:1080:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:1080[v]`;
         }
       } else if (mode === 'source_16_9') {
         // Original 16:9 widescreen
         if (hasAss) {
-          filterComplex = `[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2[v0];[v0]subtitles='${escapedAss}'[v]`;
+          filterComplex = `[0:v]scale=1920:1080:flags=lanczos:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2[v0];[v0]subtitles='${escapedAss}'[v]`;
         } else {
-          filterComplex = `[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2[v]`;
+          filterComplex = `[0:v]scale=1920:1080:flags=lanczos:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2[v]`;
         }
       } else {
         // Classic viral streamer format: Gaussian blurred background + crisp centered 16:9 stream + burned 3/4 captions
         if (hasAss) {
-          filterComplex = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,${blurParams}[bg];` +
-                          `[0:v]scale=1080:-1:force_original_aspect_ratio=decrease[fg];` +
+          filterComplex = `[0:v]scale=1080:1920:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:1920,${blurParams}[bg];` +
+                          `[0:v]scale=1080:-1:flags=lanczos:force_original_aspect_ratio=decrease[fg];` +
                           `[bg][fg]overlay=(W-w)/2:(H-h)/2[v0];` +
                           `[v0]subtitles='${escapedAss}'[v]`;
         } else {
-          filterComplex = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,${blurParams}[bg];` +
-                          `[0:v]scale=1080:-1:force_original_aspect_ratio=decrease[fg];` +
+          filterComplex = `[0:v]scale=1080:1920:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:1920,${blurParams}[bg];` +
+                          `[0:v]scale=1080:-1:flags=lanczos:force_original_aspect_ratio=decrease[fg];` +
                           `[bg][fg]overlay=(W-w)/2:(H-h)/2[v]`;
         }
       }
@@ -911,11 +911,15 @@ export class StreamClipFinderService {
         '-r', '30',
         '-fps_mode', 'cfr',
         '-c:v', 'libx264',
-        '-preset', 'veryfast',
-        '-crf', '22',
+        '-preset', 'fast',
+        '-crf', '17',
+        '-b:v', '8500k',
+        '-maxrate', '12000k',
+        '-bufsize', '16000k',
+        '-pix_fmt', 'yuv420p',
         '-af', 'aresample=async=1:first_pts=0',
         '-c:a', 'aac',
-        '-b:a', '192k',
+        '-b:a', '256k',
         '-avoid_negative_ts', 'make_zero',
         '-movflags', '+faststart',
         outputPath
