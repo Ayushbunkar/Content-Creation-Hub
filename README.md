@@ -1,19 +1,22 @@
 # Content-Creation-Hub — Local AI Video Production Studio
 
-> **⚡ SINGLE COMMAND FULL SETUP (Clone, Install Everything & Launch):**
+> **⚡ 1-COMMAND FULL AUTOMATED SETUP (Fresh Laptop / Any Windows PC):**
+>
+> Open **PowerShell** or **Command Prompt** and paste this single command:
 > 
-> ```cmd
-> git clone https://github.com/Ayushbunkar/Content-Creation-Hub.git && cd Content-Creation-Hub && .\setup.bat
-> ```
-> *Or in PowerShell:*
 > ```powershell
 > git clone https://github.com/Ayushbunkar/Content-Creation-Hub.git; cd Content-Creation-Hub; .\setup.bat
 > ```
-> *(Or simply download/clone the repo and double-click `setup.bat` in Windows File Explorer)*
+> *Or in standard Command Prompt (cmd.exe):*
+> ```cmd
+> git clone https://github.com/Ayushbunkar/Content-Creation-Hub.git && cd Content-Creation-Hub && .\setup.bat
+> ```
+> *(Zero manual prerequisite installations needed — `setup.bat` automatically detects and installs Node.js, Python, portable FFmpeg, AI virtual environments, default configuration, and launches the Studio on http://127.0.0.1:3000)*
 
 [![Platform](https://img.shields.io/badge/Platform-Windows%2011%20%7C%2010-0078D6?logo=windows&logoColor=white)](https://microsoft.com/windows)
-[![Node.js](https://img.shields.io/badge/Node.js-v20%20%7C%20v22-339933?logo=node.js&logoColor=white)](https://nodejs.org)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://python.org)
+[![Node.js](https://img.shields.io/badge/Node.js-Auto--Installed%20%7C%20v20%20%7C%20v22-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![Python](https://img.shields.io/badge/Python-Auto--Installed%20%7C%203.11%2B-3776AB?logo=python&logoColor=white)](https://python.org)
+[![FFmpeg](https://img.shields.io/badge/FFmpeg-Zero--Admin%20Portable-007800?logo=ffmpeg&logoColor=white)](https://ffmpeg.org)
 [![Remotion](https://img.shields.io/badge/Rendered%20with-Remotion%204.0-0B84F3?logo=react&logoColor=white)](https://remotion.dev)
 [![Cost](https://img.shields.io/badge/Cost-100%25%20Zero%20API%20Tokens-brightgreen)](#-zero-cost-local-ai-pipeline)
 
@@ -22,23 +25,30 @@ Turn short topics or raw footage into fully researched investigative documentari
 
 ---
 
-## ⚡ 1-Click Single Command Setup (What It Does)
+## ⚡ 1-Click Single Command Setup (What It Does Automatically)
 
-Running the single command above (`.\setup.bat`) automatically executes:
-1. **Prerequisite Check**: Validates Node.js (v20+), Python (3.10+), and FFmpeg. If FFmpeg is missing, it installs it automatically via Windows `winget`.
-2. **Node.js Environment**: Runs `npm install` for Remotion, React 19, Express, Lucide, and SQLite3.
-3. **Python AI Environment**: Automatically provisions an isolated `.venv-tts` virtual environment and installs:
-   - **OpenAI Whisper** (Speech-to-text with word-level timestamps & voice normalization)
-   - **Kokoro TTS** (24kHz zero-cost studio voiceover synthesis)
-   - **PyTorch** & audio toolkits
-   - **yt-dlp** with Node.js runtime support
-4. **Sound Design & Media Asset Initialization**:
-   - Generates procedural SFX library (`whoosh`, `bass impact`, `page turn`, `camera shutter`, `newspaper impact`, `subtle riser`, `typing`, `digital interface`).
-   - Generates copyright-safe background music (BGM) tracks with metadata.
-   - Downloads streamer avatars for Indian and Global streamers.
-5. **Windows Desktop App Integration**:
-   - Creates a dedicated **`AI Video Studio`** shortcut icon directly on your Windows Desktop!
-6. **Auto-Launch**: Starts the local server and opens the studio at `http://127.0.0.1:3000`.
+When you run `.\setup.bat`, the automated engine executes everything hands-free:
+1. **Auto Prerequisite Provisioning (`scripts/install_prerequisites.ps1`)**:
+   - **Node.js LTS**: If Node.js is missing, it is automatically downloaded and installed via silent MSI/winget.
+   - **Python 3.11**: If Python is missing, it is automatically installed with PATH configured.
+   - **FFmpeg Portable Engine**: If FFmpeg is missing, a zero-admin portable FFmpeg binary is automatically downloaded into `bin/ffmpeg` (zero admin rights needed).
+2. **Auto Configuration & Storage**:
+   - Creates `.env` automatically from `.env.example`.
+   - Creates all required output folders (`output/stream_clips`, `storage/database`, `storage/temp`, `storage/clips`, `storage/renders`).
+3. **Node.js Packages**:
+   - Runs `npm install` (with automatic `--legacy-peer-deps` fallback).
+4. **Python AI Environment**:
+   - Provisions an isolated `.venv-tts` virtual environment and installs:
+     - **OpenAI Whisper** (word-level timestamps & voice normalization)
+     - **Kokoro TTS** (24kHz zero-cost studio voiceover synthesis)
+     - **PyTorch (Optimized CPU distribution)** (lightweight download, no massive CUDA bloat)
+     - **yt-dlp** for high-speed broadcast segment extraction
+5. **Procedural Sound Assets**:
+   - Generates procedural SFX library (`whoosh`, `impact`, `paper turn`, `risers`, `typing`).
+   - Generates copyright-safe background music (BGM) tracks.
+6. **Desktop Shortcut & Auto-Launch**:
+   - Creates a ready-to-use **`AI Video Studio`** shortcut icon directly on your Windows Desktop!
+   - Tests backend port `3000` via direct TCP socket and opens the app at `http://127.0.0.1:3000`.
 
 ---
 
@@ -178,6 +188,8 @@ Everything runs entirely on your local machine with **$0 API costs**:
 │   ├── generate_sfx_library.py # Procedural SFX generator
 │   └── generate_bgm.py         # Synthesizes BGM soundscapes
 ├── setup.bat                   # 1-Click automatic installation script
+├── run.bat                     # 1-Click launcher
+├── start.bat                   # Alternate 1-click launcher
 ├── AI-Video-Studio.bat          # Desktop app window launcher
 ├── requirements.txt            # Python AI dependency manifest
 └── package.json                # Node dependencies & project scripts
@@ -187,11 +199,21 @@ Everything runs entirely on your local machine with **$0 API costs**:
 
 ## 🖥️ Running the Studio Anytime
 
-Once setup is complete, you can launch the Studio through any of these methods:
+Once setup is complete, you can launch the Studio anytime through any of these simple methods:
 
+- **1-Click Batch File**: Double-click or run `.\run.bat` or `.\start.bat`.
 - **Desktop App Icon**: Double-click the **`AI Video Studio`** shortcut on your Windows Desktop.
-- **Command Line**: Run `npm run desktop` or `.\AI-Video-Studio.bat`.
-- **Web Browser**: Run `npm run studio` and visit `http://127.0.0.1:3000`.
+- **NPM Command**: Run `npm start` in the terminal.
+- **Direct Web Access**: Visit `http://127.0.0.1:3000` in Edge, Chrome, or Brave.
+
+### ❓ Troubleshooting "127.0.0.1 refused to connect"
+If you ever see connection refused in the browser, it simply means the backend server isn't running yet. Run:
+```powershell
+.\run.bat
+# or
+npm start
+```
+The server will bind to port `3000` and automatically open the studio interface.
 
 ---
 
