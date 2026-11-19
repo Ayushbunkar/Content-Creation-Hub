@@ -87,10 +87,10 @@ if defined PYTHON_CMD (
     if exist ".venv-tts\Scripts\python.exe" (
         echo Installing AI packages: yt-dlp, requests, soundfile, numpy...
         call .venv-tts\Scripts\python.exe -m pip install --upgrade pip --quiet >nul 2>&1
-        call .venv-tts\Scripts\pip.exe install yt-dlp requests soundfile numpy --quiet >nul 2>&1
+        call .venv-tts\Scripts\python.exe -m pip install yt-dlp requests soundfile numpy --quiet >nul 2>&1
         echo Installing local Torch and Whisper voice engines...
-        call .venv-tts\Scripts\pip.exe install torch --extra-index-url https://download.pytorch.org/whl/cpu --no-warn-script-location --quiet
-        call .venv-tts\Scripts\pip.exe install -r requirements.txt --quiet >nul 2>&1
+        call .venv-tts\Scripts\python.exe -m pip install torch --extra-index-url https://download.pytorch.org/whl/cpu --no-warn-script-location --quiet
+        call .venv-tts\Scripts\python.exe -m pip install -r requirements.txt --quiet >nul 2>&1
         echo [OK] Python AI environment ready.
     ) else (
         echo [NOTICE] Python virtual environment creation skipped.
@@ -124,4 +124,4 @@ echo  - Launching AI Video Studio automatically right now...
 echo ====================================================================
 echo.
 
-call AI-Video-Studio.bat
+call run.bat

@@ -18,11 +18,11 @@ try {
     $localApp = [System.Environment]::GetEnvironmentVariable('LocalAppData')
 
     $iconCandidates = @(
-        (if ($pf) { Join-Path $pf "Google\Chrome\Application\chrome.exe" } else { $null }),
-        (if ($localApp) { Join-Path $localApp "Google\Chrome\Application\chrome.exe" } else { $null }),
-        (if ($pf) { Join-Path $pf "BraveSoftware\Brave-Browser\Application\brave.exe" } else { $null }),
-        (if ($localApp) { Join-Path $localApp "BraveSoftware\Brave-Browser\Application\brave.exe" } else { $null }),
-        (if ($pfX86) { Join-Path $pfX86 "Microsoft\Edge\Application\msedge.exe" } else { $null })
+        $(if ($pf) { Join-Path $pf "Google\Chrome\Application\chrome.exe" } else { $null }),
+        $(if ($localApp) { Join-Path $localApp "Google\Chrome\Application\chrome.exe" } else { $null }),
+        $(if ($pf) { Join-Path $pf "BraveSoftware\Brave-Browser\Application\brave.exe" } else { $null }),
+        $(if ($localApp) { Join-Path $localApp "BraveSoftware\Brave-Browser\Application\brave.exe" } else { $null }),
+        $(if ($pfX86) { Join-Path $pfX86 "Microsoft\Edge\Application\msedge.exe" } else { $null })
     )
 
     $chosenIcon = $null
