@@ -5,11 +5,11 @@
 > Open **PowerShell** or **Command Prompt** and paste this single command:
 > 
 > ```powershell
-> git clone https://github.com/Ayushbunkar/Content-Creation-Hub.git; cd Content-Creation-Hub; .\setup.bat
+> cd $HOME; git clone https://github.com/Ayushbunkar/Content-Creation-Hub.git; cd Content-Creation-Hub; .\setup.bat
 > ```
 > *Or in standard Command Prompt (cmd.exe):*
 > ```cmd
-> git clone https://github.com/Ayushbunkar/Content-Creation-Hub.git && cd Content-Creation-Hub && .\setup.bat
+> cd /d %USERPROFILE% && git clone https://github.com/Ayushbunkar/Content-Creation-Hub.git && cd Content-Creation-Hub && .\setup.bat
 > ```
 > *(Zero manual prerequisite installations needed — `setup.bat` automatically detects and installs Node.js, Python, portable FFmpeg, AI virtual environments, default configuration, and launches the Studio on http://127.0.0.1:3000)*
 
