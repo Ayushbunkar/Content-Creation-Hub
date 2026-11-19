@@ -78,16 +78,24 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         dur_str = format_ass_time(clip_duration)
         events.append(f"Dialogue: 2,0:00:00.00,{dur_str},CenterHook,,0,0,0,,{{\\pos(540,{split_divider_y})\\an5\\b1}}{formatted_hook}\n")
 
-    # 2. Add Spoken Voice Word-by-Word Captions
+    # 2. Add Spoken Voice Word-by-Word Captions with gap-free highlight transitions
     if caption_style != "center_only":
         for cue in cues:
             words = cue.get('words', [])
             if words and len(words) > 1:
+                cue_start = float(cue.get('start', 0.0))
+                cue_end = float(cue.get('end', cue_start + 1.5))
                 for w_idx, active_w in enumerate(words):
-                    w_start = max(cue['start'], active_w.get('start', cue['start']))
-                    w_end = min(cue['end'], active_w.get('end', cue['end']))
-                    if w_end <= w_start:
-                        w_end = w_start + 0.35
+                    w_start = float(active_w.get('start', cue_start))
+                    if w_idx == 0:
+                        w_start = min(w_start, cue_start)
+                    
+                    # Bridge word highlight smoothly to the next word start to eliminate subtitle flickering/gaps
+                    if w_idx + 1 < len(words):
+                        next_start = float(words[w_idx + 1].get('start', w_start + 0.35))
+                        w_end = max(w_start + 0.12, next_start)
+                    else:
+                        w_end = max(w_start + 0.25, float(active_w.get('end', cue_end)), cue_end)
                     
                     parts = []
                     for idx, w in enumerate(words):
@@ -114,7 +122,7 @@ def extract_audio_wav(media_path: Path, temp_wav: Path) -> bool:
             'ffmpeg', '-y',
             '-i', str(media_path),
             '-vn',
-            '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11,highpass=f=80,lowpass=f=7500',
+            '-af', 'aresample=async=1:first_pts=0,highpass=f=80,lowpass=f=7500',
             '-ar', '16000',
             '-ac', '1',
             '-f', 'wav',

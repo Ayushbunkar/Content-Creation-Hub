@@ -474,8 +474,10 @@ export class StreamClipFinderService {
           '-c:v', 'libx264',
           '-preset', 'ultrafast',
           '-crf', '22',
+          '-af', 'aresample=async=1:first_pts=0',
           '-c:a', 'aac',
           '-b:a', '128k',
+          '-avoid_negative_ts', 'make_zero',
           '-movflags', '+faststart',
           tempRawPath
         );
@@ -540,8 +542,10 @@ export class StreamClipFinderService {
           '-c:v', 'libx264',
           '-preset', 'ultrafast',
           '-crf', '22',
+          '-af', 'aresample=async=1:first_pts=0',
           '-c:a', 'aac',
           '-b:a', '128k',
+          '-avoid_negative_ts', 'make_zero',
           '-movflags', '+faststart',
           tempRawPath
         );
@@ -953,11 +957,14 @@ export class StreamClipFinderService {
         '-map', '[v]',
         '-map', '0:a?',
         '-r', '30',
+        '-fps_mode', 'cfr',
         '-c:v', 'libx264',
         '-preset', 'veryfast',
         '-crf', '22',
+        '-af', 'aresample=async=1:first_pts=0',
         '-c:a', 'aac',
         '-b:a', '192k',
+        '-avoid_negative_ts', 'make_zero',
         '-movflags', '+faststart',
         outputPath
       ];
