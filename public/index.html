@@ -532,8 +532,11 @@
     // ==========================================
     const APPLE_EMOJI_OVERRIDES = {
       '❤️': '2764-fe0f',
+      '❤': '2764-fe0f',
       '⚠️': '26a0-fe0f',
+      '⚠': '26a0-fe0f',
       '☠️': '2620-fe0f',
+      '☠': '2620-fe0f',
       '⚡': '26a1',
       '✨': '2728',
       '❓': '2753',
@@ -560,14 +563,14 @@
     // Renders text with authentic, ultra-crisp Apple iPhone iOS emojis in full 3D color
     function renderWordWithAppleEmojis(word, keyPrefix = 'w') {
       if (!word) return null;
-      const emojiRegex = /(\p{Extended_Pictographic}+)/gu;
+      const emojiRegex = /([\p{Extended_Pictographic}\uFE0F\u200D]+)/gu;
       if (!emojiRegex.test(word)) {
         return word;
       }
       const parts = word.split(emojiRegex);
       return parts.map((part, pIdx) => {
         if (!part) return null;
-        const isEmoji = /(\p{Extended_Pictographic}+)/u.test(part);
+        const isEmoji = /[\p{Extended_Pictographic}\uFE0F\u200D]/u.test(part);
         if (isEmoji) {
           const appleUrl = getAppleEmojiUrl(part);
           return (
