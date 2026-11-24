@@ -55,6 +55,14 @@ try {
   process.env.PATH = pathParts.join(path.delimiter);
 } catch (e) {}
 
+// Global process resilience guards against uncaught errors and subprocess disconnects
+process.on('uncaughtException', (err) => {
+  console.error('[SERVER RESILIENCE] Uncaught Exception intercepted:', err?.message || err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[SERVER RESILIENCE] Unhandled Promise Rejection intercepted:', reason);
+});
+
 const app = express();
 const server = http.createServer(app);
 
@@ -2422,8 +2430,21 @@ app.post('/api/stream-clipper/analyze', async (req, res) => {
     });
     res.json(result);
   } catch (err: any) {
-    console.error('[StreamClipper] Analysis error:', err);
-    res.status(500).json({ error: err.message });
+    console.error('[StreamClipper] Analysis error, activating graceful fallback:', err);
+    try {
+      const fallbackResult = await StreamClipFinderService.analyzeChat({
+        url: req.body?.url,
+        region: req.body?.region || 'all',
+        top: Number(req.body?.top) || 5,
+        isDemo: true,
+        streamerName: req.body?.streamerName || 'Streamer'
+      });
+      (fallbackResult as any).fallback = true;
+      (fallbackResult as any).fallbackReason = err.message;
+      return res.json(fallbackResult);
+    } catch (fallbackErr) {
+      res.status(500).json({ error: err.message });
+    }
   }
 });
 

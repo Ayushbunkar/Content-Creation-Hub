@@ -231,7 +231,7 @@ def resolve_youtube_video_id(url):
 
 import glob
 
-def fetch_youtube_comments(url, max_comments=60):
+def fetch_youtube_comments(url, max_comments=30):
     """Fetches genuine YouTube top comments when live chat replay is disabled on the broadcast"""
     try:
         venv_ytdlp = os.path.join(os.getcwd(), '.venv-tts', 'Scripts', 'yt-dlp.exe')
@@ -240,13 +240,15 @@ def fetch_youtube_comments(url, max_comments=60):
             ytdlp_exe,
             '--js-runtimes', NODE_RUNTIME_ARG,
             '--skip-download',
+            '--no-warnings',
+            '--no-check-certificates',
             '--write-comments',
             '--extractor-args', f'youtube:max_comments={max_comments}',
             '--print', '%(comments)j',
-            '--socket-timeout', '10',
+            '--socket-timeout', '5',
             url
         ]
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=18)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
         stdout = proc.stdout.strip()
         if stdout:
             start = stdout.find('[')
@@ -358,7 +360,7 @@ def generate_real_stream_moments(url, total_duration_sec=3600, top_k=4, before_s
         })
     return moments
 
-def fetch_youtube_live_chat(url, max_messages=50000, timeout_sec=28, force_fresh=False):
+def fetch_youtube_live_chat(url, max_messages=50000, timeout_sec=12, force_fresh=False):
     """Downloads real YouTube live chat replay via yt-dlp with caching and all fragment support"""
     vid = resolve_youtube_video_id(url)
     if not vid:
@@ -410,11 +412,13 @@ def fetch_youtube_live_chat(url, max_messages=50000, timeout_sec=28, force_fresh
         ytdlp_exe,
         '--js-runtimes', NODE_RUNTIME_ARG,
         '--skip-download',
+        '--no-warnings',
+        '--no-check-certificates',
         '--write-subs',
         '--sub-langs', 'live_chat',
         '--sub-format', 'json',
         '--no-playlist',
-        '--socket-timeout', '10',
+        '--socket-timeout', '5',
         '-o', out_base,
         f"https://www.youtube.com/watch?v={vid}"
     ]
@@ -818,9 +822,11 @@ def main():
             ytdlp_exe = venv_ytdlp if os.path.exists(venv_ytdlp) else 'yt-dlp'
             dur_proc = subprocess.run([
                 ytdlp_exe, '--js-runtimes', NODE_RUNTIME_ARG,
+                '--no-warnings', '--no-check-certificates',
+                '--socket-timeout', '4',
                 '--print', '%(duration)s|%(release_timestamp)s',
                 '--no-playlist', args.url
-            ], capture_output=True, text=True, timeout=8)
+            ], capture_output=True, text=True, timeout=5)
             out = dur_proc.stdout.strip()
             if '|' in out:
                 dur_str, rt_str = out.split('|', 1)

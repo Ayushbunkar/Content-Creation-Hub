@@ -213,9 +213,10 @@ export class StreamClipFinderService {
       const proc = spawn(venvPy, [
         '-m', 'yt_dlp',
         '--js-runtimes', nodeRuntime,
+        '--no-warnings',
         '--print', '%(channel)s|||%(title)s',
         '--no-playlist',
-        '--socket-timeout', '6',
+        '--socket-timeout', '4',
         url
       ]);
       let stdout = '';
@@ -223,8 +224,12 @@ export class StreamClipFinderService {
         const timer = setTimeout(() => {
           try { proc.kill(); } catch (e) {}
           resolve();
-        }, 7000);
+        }, 5000);
         proc.stdout.on('data', (d) => { stdout += d.toString(); });
+        proc.on('error', () => {
+          clearTimeout(timer);
+          resolve();
+        });
         proc.on('close', () => {
           clearTimeout(timer);
           resolve();
@@ -269,15 +274,6 @@ export class StreamClipFinderService {
     const pythonExe = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
     const scriptPath = path.join(process.cwd(), 'scripts', 'stream_chat_crawler.py');
 
-    // Auto-resolve genuine streamer channel info if URL provided
-    let autoChannel = '';
-    let autoTitle = '';
-    if (options.url && options.url.startsWith('http')) {
-      const info = await this.resolveStreamerInfo(options.url);
-      autoChannel = info.channel;
-      autoTitle = info.title;
-    }
-
     const args = [scriptPath];
     if (options.isDemo || !options.url) {
       args.push('--demo');
@@ -294,40 +290,57 @@ export class StreamClipFinderService {
     // Always request fresh crawl so re-analyzing live broadcasts continuously finds new moments
     args.push('--fresh');
 
-    return new Promise((resolve, reject) => {
+    // Run streamer info resolution and python crawler in PARALLEL for maximum speed
+    const infoPromise = (options.url && options.url.startsWith('http'))
+      ? this.resolveStreamerInfo(options.url).catch(() => ({ channel: '', title: '' }))
+      : Promise.resolve({ channel: '', title: '' });
+
+    const crawlerPromise = new Promise<any>((resolve, reject) => {
       const proc = spawn(pythonExe, args);
       let stdout = '';
       let stderr = '';
 
+      const timeoutTimer = setTimeout(() => {
+        try { proc.kill('SIGKILL'); } catch (e) {}
+        console.warn('[StreamClipFinder] Crawler exceeded 30s threshold, forcing termination.');
+      }, 30000);
+
       proc.stdout.on('data', (d) => { stdout += d.toString(); });
       proc.stderr.on('data', (d) => { stderr += d.toString(); });
+      proc.on('error', (err) => {
+        clearTimeout(timeoutTimer);
+        reject(err);
+      });
 
       proc.on('close', (code) => {
+        clearTimeout(timeoutTimer);
+        try {
+          const jsonStart = stdout.indexOf('{');
+          if (jsonStart !== -1) {
+            const parsed = JSON.parse(stdout.slice(jsonStart));
+            if (!parsed.moments || !Array.isArray(parsed.moments)) {
+              parsed.moments = [];
+            }
+            return resolve(parsed);
+          }
+        } catch (e) {}
+
         if (code !== 0 && !stdout.trim()) {
-          return reject(new Error(`Chat analysis failed (exit code ${code}): ${stderr}`));
+          return reject(new Error(`Chat analysis failed (exit code ${code}): ${stderr || 'timeout or process error'}`));
         }
 
-        try {
-          // Parse stdout JSON
-          const jsonStart = stdout.indexOf('{');
-          if (jsonStart === -1) {
-            throw new Error(`Invalid JSON output from crawler: ${stdout.slice(0, 300)}`);
-          }
-          const parsed = JSON.parse(stdout.slice(jsonStart));
-          if (!parsed.moments || !Array.isArray(parsed.moments)) {
-            parsed.moments = [];
-          }
-          parsed.streamerName = autoChannel || options.streamerName || (options.region === 'indian' ? 'Indian Creator Stream' : 'Live Stream');
-          if (autoTitle) {
-            parsed.streamTitle = autoTitle;
-          }
-          parsed.url = options.url || 'Demo Stream Simulation';
-          resolve(parsed);
-        } catch (e: any) {
-          reject(new Error(`Failed to parse crawler results: ${e.message}\nRaw: ${stdout.slice(0, 200)}`));
-        }
+        reject(new Error(`Failed to parse crawler results: ${stdout.slice(0, 200)}`));
       });
     });
+
+    const [info, crawlerData] = await Promise.all([infoPromise, crawlerPromise]);
+
+    crawlerData.streamerName = info.channel || options.streamerName || (options.region === 'indian' ? 'Indian Creator Stream' : 'Live Stream');
+    if (info.title) {
+      crawlerData.streamTitle = info.title;
+    }
+    crawlerData.url = options.url || 'Demo Stream Simulation';
+    return crawlerData;
   }
 
   /**

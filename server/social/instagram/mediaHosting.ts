@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { MediaHostingConfig } from '../types';
 
 export class MediaHostingAdapter {
@@ -62,16 +63,22 @@ export class MediaHostingAdapter {
       return { url: `${cleanBase}/${relative}` };
     }
 
-    // Option 2: Cloudinary API
+    // Option 2: Cloudinary API (Signed Upload)
     if (status.provider === 'cloudinary' && process.env.CLOUDINARY_URL) {
       try {
-        const matches = process.env.CLOUDINARY_URL.match(/cloudinary:\/\/(\w+):([^@]+)@(\w+)/);
+        const matches = process.env.CLOUDINARY_URL.match(/cloudinary:\/\/(\w+):([^@]+)@([\w-]+)/);
         if (matches) {
           const [, apiKey, apiSecret, cloudName] = matches;
+          const timestamp = Math.floor(Date.now() / 1000).toString();
+          const toSign = `timestamp=${timestamp}${apiSecret}`;
+          const signature = crypto.createHash('sha1').update(toSign).digest('hex');
+
           const formData = new FormData();
           const fileBlob = new Blob([fs.readFileSync(localFilePath)]);
           formData.append('file', fileBlob, fileName);
-          formData.append('upload_preset', 'ml_default');
+          formData.append('api_key', apiKey);
+          formData.append('timestamp', timestamp);
+          formData.append('signature', signature);
           formData.append('resource_type', 'video');
 
           const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/video/upload`, {
@@ -81,6 +88,10 @@ export class MediaHostingAdapter {
           const uploadData = await uploadRes.json();
           if (uploadData.secure_url) {
             return { url: uploadData.secure_url };
+          }
+          if (uploadData.error) {
+            console.warn('[MediaHosting] Cloudinary error response:', uploadData.error.message);
+            return { url: '', error: `Cloudinary upload failed: ${uploadData.error.message}` };
           }
         }
       } catch (err: any) {

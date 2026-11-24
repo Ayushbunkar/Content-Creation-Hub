@@ -269,9 +269,12 @@ export class OAuthService {
       }
 
       if (!igAccountId) {
+        const pagesList = pagesData.data || [];
+        const pageNames = pagesList.map((p: any) => `${p.name} (IG Linked: ${p.instagram_business_account?.id ? 'YES' : 'NO'})`).join(', ') || 'None (No pages authorized)';
+        console.error('[OAuthService] No linked IG account found. Pages status:', pageNames);
         return {
           profile: {},
-          error: 'No Instagram Professional (Creator or Business) Account linked to your Facebook Pages. Please convert your Instagram to Professional and link it to a Page in Meta Accounts Center.'
+          error: `No Instagram Professional Account linked to your Facebook Pages. (Pages detected: ${pageNames}). If your page is not listed, remove Video Studio from facebook.com/settings?tab=business_tools and re-connect so Facebook asks to select your new page.`
         };
       }
 
