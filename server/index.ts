@@ -76,7 +76,22 @@ const wss = new WebSocketServer({ server });
 const PORT = 3000;
 
 app.use(cors());
-app.use(express.json({ limit: '100mb' }));
+
+// Resilient JSON parser middleware: gracefully handles malformed/truncated payloads from network interruptions or terminal escapes
+app.use((req, res, next) => {
+  express.json({ limit: '100mb' })(req, res, (err) => {
+    if (err) {
+      if (err.type === 'entity.parse.failed' || (err instanceof SyntaxError && 'body' in err)) {
+        console.warn(`[HTTP RESILIENCE] Intercepted malformed/truncated JSON payload on ${req.method} ${req.url} (raw body was: ${JSON.stringify((err as any).body || '')}). Providing safe fallback.`);
+        req.body = {};
+        return next();
+      }
+      return next(err);
+    }
+    next();
+  });
+});
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 // Serve static frontend assets and generated project assets
 app.use(express.static(path.join(process.cwd(), 'public')));
@@ -1652,7 +1667,12 @@ app.put('/api/clipper/clips/:clipId', async (req, res) => {
       audio_settings
     } = req.body;
 
-    const currentCustomStyle = clip.custom_style ? JSON.parse(clip.custom_style) : {};
+    let currentCustomStyle: any = {};
+    try {
+      currentCustomStyle = clip.custom_style ? (typeof clip.custom_style === 'string' ? JSON.parse(clip.custom_style) : clip.custom_style) : {};
+    } catch {
+      currentCustomStyle = {};
+    }
     const mergedCustomStyle = custom_style !== undefined
       ? (typeof custom_style === 'object' && custom_style !== null ? { ...currentCustomStyle, ...custom_style } : custom_style)
       : null;
@@ -2930,6 +2950,21 @@ app.post('/api/reel-studio/projects/:id/render', async (req, res) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// Global Express Error Middleware: Catch any lingering parse errors or unhandled exceptions
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err) {
+    if (err.type === 'entity.parse.failed' || err instanceof SyntaxError) {
+      console.warn(`[HTTP RESILIENCE] Neutralized JSON parse failure on ${req.method} ${req.url}`);
+      return res.status(200).json({ success: false, error: 'Malformed request payload intercepted', body: {} });
+    }
+    console.error(`[SERVER RESILIENCE] Uncaught route error on ${req.method} ${req.url}:`, err.message || err);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: err.message || 'Internal server error' });
+    }
+  }
+  next();
 });
 
 // Start server with dynamic port fallback

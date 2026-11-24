@@ -102,6 +102,19 @@ export function cleanCaptionText(text: string): string {
 }
 
 /**
+ * Resilient JSON parser that never throws SyntaxError on malformed or truncated strings
+ */
+export function safeParseJson<T>(raw: any, fallback: T): T {
+  if (raw === null || raw === undefined) return fallback;
+  if (typeof raw === 'object') return raw;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+/**
  * Ensure video file is encoded with universal H.264 (avc1) for 100% browser compatibility
  */
 export async function ensureVideoH264(filePath: string): Promise<string> {
@@ -851,7 +864,7 @@ except Exception as e:
     // 2. Handle Hinglish: transliterate Devanagari to Roman Hinglish
     if (language === 'hinglish') {
       try {
-        const rawSegs = JSON.parse(clip.transcript_segments || '[]');
+        const rawSegs = safeParseJson(clip.transcript_segments, []);
         segments = await this.transliterateSegmentsToHinglish(rawSegs);
       } catch (e) {
         console.warn('Transliteration error in setClipLanguage:', e);
@@ -859,7 +872,7 @@ except Exception as e:
     } else if (segments.length === 0 && clip.transcript_segments) {
       // 3. If native not found, translate existing segments
       try {
-        const rawSegs = JSON.parse(clip.transcript_segments);
+        const rawSegs = safeParseJson(clip.transcript_segments, []);
         segments = await this.translateSegments(rawSegs, language === 'hi' ? 'hi' : 'en');
       } catch (e) {
         console.warn('Translation error in setClipLanguage:', e);
@@ -867,7 +880,7 @@ except Exception as e:
     }
 
     if (segments.length === 0 && clip.transcript_segments) {
-      segments = JSON.parse(clip.transcript_segments);
+      segments = safeParseJson(clip.transcript_segments, []);
     }
 
     // New hook/summary
@@ -878,7 +891,7 @@ except Exception as e:
       hinglish: 'Poppins',
       auto: 'Montserrat'
     };
-    const currentCustomStyle = clip.custom_style ? JSON.parse(clip.custom_style) : {};
+    const currentCustomStyle = safeParseJson(clip.custom_style, {});
     currentCustomStyle.fontFamily = fontMap[language] || 'Montserrat';
 
     await runQuery(`
@@ -900,9 +913,9 @@ except Exception as e:
     const updated = await getQuery<any>('SELECT * FROM clipper_clips WHERE id = ?', [clipId]);
     return {
       ...updated,
-      transcript_segments: JSON.parse(updated.transcript_segments || '[]'),
-      custom_style: JSON.parse(updated.custom_style || '{}'),
-      virality_metrics: JSON.parse(updated.virality_metrics || '{}')
+      transcript_segments: safeParseJson(updated.transcript_segments, []),
+      custom_style: safeParseJson(updated.custom_style, {}),
+      virality_metrics: safeParseJson(updated.virality_metrics, {})
     };
   }
 
@@ -991,9 +1004,9 @@ except Exception as e:
     const updated = await getQuery<any>('SELECT * FROM clipper_clips WHERE id = ?', [clipId]);
     return {
       ...updated,
-      transcript_segments: JSON.parse(updated.transcript_segments || '[]'),
-      custom_style: JSON.parse(updated.custom_style || '{}'),
-      virality_metrics: JSON.parse(updated.virality_metrics || '{}')
+      transcript_segments: safeParseJson(updated.transcript_segments, []),
+      custom_style: safeParseJson(updated.custom_style, {}),
+      virality_metrics: safeParseJson(updated.virality_metrics, {})
     };
   }
 
@@ -1596,8 +1609,8 @@ except Exception as e:
     const outputFilename = `clip_${clip.id}_${cleanTitle}_9x16.mp4`;
     const outputPath = path.join(outputDir, outputFilename);
 
-    let segments: TranscriptSegment[] = clip.transcript_segments ? JSON.parse(clip.transcript_segments) : [];
-    const customStyle = clip.custom_style ? JSON.parse(clip.custom_style) : {};
+    let segments: TranscriptSegment[] = safeParseJson(clip.transcript_segments, []);
+    const customStyle = safeParseJson(clip.custom_style, {});
 
     // Auto-fix: if target language is English ('en') or auto, and captions currently contain Devanagari Hindi characters,
     // automatically retrieve native English track or translate to English so rendered captions are in English!
