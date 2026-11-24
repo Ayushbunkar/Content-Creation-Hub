@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import { TokenStorage } from '../auth/tokenStorage';
 import { MediaHostingAdapter } from './mediaHosting';
 import { PlatformPublishResult, VideoValidationResult } from '../types';

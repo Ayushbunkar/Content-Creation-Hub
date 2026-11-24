@@ -1878,7 +1878,32 @@ print("ZIP_SUCCESS")
     if (typeof segs === 'string') {
       try { segs = JSON.parse(segs); } catch (e) { segs = []; }
     }
-    const injected = injectViralEmojisIntoSegments(segs);
+    if (!Array.isArray(segs) || segs.length === 0) {
+      // If segments were empty, synthesize an initial segment from the clip hook/title
+      const start = clip.start_time || 0;
+      const end = clip.end_time || (start + (clip.duration || 30));
+      segs = [{
+        start,
+        end,
+        text: clip.hook || clip.title || 'AI Viral Reel'
+      }];
+    }
+
+    let cs: any = {};
+    if (typeof clip.custom_style === 'string') {
+      try { cs = JSON.parse(clip.custom_style); } catch (e) {}
+    } else if (clip.custom_style) {
+      cs = clip.custom_style;
+    }
+
+    const context = {
+      hook: clip.hook || '',
+      title: clip.title || '',
+      sentiment: cs.sentiment || '',
+      chatTrigger: cs.chatTrigger || cs.chat_trigger || ''
+    };
+
+    const injected = injectViralEmojisIntoSegments(segs, context);
     await runQuery(
       'UPDATE clipper_clips SET transcript_segments = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [JSON.stringify(injected), clipId]

@@ -526,6 +526,79 @@
         .trim();
     }
 
+    // ==========================================
+    // APPLE iOS 160px ULTRA-HD EMOJI ENGINE
+    // Converts Unicode emojis to authentic, glossy 3D Apple iPhone iOS emojis
+    // ==========================================
+    const APPLE_EMOJI_OVERRIDES = {
+      '❤️': '2764-fe0f',
+      '⚠️': '26a0-fe0f',
+      '☠️': '2620-fe0f',
+      '⚡': '26a1',
+      '✨': '2728',
+      '❓': '2753',
+      '❗': '2757'
+    };
+
+    function getAppleEmojiUrl(char) {
+      if (!char) return null;
+      const trimmed = char.trim();
+      if (APPLE_EMOJI_OVERRIDES[trimmed]) {
+        return `https://cdn.jsdelivr.net/gh/iamcal/emoji-data@master/img-apple-160/${APPLE_EMOJI_OVERRIDES[trimmed]}.png`;
+      }
+      const codepoints = [];
+      for (const sym of trimmed) {
+        const cp = sym.codePointAt(0);
+        if (cp && cp !== 0xfe0f && cp !== 0x200d) {
+          codepoints.push(cp.toString(16));
+        }
+      }
+      const hex = codepoints.join('-');
+      return hex ? `https://cdn.jsdelivr.net/gh/iamcal/emoji-data@master/img-apple-160/${hex}.png` : null;
+    }
+
+    // Renders text with authentic, ultra-crisp Apple iPhone iOS emojis in full 3D color
+    function renderWordWithAppleEmojis(word, keyPrefix = 'w') {
+      if (!word) return null;
+      const emojiRegex = /(\p{Extended_Pictographic}+)/gu;
+      if (!emojiRegex.test(word)) {
+        return word;
+      }
+      const parts = word.split(emojiRegex);
+      return parts.map((part, pIdx) => {
+        if (!part) return null;
+        const isEmoji = /(\p{Extended_Pictographic}+)/u.test(part);
+        if (isEmoji) {
+          const appleUrl = getAppleEmojiUrl(part);
+          return (
+            <span key={`${keyPrefix}-em-${pIdx}`} class="inline-flex items-center align-middle mx-0.5">
+              <img
+                src={appleUrl}
+                alt={part}
+                loading="eager"
+                decoding="sync"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  if (e.currentTarget.nextSibling) {
+                    e.currentTarget.nextSibling.style.display = 'inline';
+                  }
+                }}
+                class="inline-block drop-shadow-md select-none transform hover:scale-125 transition-transform"
+                style={{
+                  width: '1.25em',
+                  height: '1.25em',
+                  verticalAlign: '-0.16em',
+                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.45))'
+                }}
+              />
+              <span style={{ display: 'none' }}>{part}</span>
+            </span>
+          );
+        }
+        return <span key={`${keyPrefix}-txt-${pIdx}`}>{part}</span>;
+      });
+    }
+
     function ClipperLivePlayer({ clip, project, onUpdate, onOpenConcat }) {
       const fgRef = React.useRef(null);
       const bgRef = React.useRef(null);
@@ -625,6 +698,21 @@
         if (bgRef.current) bgRef.current.currentTime = targetTime;
         if (camRef.current) camRef.current.currentTime = targetTime;
       }, [clip.id, isRendered, clipStart, reframingMode]);
+
+      // Reactive subtitle updater when transcript_segments change (e.g. Emoji injection or text edit)
+      React.useEffect(() => {
+        let segs = clip.transcript_segments;
+        if (typeof segs === 'string') {
+          try { segs = JSON.parse(segs); } catch (e) { segs = []; }
+        }
+        if (Array.isArray(segs) && segs.length > 0) {
+          const absTime = (!isRendered && clipStart > 0) ? (clipStart + currentTime) : currentTime;
+          const seg = segs.find(s => absTime >= s.start && absTime <= s.end) || segs[0];
+          if (seg) {
+            setActiveSubtitle(sanitizeClipperText(seg.text));
+          }
+        }
+      }, [clip.transcript_segments, clip.id]);
 
       // Unified Play / Pause for all active split layers
       const playAllLayers = () => {
@@ -878,7 +966,7 @@
                   <div class="absolute top-10 left-1/2 -translate-x-1/2 w-[88%] z-30 flex justify-center text-center pointer-events-none transition-all">
                     <div class="px-3 py-1 rounded-xl bg-black/90 border border-yellow-400/90 shadow-2xl backdrop-blur-md max-w-full animate-pulse">
                       <span class="text-[11px] font-black uppercase tracking-wider text-yellow-300 flex items-center justify-center gap-1.5 break-words">
-                        🔥 {sanitizeClipperText(clip.hook)}
+                        {renderWordWithAppleEmojis('🔥 ' + sanitizeClipperText(clip.hook), 'hook')}
                       </span>
                     </div>
                   </div>
@@ -921,16 +1009,19 @@
                   if (typeof segs === 'string') {
                     try { segs = JSON.parse(segs); } catch (e) { segs = []; }
                   }
-                  let subtitleToRender = activeSubtitle;
-                  if (!subtitleToRender && (!isPlaying || isDraggingCaption)) {
-                    if (Array.isArray(segs) && segs.length > 0) {
-                      const curSeg = segs.find(s => currentTime >= s.start && currentTime <= s.end);
-                      subtitleToRender = curSeg ? sanitizeClipperText(curSeg.text) : sanitizeClipperText(segs[0].text);
-                    } else if (clip.hook) {
-                      subtitleToRender = sanitizeClipperText(clip.hook);
-                    } else {
-                      subtitleToRender = 'AI Viral Caption';
-                    }
+                  let subtitleToRender = '';
+                  const absTime = (!isRendered && clipStart > 0) ? (clipStart + currentTime) : currentTime;
+                  if (isPlaying && activeSubtitle) {
+                    subtitleToRender = activeSubtitle;
+                  } else if (Array.isArray(segs) && segs.length > 0) {
+                    const curSeg = segs.find(s => absTime >= s.start && absTime <= s.end) || segs[0];
+                    subtitleToRender = sanitizeClipperText(curSeg ? curSeg.text : segs[0].text);
+                  } else if (activeSubtitle) {
+                    subtitleToRender = activeSubtitle;
+                  } else if (clip.hook) {
+                    subtitleToRender = sanitizeClipperText(clip.hook);
+                  } else {
+                    subtitleToRender = 'AI Viral Caption';
                   }
 
                   if (!subtitleToRender) return null;
@@ -1064,7 +1155,7 @@
                                 textShadow: isHighlighted && (currentTmplId === 'neon-glow' || currentTmplId === 'neon-captions') ? `0 0 12px ${highlightCol}` : undefined
                               }}
                             >
-                              {w}{i < words.length - 1 ? ' ' : ''}
+                              {renderWordWithAppleEmojis(w, `sub-${i}`)}{i < words.length - 1 ? ' ' : ''}
                             </span>
                           );
                         })}
@@ -3196,7 +3287,7 @@
         const id = clipId || selectedClip?.id;
         if (!id) return;
         setIsClipperBusy(true);
-        setClipperStatusMessage('Injecting trending high-retention emojis into subtitles...');
+        setClipperStatusMessage('Injecting trending high-retention Apple iOS emojis into subtitles...');
         try {
           const res = await fetch(`/api/clipper/clips/${id}/inject-emojis`, { method: 'POST' });
           const data = await res.json();
@@ -3209,12 +3300,17 @@
               ...c,
               transcript_segments: data.segments
             } : c));
+            setClipperStatusMessage('✨ Injected premium Apple iOS emojis into subtitles!');
+            setTimeout(() => setClipperStatusMessage(''), 3000);
+          } else {
+            throw new Error(data.error || 'Failed to inject emojis');
           }
         } catch (e) {
           console.error('Error injecting emojis:', e);
+          setClipperStatusMessage('⚠️ Failed: ' + (e.message || 'Error injecting emojis'));
+          setTimeout(() => setClipperStatusMessage(''), 3500);
         } finally {
           setIsClipperBusy(false);
-          setClipperStatusMessage('');
         }
       };
 
@@ -8469,7 +8565,12 @@
                                     const cs = selectedClip.custom_style || {};
                                     const cameraP = CAMERA_PRESETS.find(p => p.id === (cs.cameraPreset || 'automatic_smart_zoom')) || CAMERA_PRESETS[0];
                                     const cleanHook = sanitizeClipperText(selectedClip.hook || '');
-                                    const previewText = cleanHook ? (cleanHook.length > 42 ? cleanHook.substring(0, 42) + '...' : cleanHook) : 'मैंने दुनिया के सबसे बड़े एथलीट्स...';
+                                    let segs = selectedClip.transcript_segments;
+                                    if (typeof segs === 'string') {
+                                      try { segs = JSON.parse(segs); } catch (e) { segs = []; }
+                                    }
+                                    const firstSegText = (Array.isArray(segs) && segs.length > 0) ? sanitizeClipperText(segs[0].text) : '';
+                                    const previewText = firstSegText || (cleanHook ? (cleanHook.length > 42 ? cleanHook.substring(0, 42) + '...' : cleanHook) : 'मैंने दुनिया के सबसे बड़े एथलीट्स... 🔥');
                                     const words = previewText.split(' ').filter(Boolean);
                                     return (
                                       <div class="rounded-xl overflow-hidden border border-slate-700 mt-2">
@@ -8518,7 +8619,7 @@
                                                     margin: '0 2px'
                                                   }}
                                                 >
-                                                  {w}
+                                                  {renderWordWithAppleEmojis(w, `prev-${idx}`)}
                                                 </span>
                                               ))}
                                             </span>
