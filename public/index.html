@@ -9397,9 +9397,17 @@
                 <div class="h-full flex-1 overflow-hidden -m-4 sm:-m-6 flex flex-col">
                   {window.ClipStudioWorkspace ? (
                     <window.ClipStudioWorkspace
-                      onOpenInReelStudio={(reelProjId) => {
-                        loadReelProject(reelProjId);
-                        setCurrentTab('reel_studio');
+                      onOpenInReelStudio={async (reelProjId) => {
+                        try {
+                          const rRes = await fetch(`/api/reel-studio/projects/${reelProjId}`);
+                          const rData = await rRes.json();
+                          if (rData.project) {
+                            setActiveReelProject(rData.project);
+                          }
+                          setCurrentTab('reel_studio');
+                        } catch (err) {
+                          setCurrentTab('reel_studio');
+                        }
                       }}
                       onOpenInCaptionStudio={() => setCurrentTab('captions')}
                     />
