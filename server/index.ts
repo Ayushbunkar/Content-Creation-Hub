@@ -23,6 +23,8 @@ import { SoundDesignSystem, SFX_CATALOG, BGM_CATALOG } from './soundDesignSystem
 import { QualityControlEngine } from './qualityControlEngine';
 import { PerformanceResourceManager } from './resourceManager';
 import { SocialPublishingService } from './social';
+import { ReelStudioEngine, REEL_STYLE_PRESETS } from './reelStudioEngine';
+import { ensureVideoH264 } from './viralClipper';
 
 // Load .env configuration
 try {
@@ -101,6 +103,15 @@ CaptionStudioService.subscribe((update) => {
 
 ViralClipperService.subscribe((update) => {
   const msg = JSON.stringify({ type: 'CLIPPER_UPDATE', data: update });
+  wsClients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(msg);
+    }
+  });
+});
+
+ReelStudioEngine.subscribe((update) => {
+  const msg = JSON.stringify({ type: 'REEL_STUDIO_UPDATE', data: update });
   wsClients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(msg);
@@ -2733,6 +2744,161 @@ app.get('/api/social/history', async (req, res) => {
     const filter = (req.query.filter as any) || 'all';
     const history = await SocialPublishingService.getPublishingHistory(filter);
     res.json({ success: true, history });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// AI REEL EDITING STUDIO API ENDPOINTS
+// ==========================================
+
+// 1. Get Style Presets (15+ Presets: Hormozi, Cinematic Doc, Modern Glass, Viral, Minimal, etc.)
+app.get('/api/reel-studio/presets', (req, res) => {
+  res.json({ success: true, presets: ReelStudioEngine.getPresets() });
+});
+
+// 2. Get Audio Catalog (SFX and BGM library)
+app.get('/api/reel-studio/catalog', (req, res) => {
+  res.json({ success: true, catalog: ReelStudioEngine.getCatalog() });
+});
+
+// 3. List all Reel Studio Projects
+app.get('/api/reel-studio/projects', async (req, res) => {
+  try {
+    const projects = await ReelStudioEngine.listProjects();
+    res.json({ success: true, projects });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Create Reel Studio Project
+app.post('/api/reel-studio/projects', async (req, res) => {
+  try {
+    const project = await ReelStudioEngine.createProject(req.body);
+    res.json({ success: true, project });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5. Upload Video Direct to Reel Studio
+app.post('/api/reel-studio/upload', async (req, res) => {
+  try {
+    const rawFilename = (req.query.filename as string) || `reel_upload_${Date.now()}.mp4`;
+    const cleanFilename = path.basename(rawFilename).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const uploadDir = path.join(process.cwd(), 'storage', 'uploads');
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+    const targetPath = path.join(uploadDir, `reel_${Date.now()}_${cleanFilename}`);
+    const writeStream = fs.createWriteStream(targetPath);
+
+    req.pipe(writeStream);
+
+    writeStream.on('finish', async () => {
+      try {
+        const h264Path = await ensureVideoH264(targetPath);
+        const relVideoPath = path.relative(process.cwd(), h264Path).replace(/\\/g, '/');
+        const title = path.parse(cleanFilename).name.replace(/_/g, ' ');
+
+        const project = await ReelStudioEngine.createProject({
+          title,
+          videoPath: relVideoPath,
+          preset: (req.query.preset as string) || 'hormozi-bold',
+          aspectRatio: (req.query.aspectRatio as any) || '9:16'
+        });
+
+        res.json({ success: true, project });
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    writeStream.on('error', (err) => {
+      res.status(500).json({ error: err.message });
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 6. Get Single Reel Studio Project with parsed Timeline
+app.get('/api/reel-studio/projects/:id', async (req, res) => {
+  try {
+    const project = await ReelStudioEngine.getProject(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Reel project not found' });
+    res.json({ success: true, project });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7. Update Reel Studio Project (Autosave timeline & settings)
+app.put('/api/reel-studio/projects/:id', async (req, res) => {
+  try {
+    const updated = await ReelStudioEngine.updateProject(req.params.id, req.body);
+    res.json({ success: true, project: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 8. Delete Reel Studio Project
+app.delete('/api/reel-studio/projects/:id', async (req, res) => {
+  try {
+    await ReelStudioEngine.deleteProject(req.params.id);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 9. AI AUTO EDIT: Analyze video, transcript, cadence & generate master timeline
+app.post('/api/reel-studio/projects/:id/auto-edit', async (req, res) => {
+  try {
+    const timeline = await ReelStudioEngine.analyzeAndGenerateAutoEditPlan(req.params.id, req.body);
+    const updated = await ReelStudioEngine.getProject(req.params.id);
+    res.json({ success: true, timeline, project: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 10. AI Subject Segmentation (OpenCV GrabCut + Haar Cascade)
+app.post('/api/reel-studio/projects/:id/segment-subject', async (req, res) => {
+  try {
+    const project = await ReelStudioEngine.getProject(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const timestamp = parseFloat(req.body.timestamp || '2.0');
+    const maskDir = path.join(process.cwd(), 'storage', 'masks');
+    const absVideo = path.isAbsolute(project.video_path) ? project.video_path : path.join(process.cwd(), project.video_path);
+
+    const segResult = await ReelStudioEngine.segmentSubject(absVideo, timestamp, maskDir, req.body.rect);
+
+    if (segResult.success && segResult.fg_path) {
+      await ReelStudioEngine.updateProject(req.params.id, {
+        subject_mask_path: segResult.fg_path,
+        mask_mode: 'ai'
+      });
+    }
+
+    res.json(segResult);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 11. Render & Export Final Reel Video
+app.post('/api/reel-studio/projects/:id/render', async (req, res) => {
+  try {
+    // Start rendering in background and broadcast progress via WS
+    ReelStudioEngine.renderExportVideo(req.params.id, req.body).catch((err) => {
+      console.error('[ReelStudio Render Error]', err);
+    });
+
+    res.json({ success: true, message: 'Rendering started. Track progress in real time.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

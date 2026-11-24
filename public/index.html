@@ -48,6 +48,9 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen overflow-hidden">
   <div id="root"></div>
 
+  <!-- AI Reel Editing Studio Modular Component -->
+  <script type="text/babel" src="/reelStudio.js"></script>
+
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
@@ -510,10 +513,15 @@
         .replace(/&quot;/gi, '"')
         .replace(/&#39;/gi, "'")
         .replace(/&apos;/gi, "'")
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&[a-z0-9#]+;/gi, ' ')
         .replace(/^(\s*>+\s*)+/g, '')
         .replace(/(\s*>+\s*)+/g, ' ')
-        .replace(/\[(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^\]]*\]/gi, '')
-        .replace(/\((?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^)]*\)/gi, '')
+        .replace(/^(\s*<+\s*)+/g, '')
+        .replace(/(\s*<+\s*)+/g, ' ')
+        .replace(/\[[^\]]*(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^\]]*\]/gi, '')
+        .replace(/\([^)]*(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^)]*\)/gi, '')
+        .replace(/\[(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^\]]*/gi, '')
         .replace(/\s+/g, ' ')
         .trim();
     }
@@ -968,6 +976,46 @@
       const [projects, setProjects] = useState([]);
       const [curatedTopics, setCuratedTopics] = useState([]);
       const [activeProject, setActiveProject] = useState(null);
+
+      // ================= AI REEL EDITING STUDIO STATE ================= //
+      const [reelProjects, setReelProjects] = useState([]);
+      const [activeReelProject, setActiveReelProject] = useState(null);
+      const [reelPresets, setReelPresets] = useState([]);
+      const [reelAudioCatalog, setReelAudioCatalog] = useState({ sfx: {}, bgm: {} });
+
+      const fetchReelProjects = async () => {
+        try {
+          const res = await fetch('/api/reel-studio/projects');
+          const data = await res.json();
+          if (data.success && data.projects) {
+            setReelProjects(data.projects);
+            setActiveReelProject(prev => {
+              if (prev) {
+                const refreshed = data.projects.find(p => p.id === prev.id);
+                return refreshed || prev;
+              }
+              return data.projects[0] || null;
+            });
+          }
+        } catch (e) {
+          console.warn('[ReelStudio] Project fetch note:', e);
+        }
+      };
+
+      const fetchReelMetadata = async () => {
+        try {
+          const [pRes, cRes] = await Promise.all([
+            fetch('/api/reel-studio/presets'),
+            fetch('/api/reel-studio/catalog')
+          ]);
+          const pData = await pRes.json();
+          const cData = await cRes.json();
+          if (pData.success && pData.presets) setReelPresets(pData.presets);
+          if (cData.success && cData.catalog) setReelAudioCatalog(cData.catalog);
+        } catch (e) {
+          console.warn('[ReelStudio] Metadata fetch note:', e);
+        }
+      };
 
       // AI Generator Form State
       const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0].id);
@@ -3355,6 +3403,8 @@
         fetchSocialAccounts();
         fetchPublishingHistory();
         fetchMediaHostingStatus();
+        fetchReelProjects();
+        fetchReelMetadata();
 
         // WebSocket for live generation & transcription updates
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -3431,6 +3481,16 @@
                   setExportProgress(100);
                   if (msg.data.videoUrl) setExportedVideoUrl(msg.data.videoUrl);
                 }
+              }
+            } else if (msg.type === 'REEL_STUDIO_UPDATE') {
+              fetchReelProjects();
+              if (activeReelProject && msg.data && msg.data.projectId === activeReelProject.id) {
+                fetch(`/api/reel-studio/projects/${msg.data.projectId}`)
+                  .then(r => r.json())
+                  .then(res => {
+                    if (res.success && res.project) setActiveReelProject(res.project);
+                  })
+                  .catch(() => {});
               }
             }
           } catch (e) { }
@@ -3988,6 +4048,7 @@
                   { id: 'enhancement', label: 'Video Quality & AI Pro', badge: '60 FPS ⚡' },
                   { id: 'audio_police', label: 'Audio Copyright Police', badge: 'Police 🚨' },
                   { id: 'clipper', label: 'AI Viral Clipper', badge: 'Viral 🔥' },
+                  { id: 'reel_studio', label: 'AI Reel Studio', badge: 'Auto Reel ✨' },
                   { id: 'captions', label: 'Caption Studio', badge: 'Pro' },
                   { id: 'new', label: 'New AI Video' },
                   { id: 'progress', label: 'Job Pipeline' },
@@ -4047,7 +4108,7 @@
               <div class="flex items-center space-x-3 min-w-0">
                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0 shadow-lg shadow-emerald-400/50"></span>
                 <h2 class="text-xs sm:text-sm font-black tracking-wide text-slate-100 uppercase truncate">
-                  {currentTab === 'stream_clipper' ? 'Stream Chat Viral Clipper — Indian & Global Stream Extraction Engine' : currentTab === 'paper' ? 'Paper Animation Studio — Master Explainer Engine' : currentTab === 'documentary' ? 'CINEMATIC DOCUMENTARY ENGINE — TOPIC & SCRIPT INVESTIGATION' : currentTab === 'enhancement' ? 'Video Quality & Cinematic Production Engine' : currentTab === 'audio_police' ? 'Audio Copyright Police — Pre-Export Gate & Asset Registry' : currentTab === 'clipper' ? 'AI Viral Clipper — YouTube & Podcast Auto-Shorts' : currentTab === 'captions' ? 'Caption Studio — Video & Animated Subtitles' : currentTab.toUpperCase()}
+                  {currentTab === 'stream_clipper' ? 'Stream Chat Viral Clipper — Indian & Global Stream Extraction Engine' : currentTab === 'paper' ? 'Paper Animation Studio — Master Explainer Engine' : currentTab === 'documentary' ? 'CINEMATIC DOCUMENTARY ENGINE — TOPIC & SCRIPT INVESTIGATION' : currentTab === 'enhancement' ? 'Video Quality & Cinematic Production Engine' : currentTab === 'audio_police' ? 'Audio Copyright Police — Pre-Export Gate & Asset Registry' : currentTab === 'clipper' ? 'AI Viral Clipper — YouTube & Podcast Auto-Shorts' : currentTab === 'reel_studio' ? 'AI REEL EDITING STUDIO — OCCLUSION, GLASSMORPHISM & DUCKED AUDIO' : currentTab === 'captions' ? 'Caption Studio — Video & Animated Subtitles' : currentTab.toUpperCase()}
                 </h2>
               </div>
               <div class="text-xs text-slate-400 flex items-center space-x-3 flex-shrink-0">
@@ -7586,6 +7647,36 @@
                               </button>
 
                               <button
+                                onClick={async () => {
+                                  try {
+                                    const videoSrc = selectedClip.exported_video || activeClipperProject?.video_path || '';
+                                    const res = await fetch('/api/reel-studio/projects', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        title: selectedClip.title || 'Viral Reel Project',
+                                        videoPath: videoSrc,
+                                        aspectRatio: '9:16',
+                                        preset: 'viral-high-energy',
+                                        duration: selectedClip.duration || 30
+                                      })
+                                    });
+                                    const data = await res.json();
+                                    if (data.success && data.project) {
+                                      setActiveReelProject(data.project);
+                                      setCurrentTab('reel_studio');
+                                    }
+                                  } catch (e) {
+                                    alert('Failed to open in Reel Studio: ' + e.message);
+                                  }
+                                }}
+                                class="px-4 py-2.5 bg-gradient-to-r from-pink-600 via-purple-600 to-amber-500 hover:from-pink-500 hover:to-amber-400 text-white font-extrabold text-xs rounded-xl shadow-lg transition flex items-center space-x-2"
+                                title="Open in AI Reel Studio for Behind-Head Occlusion, Motion Zooms & Audio Ducking"
+                              >
+                                <span>✨ Open in AI Reel Studio</span>
+                              </button>
+
+                              <button
                                 onClick={() => handleRenderSingleClip(selectedClip.id)}
                                 disabled={isClipperBusy}
                                 class="px-6 py-2.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-amber-600 hover:from-indigo-500 hover:to-amber-500 text-white font-black text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition disabled:opacity-50 flex items-center space-x-2"
@@ -8079,7 +8170,8 @@
                                     const tmpl = CAPTION_TEMPLATES.find(t => t.id === currentTmplId) || CAPTION_TEMPLATES[0];
                                     const cs = selectedClip.custom_style || {};
                                     const cameraP = CAMERA_PRESETS.find(p => p.id === (cs.cameraPreset || 'automatic_smart_zoom')) || CAMERA_PRESETS[0];
-                                    const previewText = sanitizeClipperText(selectedClip.hook ? selectedClip.hook.substring(0, 42) : 'मैंने दुनिया के सबसे बड़े एथलीट्स...');
+                                    const cleanHook = sanitizeClipperText(selectedClip.hook || '');
+                                    const previewText = cleanHook ? (cleanHook.length > 42 ? cleanHook.substring(0, 42) + '...' : cleanHook) : 'मैंने दुनिया के सबसे बड़े एथलीट्स...';
                                     const words = previewText.split(' ').filter(Boolean);
                                     return (
                                       <div class="rounded-xl overflow-hidden border border-slate-700 mt-2">
@@ -8715,6 +8807,25 @@
                 </div>
               )}
 
+              {/* ===================== AI REEL EDITING STUDIO ===================== */}
+              {currentTab === 'reel_studio' && (
+                <div class="h-full flex-1 overflow-hidden -m-4 sm:-m-6">
+                  {window.ReelStudioWorkspace ? (
+                    <window.ReelStudioWorkspace
+                      project={activeReelProject}
+                      onUpdateProject={(p) => setActiveReelProject(p)}
+                      onBackToProjects={() => setCurrentTab('captions')}
+                      presets={reelPresets}
+                      audioCatalog={reelAudioCatalog}
+                    />
+                  ) : (
+                    <div class="h-full flex items-center justify-center p-8 text-slate-400">
+                      Loading AI Reel Studio...
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* ===================== TAB 1: CAPTION STUDIO ===================== */}
               {currentTab === 'captions' && (
                 <div class="max-w-7xl mx-auto space-y-6">
@@ -8751,6 +8862,28 @@
                           }`}>
                             {activeCapProject.status}
                           </span>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch('/api/reel-studio/projects', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ captionProjectId: activeCapProject.id })
+                                });
+                                const data = await res.json();
+                                if (data.success && data.project) {
+                                  setActiveReelProject(data.project);
+                                  setCurrentTab('reel_studio');
+                                }
+                              } catch (e) {
+                                alert('Failed to open in Reel Studio: ' + e.message);
+                              }
+                            }}
+                            class="px-3 py-1 bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 hover:from-amber-400 hover:to-purple-500 text-white font-extrabold text-xs rounded-lg shadow-md transition active:scale-95 flex items-center space-x-1"
+                            title="Open current video & word-level transcript in AI Reel Editing Studio"
+                          >
+                            <span>✨ Open in AI Reel Studio</span>
+                          </button>
                           <button
                             onClick={async () => {
                               if (!confirm(`Delete project "${activeCapProject.title}"?`)) return;

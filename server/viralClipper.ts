@@ -77,17 +77,21 @@ export interface ClipperClip {
 export function cleanCaptionText(text: string): string {
   if (!text) return '';
   return text
-    .replace(/&gt;/gi, '>')
-    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '')
+    .replace(/&lt;/gi, '')
     .replace(/&amp;/gi, '&')
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
     .replace(/&apos;/gi, "'")
     .replace(/&nbsp;/gi, ' ')
+    .replace(/&[a-z0-9#]+;/gi, ' ')
     .replace(/^(\s*>+\s*)+/g, '') // remove leading >> or >
     .replace(/(\s*>+\s*)+/g, ' ') // remove inline >>
-    .replace(/\[(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^\]]*\]/gi, '')
-    .replace(/\((?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^)]*\)/gi, '')
+    .replace(/^(\s*<+\s*)+/g, '')
+    .replace(/(\s*<+\s*)+/g, ' ')
+    .replace(/\[[^\]]*(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^\]]*\]/gi, '')
+    .replace(/\([^)]*(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^)]*\)/gi, '')
+    .replace(/\[(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^\]]*/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 }

@@ -313,7 +313,37 @@ export function initDatabase(): Promise<void> {
             db.run(`CREATE INDEX IF NOT EXISTS idx_audio_reg_file_hash ON audio_asset_registry(file_hash)`, () => {});
             db.run(`CREATE INDEX IF NOT EXISTS idx_audio_reg_risk ON audio_asset_registry(risk_score)`, () => {});
             db.run(`CREATE INDEX IF NOT EXISTS idx_audio_reg_type ON audio_asset_registry(audio_type)`, () => {});
-            resolve();
+
+            // AI Reel Editing Studio Projects Table
+            db.run(`
+              CREATE TABLE IF NOT EXISTS reel_projects (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                caption_project_id TEXT,
+                video_path TEXT NOT NULL,
+                audio_path TEXT,
+                file_info TEXT,
+                aspect_ratio TEXT DEFAULT '9:16',
+                duration REAL DEFAULT 0,
+                preset TEXT DEFAULT 'hormozi-bold',
+                status TEXT DEFAULT 'draft',
+                progress INTEGER DEFAULT 0,
+                error_message TEXT,
+                transcript_json TEXT,
+                timeline_data TEXT,
+                ai_edit_plan TEXT,
+                subject_mask_path TEXT,
+                mask_mode TEXT DEFAULT 'ai',
+                manual_mask_data TEXT,
+                exported_video TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+              )
+            `, (reelErr) => {
+              if (reelErr) return reject(reelErr);
+              db.run(`CREATE INDEX IF NOT EXISTS idx_reel_proj_status ON reel_projects(status)`, () => {});
+              resolve();
+            });
           });
         });
       });

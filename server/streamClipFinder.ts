@@ -449,17 +449,23 @@ export class StreamClipFinderService {
       let streamUrls: string[] = [];
       const nodeRuntime = process.execPath ? `node:${process.execPath}` : 'node';
       try {
-        const getUrlProc = spawn(venvPy, [
+        const ffmpegCmd = this.getFfmpegCmd();
+        const getUrlArgs = [
           '-m', 'yt_dlp',
-          '--extractor-args', 'youtube:player_client=android,web',
-          '--ffmpeg-location', path.dirname(this.getFfmpegCmd()),
+          '--extractor-args', 'youtube:player_client=android,web'
+        ];
+        if (path.isAbsolute(ffmpegCmd) && fs.existsSync(ffmpegCmd)) {
+          getUrlArgs.push('--ffmpeg-location', path.dirname(ffmpegCmd));
+        }
+        getUrlArgs.push(
           '--js-runtimes', nodeRuntime,
           '-g',
-          '-f', 'best[height<=1080]/bestvideo[height<=1080]+bestaudio/best',
+          '-f', 'best[vcodec^=avc][height<=1080]/best[height<=1080]/bestvideo[height<=1080]+bestaudio/best',
           '--no-playlist',
           '--socket-timeout', '15',
           url
-        ]);
+        );
+        const getUrlProc = spawn(venvPy, getUrlArgs);
         let urlOut = '';
         await new Promise<void>((res) => {
           const t = setTimeout(() => { try { getUrlProc.kill(); } catch (e) {} res(); }, 25000);
@@ -578,21 +584,27 @@ export class StreamClipFinderService {
 
         await new Promise<void>((resolve) => {
           const nodeRuntime = process.execPath ? `node:${process.execPath}` : 'node';
-          const ytdlp = spawn(venvPy, [
+          const ffmpegExe = this.getFfmpegCmd();
+          const ytdlpArgs = [
             '-m', 'yt_dlp',
-            '--extractor-args', 'youtube:player_client=android,web',
-            '--ffmpeg-location', path.dirname(this.getFfmpegCmd()),
+            '--extractor-args', 'youtube:player_client=android,web'
+          ];
+          if (path.isAbsolute(ffmpegExe) && fs.existsSync(ffmpegExe)) {
+            ytdlpArgs.push('--ffmpeg-location', path.dirname(ffmpegExe));
+          }
+          ytdlpArgs.push(
             '--js-runtimes', nodeRuntime,
             '--remote-components', 'ejs:github',
             '--download-sections', timeSpec,
             '--force-keyframes-at-cuts',
             '--no-playlist',
-            '--socket-timeout', '20',
-            '-f', 'best[height<=1080]/bestvideo[height<=1080]+bestaudio/best',
+            '--socket-timeout', '25',
+            '-f', 'best[vcodec^=avc][height<=1080]+bestaudio[ext=m4a]/best[height<=1080]/bestvideo[height<=1080]+bestaudio/best',
             '--merge-output-format', 'mp4',
             '-o', tempRawPath,
             url
-          ]);
+          );
+          const ytdlp = spawn(venvPy, ytdlpArgs);
 
           let ytdlpLog = '';
           ytdlp.stdout.on('data', (d) => { ytdlpLog += d.toString(); });
@@ -1009,6 +1021,8 @@ export class StreamClipFinderService {
         '-c:v', 'libx264',
         '-pix_fmt', 'yuv420p',
         '-preset', 'ultrafast',
+        '-c:a', 'aac',
+        '-b:a', '128k',
         '-t', String(dur),
         outputPath
       ];
