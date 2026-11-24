@@ -1520,7 +1520,9 @@
                           fontFamily: `${timeline.captionStyle?.fontFamily || selectedPreset.font}, sans-serif`,
                           fontSize: `${Math.round((timeline.captionStyle?.fontSize || selectedPreset.fontSize) * 0.32)}px`,
                           color: timeline.captionStyle?.color || selectedPreset.color,
-                          WebkitTextStroke: `${timeline.captionStyle?.strokeWidth || 3}px ${timeline.captionStyle?.strokeColor || '#000000'}`
+                          WebkitTextStroke: `${Math.max(0.5, ((timeline.captionStyle?.strokeWidth ?? 3) * 0.32)).toFixed(1)}px ${timeline.captionStyle?.strokeColor || '#000000'}`,
+                          paintOrder: 'stroke fill',
+                          textShadow: '0 2px 10px rgba(0,0,0,0.9)'
                         }}
                       >
                         {(displayCaption.words && displayCaption.words.length > 0) ? (
