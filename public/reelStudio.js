@@ -45,6 +45,8 @@
     }
 
     const videoRef = useRef(null);
+    const blurVideoRef = useRef(null);
+    const canvasContainerRef = useRef(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(project.duration || 30);
@@ -59,10 +61,36 @@
     const [showSafeArea, setShowSafeArea] = useState(true);
     const [timelineZoom, setTimelineZoom] = useState(1); // 1x to 4x
 
+    // Parse timeline data safely if passed as JSON string from database
+    const parseTd = (proj) => {
+      if (!proj || !proj.timeline_data) return {};
+      if (typeof proj.timeline_data === 'string') {
+        try { return JSON.parse(proj.timeline_data); } catch (e) { return {}; }
+      }
+      return proj.timeline_data;
+    };
+    const initialTd = parseTd(project);
+
+    // 9:16 Reel Framing Mode ('blur_pad' = blurred backdrop, 'cover' = fill 9:16, 'fit' = letterbox)
+    const [framingMode, setFramingMode] = useState(initialTd.framingMode || project.framing_mode || 'blur_pad');
+
+    // Reel Hook Duration & Trimming (15s / 30s / 60s Reel Hook Window)
+    const [reelTrimStart, setReelTrimStart] = useState(() => initialTd.videoTrack?.trimStart !== undefined ? initialTd.videoTrack.trimStart : 0);
+    const [reelTrimEnd, setReelTrimEnd] = useState(() => {
+      const existingEnd = initialTd.videoTrack?.trimEnd;
+      if (existingEnd && existingEnd > 0) return existingEnd;
+      return Math.min(30, project.duration || 30);
+    });
+    const reelDuration = Math.max(1, reelTrimEnd - reelTrimStart);
+
+    // Interactive Direct Manipulation Dragging on Canvas
+    const [activeDragTarget, setActiveDragTarget] = useState(null); // 'behind_head' | 'captions' | 'card_ID'
+
     // Timeline Data (state mirror for responsive immediate UI updates)
     const [timeline, setTimeline] = useState(() => {
-      const td = project.timeline_data || {};
+      const td = initialTd;
       return {
+        framingMode: td.framingMode || 'blur_pad',
         videoTrack: td.videoTrack || { src: '/' + (project.video_path || '').replace(/\\/g, '/'), trimStart: 0, trimEnd: project.duration || 30, volume: 1 },
         behindHead: td.behindHead || {
           enabled: false,
@@ -139,25 +167,33 @@
 
     // Keep local timeline in sync when project changes
     useEffect(() => {
-      if (project.timeline_data) {
+      const td = parseTd(project);
+      if (td && Object.keys(td).length > 0) {
         setTimeline(prev => ({
           ...prev,
-          ...project.timeline_data
+          ...td
         }));
+        if (td.framingMode) setFramingMode(td.framingMode);
+        if (td.videoTrack?.trimStart !== undefined) setReelTrimStart(td.videoTrack.trimStart);
+        if (td.videoTrack?.trimEnd !== undefined) setReelTrimEnd(td.videoTrack.trimEnd);
       }
       if (project.duration && project.duration > 0) {
         setDuration(project.duration);
       }
     }, [project.id]);
 
-    // Playback loop and sync
+    // Playback loop and sync (supports dual-video blurred backdrop sync)
     const togglePlay = () => {
       if (!videoRef.current) return;
       if (isPlaying) {
         videoRef.current.pause();
+        if (blurVideoRef.current) blurVideoRef.current.pause();
         setIsPlaying(false);
       } else {
-        videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+        videoRef.current.play().then(() => {
+          setIsPlaying(true);
+          if (blurVideoRef.current) blurVideoRef.current.play().catch(() => {});
+        }).catch(() => {});
       }
     };
 
@@ -165,9 +201,14 @@
       if (!videoRef.current) return;
       const t = videoRef.current.currentTime;
       setCurrentTime(t);
+      if (blurVideoRef.current && Math.abs(blurVideoRef.current.currentTime - t) > 0.25) {
+        blurVideoRef.current.currentTime = t;
+      }
       if (duration && t >= duration && isLooping) {
         videoRef.current.currentTime = 0;
+        if (blurVideoRef.current) blurVideoRef.current.currentTime = 0;
         videoRef.current.play();
+        if (blurVideoRef.current) blurVideoRef.current.play().catch(() => {});
       }
     };
 
@@ -177,7 +218,82 @@
       if (videoRef.current) {
         videoRef.current.currentTime = clamped;
       }
+      if (blurVideoRef.current) {
+        blurVideoRef.current.currentTime = clamped;
+      }
     };
+
+    // Quick Reel Duration Presets (15s, 30s, 60s)
+    const handleSetReelDuration = (secs) => {
+      const start = currentTime < (duration - secs) ? currentTime : Math.max(0, duration - secs);
+      const end = Math.min(duration, +(start + secs).toFixed(2));
+      const roundedStart = +start.toFixed(2);
+      setReelTrimStart(roundedStart);
+      setReelTrimEnd(end);
+      const updatedTimeline = {
+        ...timeline,
+        videoTrack: {
+          ...timeline.videoTrack,
+          trimStart: roundedStart,
+          trimEnd: end
+        }
+      };
+      setTimeline(updatedTimeline);
+      syncProjectToServer(updatedTimeline);
+      seekTo(roundedStart);
+    };
+
+    // Direct Canvas Drag Event Handlers
+    const handleCanvasMouseDown = (e, target) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setActiveDragTarget(target);
+    };
+
+    const handleCanvasMouseMove = useCallback((e) => {
+      if (!activeDragTarget || !canvasContainerRef.current) return;
+      const rect = canvasContainerRef.current.getBoundingClientRect();
+      const x = Math.max(5, Math.min(95, ((e.clientX - rect.left) / rect.width) * 100));
+      const y = Math.max(5, Math.min(95, ((e.clientY - rect.top) / rect.height) * 100));
+
+      if (activeDragTarget === 'behind_head') {
+        const updatedBh = { ...timeline.behindHead, posX: Math.round(x), posY: Math.round(y) };
+        const updatedTimeline = { ...timeline, behindHead: updatedBh };
+        setTimeline(updatedTimeline);
+        syncProjectToServer(updatedTimeline);
+      } else if (activeDragTarget === 'captions') {
+        // Vertical height offset in pixels (from bottom 80px to 750px)
+        const offsetPx = Math.round((1 - (y / 100)) * 850);
+        const updatedStyle = { ...timeline.captionStyle, verticalOffset: Math.max(80, Math.min(750, offsetPx)) };
+        const updatedTimeline = { ...timeline, captionStyle: updatedStyle };
+        setTimeline(updatedTimeline);
+        syncProjectToServer(updatedTimeline);
+      } else if (activeDragTarget.startsWith('card_')) {
+        const cardId = activeDragTarget.replace('card_', '');
+        const updatedCards = (timeline.glassCardsTrack || []).map(c => {
+          if (c.id === cardId) return { ...c, posX: Math.round(x), posY: Math.round(y) };
+          return c;
+        });
+        const updatedTimeline = { ...timeline, glassCardsTrack: updatedCards };
+        setTimeline(updatedTimeline);
+        syncProjectToServer(updatedTimeline);
+      }
+    }, [activeDragTarget, timeline, syncProjectToServer]);
+
+    const handleCanvasMouseUp = useCallback(() => {
+      setActiveDragTarget(null);
+    }, []);
+
+    useEffect(() => {
+      if (activeDragTarget) {
+        window.addEventListener('mousemove', handleCanvasMouseMove);
+        window.addEventListener('mouseup', handleCanvasMouseUp);
+        return () => {
+          window.removeEventListener('mousemove', handleCanvasMouseMove);
+          window.removeEventListener('mouseup', handleCanvasMouseUp);
+        };
+      }
+    }, [activeDragTarget, handleCanvasMouseMove, handleCanvasMouseUp]);
 
     // Auto Edit State
     const [isAutoEditing, setIsAutoEditing] = useState(false);
@@ -201,6 +317,12 @@
         const data = await res.json();
         if (data.success && data.timeline) {
           setTimeline(data.timeline);
+          if (data.timeline.framingMode) setFramingMode(data.timeline.framingMode);
+          if (data.timeline.videoTrack?.trimStart !== undefined) {
+            setReelTrimStart(data.timeline.videoTrack.trimStart);
+            setReelTrimEnd(data.timeline.videoTrack.trimEnd);
+            seekTo(data.timeline.videoTrack.trimStart);
+          }
           if (data.project && onUpdateProject) {
             onUpdateProject(data.project);
           }
@@ -333,7 +455,7 @@
       : 'w-full max-w-[340px] aspect-[9/16]';
 
     return (
-      <div class="flex flex-col h-screen bg-slate-950 text-slate-100 select-none overflow-hidden font-sans">
+      <div class="fixed inset-0 z-50 flex flex-col bg-slate-950 text-slate-100 select-none overflow-hidden font-sans">
         
         {/* ================================================================= */}
         {/* 1. TOP STUDIO NAVIGATION & ACTION BAR                             */}
@@ -451,12 +573,12 @@
         {/* ================================================================= */}
         {/* 2. MAIN 3-COLUMN WORKBENCH (Left Tools, Center Canvas, Right Insp)*/}
         {/* ================================================================= */}
-        <div class="flex-1 flex overflow-hidden">
+        <div class="flex-1 min-h-0 flex overflow-hidden">
           
           {/* --------------------------------------------------------------- */}
           {/* LEFT TOOL SHELF & PRESET LIBRARY                                */}
           {/* --------------------------------------------------------------- */}
-          <aside class="w-80 bg-slate-900/95 border-r border-slate-800/80 flex flex-col flex-shrink-0 z-20">
+          <aside class="w-72 bg-slate-900/95 border-r border-slate-800/80 flex flex-col flex-shrink-0 z-20">
             {/* Shelf Mode Switcher Tabs */}
             <div class="grid grid-cols-6 border-b border-slate-800 bg-slate-950/70 p-1 text-[11px] font-bold">
               {[
@@ -1093,7 +1215,7 @@
           {/* --------------------------------------------------------------- */}
           {/* CENTER INTERACTIVE CANVA & VIDEO VIEWPORT                       */}
           {/* --------------------------------------------------------------- */}
-          <main class="flex-1 flex flex-col bg-slate-950/90 relative overflow-hidden">
+          <main class="flex-1 min-w-0 flex flex-col bg-slate-950/90 relative overflow-hidden">
             
             {/* Viewport Top Bar */}
             <div class="h-9 px-4 flex items-center justify-between border-b border-slate-800/80 bg-slate-950 text-xs text-slate-400">
@@ -1111,7 +1233,53 @@
                 )}
               </div>
 
-              <div class="flex items-center space-x-2">
+              <div class="flex items-center space-x-3">
+                {/* Framing Mode Switcher */}
+                <div class="flex items-center space-x-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+                  <button
+                    onClick={() => {
+                      setFramingMode('blur_pad');
+                      const updatedTimeline = { ...timeline, framingMode: 'blur_pad' };
+                      setTimeline(updatedTimeline);
+                      syncProjectToServer(updatedTimeline);
+                    }}
+                    class={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
+                      framingMode === 'blur_pad' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                    title="Scale video with blurred duplicate background (Standard 9:16)"
+                  >
+                    🌌 Blur Backdrop
+                  </button>
+                  <button
+                    onClick={() => {
+                      setFramingMode('cover');
+                      const updatedTimeline = { ...timeline, framingMode: 'cover' };
+                      setTimeline(updatedTimeline);
+                      syncProjectToServer(updatedTimeline);
+                    }}
+                    class={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
+                      framingMode === 'cover' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                    title="Fill 9:16 vertical canvas (center crop)"
+                  >
+                    📱 Fill 9:16
+                  </button>
+                  <button
+                    onClick={() => {
+                      setFramingMode('fit');
+                      const updatedTimeline = { ...timeline, framingMode: 'fit' };
+                      setTimeline(updatedTimeline);
+                      syncProjectToServer(updatedTimeline);
+                    }}
+                    class={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
+                      framingMode === 'fit' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                    title="Fit full video with clean letterbox"
+                  >
+                    ⬛ Fit Box
+                  </button>
+                </div>
+
                 <label class="flex items-center space-x-1.5 cursor-pointer text-[11px]">
                   <input
                     type="checkbox"
@@ -1124,14 +1292,36 @@
               </div>
             </div>
 
-            {/* Centered Canvas Container */}
-            <div class="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
+            {/* Centered Canvas Container (Realistic 9:16 Smartphone Chassis) */}
+            <div class="flex-1 flex items-center justify-center p-3 relative overflow-hidden">
               <div
-                class={`${canvasAspectClass} relative bg-black rounded-2xl overflow-hidden shadow-2xl border-2 border-indigo-500/30 flex items-center justify-center`}
+                ref={canvasContainerRef}
+                class={`relative overflow-hidden shadow-2xl flex items-center justify-center select-none ${
+                  aspect === '9:16'
+                    ? 'rounded-[42px] border-[10px] border-slate-900 ring-2 ring-slate-800/90 bg-black'
+                    : 'rounded-2xl border-2 border-indigo-500/30 bg-black'
+                }`}
                 style={{
+                  aspectRatio: aspect === '16:9' ? '16 / 9' : (aspect === '1:1' ? '1 / 1' : '9 / 16'),
+                  height: 'min(550px, calc(100vh - 330px))',
+                  width: 'auto',
+                  maxHeight: '100%',
                   transform: shakeTransform
                 }}
               >
+                {/* 9:16 Smartphone Chassis Dynamic Island */}
+                {aspect === '9:16' && (
+                  <div class="absolute top-2.5 left-1/2 -translate-x-1/2 w-24 h-4 bg-slate-950 rounded-full z-50 pointer-events-none flex items-center justify-center border border-slate-800/60 shadow-md">
+                    <div class="w-2.5 h-2.5 rounded-full bg-slate-900 border border-slate-700 mr-2"></div>
+                    <div class="w-1.5 h-1.5 rounded-full bg-emerald-500/90 animate-pulse"></div>
+                  </div>
+                )}
+
+                {/* 9:16 Smartphone Bottom Home Indicator Bar */}
+                {aspect === '9:16' && (
+                  <div class="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-24 h-1 bg-white/40 rounded-full z-50 pointer-events-none"></div>
+                )}
+
                 {/* Visual Viewport Inner: Zoom & Transform Container */}
                 <div
                   class="absolute inset-0 w-full h-full overflow-hidden flex items-center justify-center transition-transform"
@@ -1142,8 +1332,20 @@
                   }}
                 >
                   {/* ======================================================= */}
-                  {/* LAYER 1: PRIMARY BACKGROUND VIDEO                       */}
+                  {/* LAYER 1: DUAL VIDEO BACKDROP (BLUR_PAD MODE)            */}
                   {/* ======================================================= */}
+                  {aspect === '9:16' && framingMode === 'blur_pad' && (
+                    <video
+                      ref={blurVideoRef}
+                      src={timeline.videoTrack?.src || ('/' + (project.video_path || '').replace(/\\/g, '/'))}
+                      preload="auto"
+                      playsInline
+                      muted
+                      class="absolute inset-0 w-full h-full object-cover scale-150 filter blur-xl brightness-50 opacity-80 z-0 pointer-events-none"
+                    />
+                  )}
+
+                  {/* Primary Video Element */}
                   <video
                     ref={videoRef}
                     src={timeline.videoTrack?.src || ('/' + (project.video_path || '').replace(/\\/g, '/'))}
@@ -1156,15 +1358,20 @@
                     }}
                     onPlay={() => setIsPlaying(true)}
                     onPause={() => setIsPlaying(false)}
-                    class="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none"
+                    class={`absolute inset-0 w-full h-full pointer-events-none ${
+                      framingMode === 'cover' ? 'object-cover z-10' :
+                      framingMode === 'blur_pad' ? 'object-contain z-10 drop-shadow-2xl' :
+                      'object-contain z-10'
+                    }`}
                   />
 
                   {/* ======================================================= */}
-                  {/* LAYER 2: 3D BEHIND-HEAD OCCLUSION TEXT                  */}
+                  {/* LAYER 2: 3D BEHIND-HEAD OCCLUSION TEXT (INTERACTIVE DRAG)*/}
                   {/* ======================================================= */}
                   {isBhActive && (
                     <div
-                      class="absolute z-20 pointer-events-none select-none text-center transition-all flex items-center justify-center"
+                      onMouseDown={(e) => handleCanvasMouseDown(e, 'behind_head')}
+                      class="absolute z-20 select-none text-center transition-transform flex items-center justify-center cursor-move group hover:ring-2 hover:ring-amber-400/80 rounded-xl"
                       style={{
                         left: `${bh.posX}%`,
                         top: `${bh.posY}%`,
@@ -1172,6 +1379,7 @@
                         width: '90%',
                         opacity: bh.opacity || 0.95
                       }}
+                      title="Click & Drag to reposition Word Behind Head directly on canvas"
                     >
                       <span
                         style={{
@@ -1190,6 +1398,9 @@
                         }}
                       >
                         {bh.text}
+                      </span>
+                      <span class="absolute -top-4 right-2 text-[9px] font-bold bg-amber-500 text-slate-950 px-1.5 py-0.2 rounded opacity-0 group-hover:opacity-100 transition pointer-events-none">
+                        ✋ Drag Pos
                       </span>
                     </div>
                   )}
@@ -1222,17 +1433,19 @@
                   )}
 
                   {/* ======================================================= */}
-                  {/* LAYER 4: WORD-LEVEL KARAOKE CAPTIONS                    */}
+                  {/* LAYER 4: WORD-LEVEL KARAOKE CAPTIONS (INTERACTIVE DRAG) */}
                   {/* ======================================================= */}
                   {activeCaptionSeg && (
                     <div
-                      class="absolute left-1/2 -translate-x-1/2 w-[88%] z-40 text-center pointer-events-none transition-all flex justify-center"
+                      onMouseDown={(e) => handleCanvasMouseDown(e, 'captions')}
+                      class="absolute left-1/2 -translate-x-1/2 w-[88%] z-40 text-center transition-all flex justify-center cursor-move group"
                       style={{
                         bottom: `${Math.round((timeline.captionStyle?.verticalOffset || 480) * 0.15)}px`
                       }}
+                      title="Click & Drag vertically to reposition captions on canvas"
                     >
                       <div
-                        class="px-4 py-2 rounded-2xl max-w-full font-black shadow-2xl backdrop-blur-md break-words leading-tight"
+                        class="px-4 py-2 rounded-2xl max-w-full font-black shadow-2xl backdrop-blur-md break-words leading-tight group-hover:ring-2 group-hover:ring-cyan-400 relative"
                         style={{
                           backgroundColor: timeline.captionStyle?.bgBox ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.65)',
                           border: '1px solid rgba(255,255,255,0.18)',
@@ -1263,24 +1476,29 @@
                         ) : (
                           <span>{activeCaptionSeg.text}</span>
                         )}
+                        <span class="absolute -top-3.5 right-1 text-[8px] font-bold bg-cyan-500 text-slate-950 px-1 rounded opacity-0 group-hover:opacity-100 transition pointer-events-none">
+                          ↕ Drag Height
+                        </span>
                       </div>
                     </div>
                   )}
 
-                  {/* LAYER 4: GLASSMORPHISM INTERFACE CARDS */}
+                  {/* LAYER 4: GLASSMORPHISM INTERFACE CARDS (INTERACTIVE DRAG) */}
                   {activeGlassCards.map((card) => (
                     <div
                       key={card.id}
-                      class="absolute z-40 pointer-events-none transition-all"
+                      onMouseDown={(e) => handleCanvasMouseDown(e, `card_${card.id}`)}
+                      class="absolute z-40 transition-all cursor-move group"
                       style={{
                         left: `${card.posX}%`,
                         top: `${card.posY}%`,
                         transform: 'translate(-50%, -50%)',
                         width: '85%'
                       }}
+                      title="Click & Drag to reposition Glass Card on canvas"
                     >
                       <div
-                        class="p-3.5 rounded-2xl shadow-2xl border flex items-center space-x-3 text-left"
+                        class="p-3.5 rounded-2xl shadow-2xl border flex items-center space-x-3 text-left group-hover:ring-2 group-hover:ring-sky-400/80"
                         style={{
                           background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.90) 100%)',
                           backdropFilter: `blur(${card.blur || 16}px)`,
@@ -1307,6 +1525,9 @@
                             {card.content}
                           </p>
                         </div>
+                        <span class="text-[8px] font-bold bg-sky-500 text-slate-950 px-1 rounded opacity-0 group-hover:opacity-100 transition pointer-events-none">
+                          ✋ Drag
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -1347,6 +1568,69 @@
                     {isPlaying ? '⏸️' : '▶️'}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Reel Short-Form Trimming & Climax Selector Bar */}
+            <div class="h-9 px-4 bg-slate-950 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-300 z-30">
+              <div class="flex items-center space-x-2">
+                <span class="text-[11px] font-bold text-slate-400">✂️ Reel Hook:</span>
+                <button
+                  onClick={() => {
+                    handleRunAutoEdit();
+                  }}
+                  class="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black hover:from-amber-400 hover:to-orange-400 transition text-[11px] flex items-center space-x-1 shadow"
+                  title="Auto-detect Climax & 30s Hook Window"
+                >
+                  <span>⚡ Auto 30s Hook</span>
+                </button>
+                <button
+                  onClick={() => handleSetReelDuration(15)}
+                  class={`px-2 py-0.5 rounded-lg font-bold transition text-[11px] ${
+                    Math.abs(reelDuration - 15) < 0.5 ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-700'
+                  }`}
+                >
+                  ⏱️ 15s Story
+                </button>
+                <button
+                  onClick={() => handleSetReelDuration(30)}
+                  class={`px-2 py-0.5 rounded-lg font-bold transition text-[11px] ${
+                    Math.abs(reelDuration - 30) < 0.5 ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-700'
+                  }`}
+                >
+                  ⏱️ 30s Reel
+                </button>
+                <button
+                  onClick={() => handleSetReelDuration(60)}
+                  class={`px-2 py-0.5 rounded-lg font-bold transition text-[11px] ${
+                    Math.abs(reelDuration - 60) < 0.5 ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-700'
+                  }`}
+                >
+                  ⏱️ 60s Short
+                </button>
+                <button
+                  onClick={() => {
+                    setReelTrimStart(0);
+                    setReelTrimEnd(duration);
+                    const updatedTimeline = {
+                      ...timeline,
+                      videoTrack: { ...timeline.videoTrack, trimStart: 0, trimEnd: duration }
+                    };
+                    setTimeline(updatedTimeline);
+                    syncProjectToServer(updatedTimeline);
+                  }}
+                  class="px-2 py-0.5 rounded-lg bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 transition text-[11px]"
+                >
+                  Full Video
+                </button>
+              </div>
+
+              <div class="flex items-center space-x-2 text-[11px] font-mono text-slate-400">
+                <span>Export Range:</span>
+                <span class="text-indigo-400 font-bold">{reelTrimStart.toFixed(1)}s</span>
+                <span>→</span>
+                <span class="text-indigo-400 font-bold">{reelTrimEnd.toFixed(1)}s</span>
+                <span class="text-emerald-400 font-bold">({reelDuration.toFixed(1)}s Reel)</span>
               </div>
             </div>
 
@@ -1581,7 +1865,42 @@
                 <div class="space-y-4">
                   <div>
                     <span class="font-bold text-slate-200 block mb-1">Global Caption Typography</span>
-                    <p class="text-[10px] text-slate-400">Controls word-by-word font scaling and positioning.</p>
+                    <p class="text-[10px] text-slate-400">Controls word-by-word font scaling, live canvas dragging, and safe positioning.</p>
+                  </div>
+
+                  <div>
+                    <label class="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase">Safe Position (Avoid Face/Logos)</label>
+                    <div class="grid grid-cols-4 gap-1">
+                      {[
+                        { id: 'bottom', label: '⬇️ Bottom', offset: 240 },
+                        { id: 'lower-third', label: '📺 Lower 3rd', offset: 340 },
+                        { id: 'center', label: '⏺️ Center', offset: 480 },
+                        { id: 'top', label: '⬆️ Top', offset: 720 }
+                      ].map(p => (
+                        <button
+                          key={p.id}
+                          onClick={() => {
+                            const updatedTimeline = {
+                              ...timeline,
+                              captionStyle: {
+                                ...timeline.captionStyle,
+                                position: p.id,
+                                verticalOffset: p.offset
+                              }
+                            };
+                            setTimeline(updatedTimeline);
+                            syncProjectToServer(updatedTimeline);
+                          }}
+                          class={`py-1 rounded text-[10px] font-bold border transition ${
+                            (timeline.captionStyle?.position === p.id || (!timeline.captionStyle?.position && p.id === 'bottom'))
+                              ? 'bg-indigo-600 text-white border-indigo-400 shadow'
+                              : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div>
@@ -1725,11 +2044,26 @@
               <div class="w-3 h-3 bg-rose-500 rounded-full -ml-[5px] -mt-1 shadow" />
             </div>
 
-            {/* TRACK 1: VIDEO */}
+            {/* TRACK 1: VIDEO & REEL TRIM HIGHLIGHT */}
             <div class="h-5 flex items-center text-[10px] space-x-2">
-              <span class="w-24 text-slate-400 font-bold truncate">📹 Video</span>
-              <div class="flex-1 h-4 bg-indigo-950/80 border border-indigo-700/60 rounded flex items-center px-2 text-indigo-300 font-bold">
-                Main Video Source ({duration.toFixed(1)}s)
+              <span class="w-24 text-slate-400 font-bold truncate">📹 Video Track</span>
+              <div class="flex-1 h-4 bg-slate-950 relative rounded border border-slate-800 overflow-hidden">
+                <div class="absolute inset-0 bg-indigo-950/40 text-indigo-400/60 text-[9px] px-2 flex items-center">
+                  Full Video ({duration.toFixed(1)}s)
+                </div>
+                {/* Active Reel Trim Window Highlight */}
+                {duration > 0 && (
+                  <div
+                    class="absolute top-0 bottom-0 bg-gradient-to-r from-indigo-600/80 to-purple-600/80 border-2 border-indigo-400 rounded text-[9px] font-black text-white px-1.5 flex items-center justify-between shadow-lg"
+                    style={{
+                      left: `${(reelTrimStart / duration) * 100}%`,
+                      width: `${Math.max(2, ((reelTrimEnd - reelTrimStart) / duration) * 100)}%`
+                    }}
+                    title={`Active Reel Window: ${reelTrimStart.toFixed(1)}s - ${reelTrimEnd.toFixed(1)}s (${reelDuration.toFixed(1)}s)`}
+                  >
+                    <span class="truncate">✂️ Reel Cut ({reelDuration.toFixed(1)}s)</span>
+                  </div>
+                )}
               </div>
             </div>
 

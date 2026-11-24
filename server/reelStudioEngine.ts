@@ -743,12 +743,24 @@ export class ReelStudioEngine {
       }
     }
 
+    // Auto-detect optimal 30s-45s Reel Hook segment if footage is longer than 60s
+    let targetReelDur = Math.min(30, duration);
+    let bestTrimStart = 0;
+    if (duration > 45 && detectedKeywords.length > 0) {
+      bestTrimStart = Math.max(0, detectedKeywords[0].start - 0.5);
+      if (bestTrimStart + targetReelDur > duration) {
+        bestTrimStart = Math.max(0, duration - targetReelDur);
+      }
+    }
+    const bestTrimEnd = Math.min(duration, bestTrimStart + targetReelDur);
+
     // Assemble Master Timeline Project Data
     const timelineData: ReelTimeline = {
+      framingMode: 'blur_pad',
       videoTrack: {
         src: '/' + project.video_path.replace(/\\/g, '/'),
-        trimStart: 0,
-        trimEnd: duration,
+        trimStart: +bestTrimStart.toFixed(2),
+        trimEnd: +bestTrimEnd.toFixed(2),
         volume: 1.0
       },
       behindHead: behindHeadConfig,
@@ -836,30 +848,47 @@ export class ReelStudioEngine {
       width = 1080; height = 1080;
     }
 
+    const trimStart = timeline.videoTrack?.trimStart || 0;
+    const trimEnd = timeline.videoTrack?.trimEnd || (project.duration || 30);
+    const targetDuration = Math.max(1, trimEnd - trimStart);
+    const framingMode = timeline.framingMode || (project as any).framing_mode || 'blur_pad';
+
     // 1. Generate Advanced SubStation Alpha (.ass) Subtitles Script
     const captionsDir = path.join(process.cwd(), 'storage', 'captions');
     if (!fs.existsSync(captionsDir)) fs.mkdirSync(captionsDir, { recursive: true });
     const assSubtitlePath = path.join(captionsDir, `reel_${projectId}.ass`);
 
-    this.generateAssSubtitles(timeline, assSubtitlePath, width, height);
+    this.generateAssSubtitles(timeline, assSubtitlePath, width, height, trimStart, trimEnd);
 
     // 2. Prepare Background Music & Sound Effects Mix
     const audioDir = path.join(process.cwd(), 'storage', 'audio');
     if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
     const mixedAudioPath = path.join(audioDir, `reel_audio_${projectId}.wav`);
 
-    await this.mixAudioTracks(timeline, mixedAudioPath, project.duration || 30);
+    await this.mixAudioTracks(timeline, mixedAudioPath, targetDuration, trimStart);
 
     // 3. Assemble FFmpeg Filtergraph
     // Features: Aspect Crop/Pad -> Camera Zooms -> Screen Shake -> Word-Behind-Head Compositing -> ASS Subtitles
     const filters: string[] = [];
-    const inputArgs: string[] = ['-y', '-i', sourceVideo];
+    const inputArgs: string[] = ['-y'];
+    if (trimStart > 0) {
+      inputArgs.push('-ss', `${trimStart}`);
+    }
+    inputArgs.push('-i', sourceVideo);
     let currentVTag = '0:v';
 
-    // Framing: 9:16 Vertical Center Crop / Scale
+    // Framing: 9:16 Vertical Reel (Blur Backdrop vs Crop Fill vs Fit Letterbox)
     if (aspectRatio === '9:16') {
-      filters.push(`[${currentVTag}]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v_framed]`);
-      currentVTag = 'v_framed';
+      if (framingMode === 'blur_pad') {
+        filters.push(`[${currentVTag}]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=28:5,eq=brightness=-0.15[bgblur];[fg]scale=1080:1920:force_original_aspect_ratio=decrease[fgscaled];[bgblur][fgscaled]overlay=(W-w)/2:(H-h)/2[v_framed]`);
+        currentVTag = 'v_framed';
+      } else if (framingMode === 'fit') {
+        filters.push(`[${currentVTag}]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black[v_framed]`);
+        currentVTag = 'v_framed';
+      } else {
+        filters.push(`[${currentVTag}]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v_framed]`);
+        currentVTag = 'v_framed';
+      }
     } else if (aspectRatio === '1:1') {
       filters.push(`[${currentVTag}]scale=1080:1080:force_original_aspect_ratio=increase,crop=1080:1080[v_framed]`);
       currentVTag = 'v_framed';
@@ -879,7 +908,9 @@ export class ReelStudioEngine {
       const cleanBhText = (bh.text || 'WORD').replace(/'/g, "\\'").replace(/:/g, '\\:');
       const textX = `(w-text_w)*${(bh.posX / 100).toFixed(2)}`;
       const textY = `(h-text_h)*${(bh.posY / 100).toFixed(2)}`;
-      const enableClause = `between(t,${bh.startTime},${bh.endTime})`;
+      const bhStart = Math.max(0, bh.startTime - trimStart);
+      const bhEnd = Math.max(0, bh.endTime - trimStart);
+      const enableClause = `between(t,${bhStart.toFixed(2)},${bhEnd.toFixed(2)})`;
 
       filters.push(`[${currentVTag}]drawtext=text='${cleanBhText}':font='Montserrat':fontsize=${bh.fontSize || 96}:fontcolor=${bhColor}:shadowcolor=black@0.7:shadowx=6:shadowy=6:x=${textX}:y=${textY}:enable='${enableClause}'[v_with_bhtext]`);
       currentVTag = 'v_with_bhtext';
@@ -907,7 +938,7 @@ export class ReelStudioEngine {
       '-map', `${audioInputIdx}:a`,
       '-c:a', 'aac',
       '-b:a', '192k',
-      '-t', `${project.duration || 30}`,
+      '-t', `${targetDuration}`,
       '-r', `${fps}`,
       '-pix_fmt', 'yuv420p'
     ];
@@ -948,7 +979,7 @@ export class ReelStudioEngine {
             '-map', `${audioInputIdx}:a`,
             '-c:a', 'aac',
             '-b:a', '192k',
-            '-t', `${project.duration || 30}`,
+            '-t', `${targetDuration}`,
             '-r', `${fps}`,
             '-pix_fmt', 'yuv420p',
             '-c:v', 'libx264',
@@ -984,14 +1015,17 @@ export class ReelStudioEngine {
   /**
    * Mix multi-track audio: Original voice + Ducked BGM + SFX Cues
    */
-  private static async mixAudioTracks(timeline: ReelTimeline, outputPath: string, totalDuration: number): Promise<void> {
+  private static async mixAudioTracks(timeline: ReelTimeline, outputPath: string, totalDuration: number, trimStart: number = 0): Promise<void> {
     return new Promise((resolve, reject) => {
       const inputs: string[] = [];
       const filterSegments: string[] = [];
       let inputIndex = 0;
 
-      // 1. Primary Speech Audio Track
+      // 1. Primary Speech Audio Track (synced to Reel trimStart)
       const primaryAudio = path.join(process.cwd(), timeline.videoTrack.src.replace(/^\//, ''));
+      if (trimStart > 0) {
+        inputs.push('-ss', `${trimStart}`);
+      }
       inputs.push('-i', primaryAudio);
       filterSegments.push(`[${inputIndex}:a]volume=${timeline.videoTrack.volume || 1.0}[a_voice]`);
       inputIndex++;
@@ -1017,9 +1051,10 @@ export class ReelStudioEngine {
       const sfx = timeline.sfxTrack || [];
       sfx.forEach((cue, idx) => {
         const sfxDiskPath = path.join(process.cwd(), 'public', cue.src.replace(/^\//, ''));
-        if (fs.existsSync(sfxDiskPath) && cue.startTime < totalDuration) {
+        const cueRelativeStart = cue.startTime - trimStart;
+        if (fs.existsSync(sfxDiskPath) && cueRelativeStart >= 0 && cueRelativeStart < totalDuration) {
           inputs.push('-i', sfxDiskPath);
-          const delayMs = Math.round(cue.startTime * 1000);
+          const delayMs = Math.round(cueRelativeStart * 1000);
           filterSegments.push(`[${inputIndex}:a]adelay=${delayMs}|${delayMs},volume=${cue.volume || 0.5}[a_sfx_${idx}]`);
           mixInputs += `[a_sfx_${idx}]`;
           currentAudioMixCount++;
@@ -1063,7 +1098,9 @@ export class ReelStudioEngine {
     timeline: ReelTimeline,
     outputPath: string,
     width: number,
-    height: number
+    height: number,
+    trimStart: number = 0,
+    trimEnd: number = 999999
   ): void {
     const cs = timeline.captionStyle || {
       fontFamily: 'Montserrat',
@@ -1131,8 +1168,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     for (const seg of timeline.captionsTrack) {
       if (!seg.text || seg.start >= seg.end) continue;
-      const startStr = formatTs(seg.start);
-      const endStr = formatTs(seg.end);
+      const relStart = seg.start - trimStart;
+      const relEnd = seg.end - trimStart;
+      if (relEnd <= 0 || relStart >= (trimEnd - trimStart)) continue;
+      const clampedStart = Math.max(0, relStart);
+      const clampedEnd = Math.max(0.1, relEnd);
+      const startStr = formatTs(clampedStart);
+      const endStr = formatTs(clampedEnd);
 
       // Karaoke style highlighting if words present
       let lineText = '';
