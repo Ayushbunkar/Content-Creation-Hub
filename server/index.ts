@@ -1916,6 +1916,158 @@ app.post('/api/clipper/clips/:clipId/open-in-caption-studio', async (req, res) =
   }
 });
 
+// 10c. Open clip in AI Reel Studio bridge (with word-level transcript & auto-timeline)
+app.post('/api/clipper/clips/:clipId/open-in-reel-studio', async (req, res) => {
+  try {
+    const clipId = String(req.params.clipId);
+    const clip = await getQuery<any>('SELECT * FROM clipper_clips WHERE id = ?', [clipId]);
+    if (!clip) return res.status(404).json({ error: 'Clip not found' });
+
+    const project = await getQuery<any>('SELECT * FROM clipper_projects WHERE id = ?', [clip.project_id]);
+    const sourceVideo = clip.exported_video || project?.video_path || '';
+    const fullPath = path.isAbsolute(sourceVideo) ? sourceVideo : path.join(process.cwd(), sourceVideo);
+
+    let duration = clip.duration || (clip.end_time - clip.start_time) || 30;
+    try {
+      if (fs.existsSync(fullPath)) {
+        const probe = await CaptionStudioService.probeMedia(fullPath);
+        if (probe?.durationSeconds) duration = probe.durationSeconds;
+      }
+    } catch (e) {}
+
+    const rawSegments = clip.transcript_segments ? JSON.parse(clip.transcript_segments) : [];
+
+    // Convert segments into captionsTrack with relative timestamps
+    const clipStart = clip.start_time || 0;
+    const captionsTrack: any[] = [];
+    rawSegments.forEach((seg: any, idx: number) => {
+      const segStart = Math.max(0, +(seg.start - (clip.exported_video ? clipStart : 0)).toFixed(2));
+      const segEnd = Math.max(segStart + 0.5, +(seg.end - (clip.exported_video ? clipStart : 0)).toFixed(2));
+      const words = (seg.words || []).map((w: any, wIdx: number) => ({
+        word: w.word,
+        start: Math.max(0, +(w.start - (clip.exported_video ? clipStart : 0)).toFixed(2)),
+        end: Math.max(0, +(w.end - (clip.exported_video ? clipStart : 0)).toFixed(2)),
+        isKeyword: wIdx === 1 || w.word.length >= 7
+      }));
+      captionsTrack.push({
+        id: `cap_seg_${idx + 1}`,
+        start: segStart,
+        end: segEnd,
+        text: seg.text,
+        words
+      });
+    });
+
+    // Pick a punchy climax word for behind-head text
+    const sampleWords = (clip.title || 'THE UNREAL MOMENT').replace(/[^\w\s]/g, '').split(/\s+/).filter(Boolean);
+    const behindHeadWord = sampleWords.length > 1 ? sampleWords[1].toUpperCase() : (sampleWords[0] || 'MIND BLOWN').toUpperCase();
+
+    const reelProjId = `reel_clip_${clip.id}`;
+    const initialTimeline: any = {
+      videoTrack: {
+        src: '/' + sourceVideo.replace(/\\/g, '/'),
+        trimStart: 0,
+        trimEnd: duration,
+        volume: 1.0
+      },
+      behindHead: {
+        enabled: true,
+        text: behindHeadWord,
+        startTime: 1.0,
+        endTime: 4.5,
+        font: 'Montserrat',
+        fontSize: 100,
+        fontWeight: '900',
+        color: '#FFFFFF',
+        glowColor: '#FFD700',
+        shadow: true,
+        depth: 18,
+        posX: 50,
+        posY: 38,
+        scale: 1.0,
+        rotation: 0,
+        opacity: 0.95,
+        maskMode: 'ai',
+        feather: 15
+      },
+      captionsTrack,
+      captionStyle: {
+        preset: 'hormozi-bold',
+        fontFamily: 'Montserrat',
+        fontSize: 64,
+        fontWeight: '900',
+        color: '#FFFFFF',
+        highlightColor: '#FFD700',
+        position: 'lower-third',
+        verticalOffset: 450,
+        animation: 'word-pop',
+        strokeWidth: 4,
+        strokeColor: '#000000',
+        bgBox: false
+      },
+      glassCardsTrack: [],
+      cameraTrack: [
+        { id: 'cam_1', type: 'punch-zoom', startTime: 1.5, duration: 2.5, scale: 1.15, anchorX: 50, anchorY: 38, easing: 'ease-out' }
+      ],
+      shakeTrack: [],
+      sfxTrack: [
+        { id: 'sfx_1', sfxId: 'bass-impact', name: 'Bass Impact', src: '/audio/sfx/bass-impact.wav', startTime: 1.5, volume: 0.5 }
+      ],
+      bgmTrack: {
+        trackId: 'tech_cyber',
+        src: '/audio/bgm/tech_cyber.wav',
+        volume: 0.22,
+        duckingEnabled: true,
+        duckingDb: -14,
+        fadeIn: 1.0,
+        fadeOut: 1.5
+      },
+      overlaysTrack: [],
+      keyframes: []
+    };
+
+    const existing = await getQuery<any>('SELECT id FROM reel_projects WHERE id = ?', [reelProjId]);
+    if (!existing) {
+      await runQuery(`
+        INSERT INTO reel_projects (
+          id, title, video_path, audio_path, file_info, aspect_ratio, duration, preset,
+          status, progress, transcript_json, timeline_data, mask_mode, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `, [
+        reelProjId,
+        clip.title,
+        sourceVideo,
+        project?.audio_path || '',
+        null,
+        '9:16',
+        duration,
+        'hormozi-bold',
+        'editing',
+        100,
+        JSON.stringify({ segments: rawSegments }),
+        JSON.stringify(initialTimeline),
+        'ai'
+      ]);
+    } else {
+      await runQuery(`
+        UPDATE reel_projects SET
+          title = ?,
+          video_path = ?,
+          duration = ?,
+          timeline_data = ?,
+          transcript_json = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `, [clip.title, sourceVideo, duration, JSON.stringify(initialTimeline), JSON.stringify({ segments: rawSegments }), reelProjId]);
+    }
+
+    const created = await ReelStudioEngine.getProject(reelProjId);
+    res.json({ success: true, project: created });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 10b. Open clip or project video directly in Concat Video Editor desktop app
 app.post('/api/editor/open-concat', async (req, res) => {
   try {

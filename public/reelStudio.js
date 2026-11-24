@@ -262,9 +262,9 @@
         setTimeline(updatedTimeline);
         syncProjectToServer(updatedTimeline);
       } else if (activeDragTarget === 'captions') {
-        // Vertical height offset in pixels (from bottom 80px to 750px)
-        const offsetPx = Math.round((1 - (y / 100)) * 850);
-        const updatedStyle = { ...timeline.captionStyle, verticalOffset: Math.max(80, Math.min(750, offsetPx)) };
+        // Vertical height offset in pixels (from bottom 100px to 1600px relative to 1920p canvas)
+        const offsetPx = Math.round((1 - (y / 100)) * 1920);
+        const updatedStyle = { ...timeline.captionStyle, verticalOffset: Math.max(100, Math.min(1600, offsetPx)) };
         const updatedTimeline = { ...timeline, captionStyle: updatedStyle };
         setTimeline(updatedTimeline);
         syncProjectToServer(updatedTimeline);
@@ -414,6 +414,34 @@
     const activeCaptionSeg = useMemo(() => {
       return (timeline.captionsTrack || []).find(s => currentTime >= s.start && currentTime <= s.end);
     }, [timeline.captionsTrack, currentTime]);
+
+    // Live display caption (shows active speech segment, or nearest/sample preview so all preset clicks and style updates reflect immediately)
+    const displayCaption = useMemo(() => {
+      if (activeCaptionSeg) return activeCaptionSeg;
+      const track = timeline.captionsTrack || [];
+      if (track.length > 0) {
+        const nearest = track.reduce((prev, curr) => {
+          return (Math.abs(curr.start - currentTime) < Math.abs(prev.start - currentTime) ? curr : prev);
+        }, track[0]);
+        if (nearest) return { ...nearest, isPreview: false };
+      }
+      const rawText = project.title || 'THE UNREAL MOMENT';
+      const cleanWords = rawText.replace(/[^\w\s]/g, '').split(/\s+/).filter(Boolean);
+      const words = (cleanWords.length > 0 ? cleanWords : ['THE', 'UNREAL', 'MOMENT']).map((w, idx, arr) => ({
+        word: w.toUpperCase(),
+        start: 0,
+        end: 3,
+        isKeyword: idx === 1 || idx === arr.length - 1
+      }));
+      return {
+        id: 'preview_sample',
+        start: 0,
+        end: duration || 30,
+        text: rawText,
+        words,
+        isPreview: true
+      };
+    }, [activeCaptionSeg, timeline.captionsTrack, currentTime, project.title, duration]);
 
     // Active glass cards
     const activeGlassCards = useMemo(() => {
@@ -613,6 +641,46 @@
                     <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Reel Presets ({presets.length})</span>
                     <span class="text-[10px] text-indigo-400 font-mono">Word-by-word synced</span>
                   </div>
+
+                  {(!timeline.captionsTrack || timeline.captionsTrack.length === 0) && (
+                    <div class="p-3 bg-indigo-950/40 border border-indigo-700/60 rounded-xl space-y-2">
+                      <div class="flex items-center justify-between text-[11px] font-bold text-indigo-300">
+                        <span>✨ Live Style Preview Active</span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded bg-indigo-900 text-indigo-200">Interactive</span>
+                      </div>
+                      <p class="text-[10px] text-slate-300 leading-relaxed">
+                        Click any preset below to instantly preview typography, outlines, and colors on the phone canvas.
+                      </p>
+                      <button
+                        onClick={() => {
+                          const rawText = project.title || 'THE UNREAL MOMENT';
+                          const words = rawText.replace(/[^\w\s]/g, '').split(/\s+/).filter(Boolean).map((w, idx, arr) => ({
+                            word: w.toUpperCase(),
+                            start: +(idx * 0.45).toFixed(2),
+                            end: +((idx + 1) * 0.45).toFixed(2),
+                            isKeyword: idx === 1 || idx === arr.length - 1
+                          }));
+                          const updatedTimeline = {
+                            ...timeline,
+                            captionsTrack: [
+                              {
+                                id: 'cap_seg_1',
+                                start: 0.5,
+                                end: Math.min(duration || 30, Math.max(3.5, words.length * 0.45 + 0.5)),
+                                text: rawText,
+                                words
+                              }
+                            ]
+                          };
+                          setTimeline(updatedTimeline);
+                          syncProjectToServer(updatedTimeline);
+                        }}
+                        class="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-xs shadow transition flex items-center justify-center space-x-1.5 cursor-pointer"
+                      >
+                        <span>📌 Lock Caption to Timeline</span>
+                      </button>
+                    </div>
+                  )}
                   <div class="space-y-2">
                     {presets.map(p => {
                       const isSelected = (timeline.captionStyle?.preset || project.preset) === p.id;
@@ -1435,17 +1503,17 @@
                   {/* ======================================================= */}
                   {/* LAYER 4: WORD-LEVEL KARAOKE CAPTIONS (INTERACTIVE DRAG) */}
                   {/* ======================================================= */}
-                  {activeCaptionSeg && (
+                  {displayCaption && (
                     <div
                       onMouseDown={(e) => handleCanvasMouseDown(e, 'captions')}
                       class="absolute left-1/2 -translate-x-1/2 w-[88%] z-40 text-center transition-all flex justify-center cursor-move group"
                       style={{
-                        bottom: `${Math.round((timeline.captionStyle?.verticalOffset || 480) * 0.15)}px`
+                        bottom: `${Math.max(8, Math.min(84, ((timeline.captionStyle?.verticalOffset || 450) / 1920) * 100))}%`
                       }}
                       title="Click & Drag vertically to reposition captions on canvas"
                     >
                       <div
-                        class="px-4 py-2 rounded-2xl max-w-full font-black shadow-2xl backdrop-blur-md break-words leading-tight group-hover:ring-2 group-hover:ring-cyan-400 relative"
+                        class="px-4 py-2 rounded-2xl max-w-full font-black shadow-2xl backdrop-blur-md break-words leading-tight group-hover:ring-2 group-hover:ring-cyan-400 relative transition-all"
                         style={{
                           backgroundColor: timeline.captionStyle?.bgBox ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.65)',
                           border: '1px solid rgba(255,255,255,0.18)',
@@ -1455,8 +1523,8 @@
                           WebkitTextStroke: `${timeline.captionStyle?.strokeWidth || 3}px ${timeline.captionStyle?.strokeColor || '#000000'}`
                         }}
                       >
-                        {(activeCaptionSeg.words && activeCaptionSeg.words.length > 0) ? (
-                          activeCaptionSeg.words.map((w, wIdx) => {
+                        {(displayCaption.words && displayCaption.words.length > 0) ? (
+                          displayCaption.words.map((w, wIdx) => {
                             const isKw = w.isKeyword || wIdx === 1;
                             return (
                               <span
@@ -1474,7 +1542,12 @@
                             );
                           })
                         ) : (
-                          <span>{activeCaptionSeg.text}</span>
+                          <span>{displayCaption.text}</span>
+                        )}
+                        {displayCaption.isPreview && (
+                          <span class="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-indigo-600/90 text-white px-2 py-0.5 rounded-full uppercase tracking-wider pointer-events-none shadow-md whitespace-nowrap">
+                            ✨ Style Preview
+                          </span>
                         )}
                         <span class="absolute -top-3.5 right-1 text-[8px] font-bold bg-cyan-500 text-slate-950 px-1 rounded opacity-0 group-hover:opacity-100 transition pointer-events-none">
                           ↕ Drag Height
@@ -1561,10 +1634,12 @@
 
                 {/* Big Hover Play/Pause Overlay */}
                 <div
-                  onClick={togglePlay}
-                  class="absolute inset-0 z-50 flex items-center justify-center bg-black/20 hover:bg-black/30 cursor-pointer opacity-0 hover:opacity-100 transition"
+                  class="absolute inset-0 z-30 flex items-center justify-center bg-black/10 hover:bg-black/20 opacity-0 hover:opacity-100 transition pointer-events-none"
                 >
-                  <div class="w-14 h-14 rounded-full bg-indigo-600/90 text-white flex items-center justify-center text-xl shadow-2xl backdrop-blur-sm transition transform hover:scale-110">
+                  <div
+                    onClick={togglePlay}
+                    class="w-14 h-14 rounded-full bg-indigo-600/90 text-white flex items-center justify-center text-xl shadow-2xl backdrop-blur-sm transition transform hover:scale-110 pointer-events-auto cursor-pointer"
+                  >
                     {isPlaying ? '⏸️' : '▶️'}
                   </div>
                 </div>
@@ -1873,9 +1948,9 @@
                     <div class="grid grid-cols-4 gap-1">
                       {[
                         { id: 'bottom', label: '⬇️ Bottom', offset: 240 },
-                        { id: 'lower-third', label: '📺 Lower 3rd', offset: 340 },
-                        { id: 'center', label: '⏺️ Center', offset: 480 },
-                        { id: 'top', label: '⬆️ Top', offset: 720 }
+                        { id: 'lower-third', label: '📺 Lower 3rd', offset: 450 },
+                        { id: 'center', label: '⏺️ Center', offset: 960 },
+                        { id: 'top', label: '⬆️ Top', offset: 1450 }
                       ].map(p => (
                         <button
                           key={p.id}
@@ -1933,9 +2008,9 @@
                     </div>
                     <input
                       type="range"
-                      min="200"
-                      max="800"
-                      value={timeline.captionStyle?.verticalOffset || 480}
+                      min="100"
+                      max="1600"
+                      value={timeline.captionStyle?.verticalOffset || 450}
                       onChange={(e) => {
                         const updatedTimeline = {
                           ...timeline,
@@ -2025,9 +2100,9 @@
           <div
             onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
-              const clickX = e.clientX - rect.left - 96; // minus label column
-              const totalW = (rect.width - 96) * timelineZoom;
-              if (clickX >= 0 && totalW > 0) {
+              const clickX = e.clientX - rect.left - 104; // 96px label + 8px space-x-2 gap
+              const totalW = (rect.width - 104);
+              if (clickX >= 0 && totalW > 0 && duration > 0) {
                 const targetSec = (clickX / totalW) * duration;
                 seekTo(targetSec);
               }
@@ -2036,9 +2111,9 @@
           >
             {/* Playhead Vertical Line */}
             <div
-              class="absolute top-0 bottom-0 w-0.5 bg-rose-500 shadow-lg shadow-rose-500 z-50 pointer-events-none"
+              class="absolute top-0 bottom-0 w-0.5 bg-rose-500 shadow-lg shadow-rose-500 z-50 pointer-events-none transition-all duration-75"
               style={{
-                left: `${96 + (duration > 0 ? (currentTime / duration) * 100 * timelineZoom : 0)}%`
+                left: `calc(104px + ${(duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0)}% - ${(duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) * 104 : 0)}px)`
               }}
             >
               <div class="w-3 h-3 bg-rose-500 rounded-full -ml-[5px] -mt-1 shadow" />

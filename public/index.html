@@ -8175,22 +8175,31 @@
                               <button
                                 onClick={async () => {
                                   try {
-                                    const videoSrc = selectedClip.exported_video || activeClipperProject?.video_path || '';
-                                    const res = await fetch('/api/reel-studio/projects', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        title: selectedClip.title || 'Viral Reel Project',
-                                        videoPath: videoSrc,
-                                        aspectRatio: '9:16',
-                                        preset: 'viral-high-energy',
-                                        duration: selectedClip.duration || 30
-                                      })
+                                    const res = await fetch(`/api/clipper/clips/${selectedClip.id}/open-in-reel-studio`, {
+                                      method: 'POST'
                                     });
                                     const data = await res.json();
                                     if (data.success && data.project) {
                                       setActiveReelProject(data.project);
                                       setCurrentTab('reel_studio');
+                                    } else {
+                                      const videoSrc = selectedClip.exported_video || activeClipperProject?.video_path || '';
+                                      const res2 = await fetch('/api/reel-studio/projects', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                          title: selectedClip.title || 'Viral Reel Project',
+                                          videoPath: videoSrc,
+                                          aspectRatio: '9:16',
+                                          preset: 'hormozi-bold',
+                                          duration: selectedClip.duration || 30
+                                        })
+                                      });
+                                      const data2 = await res2.json();
+                                      if (data2.success && data2.project) {
+                                        setActiveReelProject(data2.project);
+                                        setCurrentTab('reel_studio');
+                                      }
                                     }
                                   } catch (e) {
                                     alert('Failed to open in Reel Studio: ' + e.message);
