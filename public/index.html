@@ -529,11 +529,66 @@
     function ClipperLivePlayer({ clip, project, onUpdate, onOpenConcat }) {
       const fgRef = React.useRef(null);
       const bgRef = React.useRef(null);
+      const containerRef = React.useRef(null);
       const [isPlaying, setIsPlaying] = React.useState(false);
       const [currentTime, setCurrentTime] = React.useState(0);
       const [activeSubtitle, setActiveSubtitle] = React.useState('');
       const [isMuted, setIsMuted] = React.useState(false);
       const [isAligning, setIsAligning] = React.useState(false);
+      const [isDraggingCaption, setIsDraggingCaption] = React.useState(false);
+      const [dragYPercent, setDragYPercent] = React.useState(null);
+
+      // Interactive mouse/touch drag handler for freeform caption positioning
+      const handleCaptionPointerDown = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDraggingCaption(true);
+        const container = containerRef.current;
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+
+        const updatePos = (moveEvent) => {
+          const clientY = (moveEvent.touches && moveEvent.touches.length > 0)
+            ? moveEvent.touches[0].clientY
+            : moveEvent.clientY;
+          if (clientY === undefined) return null;
+          const relY = clientY - rect.top;
+          const clampedPercent = Math.max(8, Math.min(92, Math.round((relY / rect.height) * 100)));
+          setDragYPercent(clampedPercent);
+          return clampedPercent;
+        };
+
+        const onMove = (moveEvt) => {
+          updatePos(moveEvt);
+        };
+
+        const onUp = (upEvt) => {
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+          window.removeEventListener('touchmove', onMove);
+          window.removeEventListener('touchend', onUp);
+          setIsDraggingCaption(false);
+
+          const finalY = updatePos(upEvt);
+          setDragYPercent(null);
+          if (typeof finalY === 'number' && onUpdate) {
+            const verticalOffset = Math.round(1920 * (1 - finalY / 100));
+            onUpdate({
+              custom_style: {
+                ...(clip.custom_style || {}),
+                posY: finalY,
+                verticalOffset: verticalOffset,
+                position: 'custom'
+              }
+            });
+          }
+        };
+
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        window.addEventListener('touchmove', onMove, { passive: false });
+        window.addEventListener('touchend', onUp);
+      };
 
       const hasExported = !!clip.exported_video;
       // Default to 'live' edit mode so all user changes (font, color, zoom) appear instantly!
@@ -642,7 +697,7 @@
 
       return (
         <div class="space-y-3">
-          <div class={`${containerAspect} mx-auto bg-slate-950 rounded-2xl overflow-hidden border-2 border-indigo-500/40 relative shadow-2xl flex items-center justify-center select-none group`}>
+          <div ref={containerRef} class={`${containerAspect} mx-auto bg-slate-950 rounded-2xl overflow-hidden border-2 border-indigo-500/40 relative shadow-2xl flex items-center justify-center select-none group`}>
             {isRendered ? (
               // RENDERED FINAL VIDEO
               <video
@@ -785,38 +840,85 @@
                   </div>
                 )}
 
-                {/* 4. Live Animated Caption Overlay (Simulating selected preset in real-time) */}
-                {activeSubtitle && (() => {
+                {/* 4. Live Interactive Animated Caption Overlay with Proportional Size & Hand Drag */}
+                {(() => {
                   const cs = clip.custom_style || {};
-                  const pos = cs.position || (reframingMode === 'split_facecam' ? 'center' : 'bottom');
-                  const posClass = pos === 'top' ? 'top-6' : (pos === 'center' || reframingMode === 'split_facecam') ? 'top-1/2 -translate-y-1/2' : pos === 'lower-third' ? 'bottom-16' : 'bottom-6';
                   const fontFam = cs.fontFamily || 'Montserrat';
                   const highlightCol = cs.highlightColor || '#FFE600';
                   const textCol = cs.color || '#FFFFFF';
-                  // Responsive font calculation to prevent long words/sentences from overflowing 9:16 bounds
-                  const rawFont = cs.fontSize || 54;
-                  const textLen = activeSubtitle.length;
-                  let fontSize = 12;
-                  if (textLen > 45) {
-                    fontSize = 10;
-                  } else if (textLen > 28) {
-                    fontSize = 11;
-                  } else if (textLen > 16) {
-                    fontSize = 12.5;
-                  } else {
-                    fontSize = Math.min(14.5, Math.max(12, Math.round(rawFont * 0.20)));
+
+                  // Dynamic proportional font scaling: directly scales with slider (36px -> ~8px, 68px -> ~15px, 110px -> ~24.5px)
+                  const rawFont = (typeof cs.fontSize === 'number' && cs.fontSize > 0) ? cs.fontSize : 68;
+                  const basePreviewFont = 15;
+                  const fontSize = Math.max(8, Math.min(28, Math.round((rawFont / 68) * basePreviewFont * 10) / 10));
+
+                  // Y Position calculation: supports freeform drag percentage, cs.posY, or safe buttons
+                  let currentY = 84;
+                  if (dragYPercent !== null) {
+                    currentY = dragYPercent;
+                  } else if (typeof cs.posY === 'number') {
+                    currentY = cs.posY;
+                  } else if (cs.position === 'top') {
+                    currentY = 12;
+                  } else if (cs.position === 'center' || reframingMode === 'split_facecam') {
+                    currentY = 50;
+                  } else if (cs.position === 'lower-third') {
+                    currentY = 72;
+                  } else if (cs.verticalOffset !== undefined) {
+                    currentY = Math.max(8, Math.min(92, Math.round((1 - cs.verticalOffset / 1920) * 100)));
                   }
-                  const words = activeSubtitle.split(' ');
+
+                  // Determine subtitle text: if active subtitle exists use it; if paused or dragging, show sample/first segment so user can see live styling
+                  let segs = clip.transcript_segments;
+                  if (typeof segs === 'string') {
+                    try { segs = JSON.parse(segs); } catch (e) { segs = []; }
+                  }
+                  let subtitleToRender = activeSubtitle;
+                  if (!subtitleToRender && (!isPlaying || isDraggingCaption)) {
+                    if (Array.isArray(segs) && segs.length > 0) {
+                      const curSeg = segs.find(s => currentTime >= s.start && currentTime <= s.end);
+                      subtitleToRender = curSeg ? sanitizeClipperText(curSeg.text) : sanitizeClipperText(segs[0].text);
+                    } else if (clip.hook) {
+                      subtitleToRender = sanitizeClipperText(clip.hook);
+                    } else {
+                      subtitleToRender = 'AI Viral Caption';
+                    }
+                  }
+
+                  if (!subtitleToRender) return null;
+
+                  const words = subtitleToRender.split(' ').filter(Boolean);
+
                   return (
-                    <div class={`absolute ${posClass} left-1/2 -translate-x-1/2 w-[86%] z-20 flex justify-center text-center pointer-events-none transition-all`}>
+                    <div
+                      onMouseDown={handleCaptionPointerDown}
+                      onTouchStart={handleCaptionPointerDown}
+                      class={`absolute left-1/2 -translate-x-1/2 -translate-y-1/2 w-[88%] z-30 flex flex-col items-center justify-center text-center cursor-grab active:cursor-grabbing select-none group/caption ${
+                        isDraggingCaption ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-black/70 rounded-2xl scale-105' : ''
+                      }`}
+                      style={{
+                        top: `${currentY}%`,
+                        touchAction: 'none'
+                      }}
+                      title="Click & drag to position caption anywhere with your hand"
+                    >
+                      {/* Drag position indicator & hint tooltip */}
+                      <div class={`mb-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-opacity pointer-events-none ${
+                        isDraggingCaption
+                          ? 'opacity-100 bg-indigo-600 text-white shadow-lg'
+                          : 'opacity-0 group-hover/caption:opacity-100 bg-black/85 text-indigo-300 border border-indigo-500/50'
+                      }`}>
+                        <span>✋ {isDraggingCaption ? `Position: ${currentY}%` : 'Drag to Move'}</span>
+                      </div>
+
                       <span
-                        class="inline-block max-w-full px-3 py-1.5 rounded-xl font-black shadow-2xl backdrop-blur-md break-words whitespace-normal leading-snug"
+                        class="inline-block max-w-full px-3 py-1.5 rounded-xl font-black shadow-2xl backdrop-blur-md break-words whitespace-normal leading-snug transition-transform"
                         style={{
                           backgroundColor: ['boxed-caption','netflix-doc','news-broadcast','yellow-box-highlight','yellow-karaoke'].includes(clip.caption_template) ? 'rgba(0,0,0,0.88)' : 'rgba(0,0,0,0.72)',
                           color: textCol,
                           fontSize: `${fontSize}px`,
                           fontFamily: `${fontFam}, sans-serif`,
-                          border: '1px solid rgba(255,255,255,0.18)',
+                          border: isDraggingCaption ? '2px dashed #818cf8' : '1px solid rgba(255,255,255,0.22)',
                           boxSizing: 'border-box',
                           wordBreak: 'break-word',
                           overflowWrap: 'break-word',
@@ -2849,9 +2951,21 @@
         xhr.send(file);
       };
 
-      // Update selected clip parameters
+      // Update selected clip parameters with instantaneous optimistic preview
       const handleUpdateSelectedClip = async (updates) => {
         if (!selectedClip) return;
+        const optimisticCustomStyle = {
+          ...(selectedClip.custom_style || {}),
+          ...(updates.custom_style || {})
+        };
+        const optimisticClip = {
+          ...selectedClip,
+          ...updates,
+          custom_style: optimisticCustomStyle
+        };
+        setSelectedClip(optimisticClip);
+        setClipperClips(prev => prev.map(c => c.id === selectedClip.id ? optimisticClip : c));
+
         try {
           const res = await fetch(`/api/clipper/clips/${selectedClip.id}`, {
             method: 'PUT',
@@ -8062,16 +8176,24 @@
 
                                   {/* Safe Caption Positioning */}
                                   <div>
-                                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">📍 Safe Position (Avoid Face/Logos)</label>
+                                    <div class="flex items-center justify-between mb-1">
+                                      <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">📍 Safe Position (Avoid Face/Logos)</label>
+                                      {selectedClip.custom_style?.posY !== undefined && (
+                                        <span class="text-[10px] font-mono text-cyan-400 font-bold">
+                                          Y: {selectedClip.custom_style.posY}%
+                                        </span>
+                                      )}
+                                    </div>
                                     <div class="grid grid-cols-4 gap-1.5">
                                       {[
-                                        { label: 'Bottom',   value: 480,  icon: '⬇️', pos: 'bottom' },
-                                        { label: 'Center',   value: 960,  icon: '⏺️', pos: 'center' },
-                                        { label: 'Top',      value: 1620, icon: '⬆️', pos: 'top' },
-                                        { label: 'Lower 3rd',value: 320,  icon: '📺', pos: 'lower-third' }
+                                        { label: 'Bottom',   value: 480,  posY: 84, icon: '⬇️', pos: 'bottom' },
+                                        { label: 'Center',   value: 960,  posY: 50, icon: '⏺️', pos: 'center' },
+                                        { label: 'Top',      value: 1620, posY: 12, icon: '⬆️', pos: 'top' },
+                                        { label: 'Lower 3rd',value: 320,  posY: 72, icon: '📺', pos: 'lower-third' }
                                       ].map(pos => {
-                                        const currentOffset = (selectedClip.custom_style || {}).verticalOffset;
-                                        const isActive = currentOffset === pos.value || (!currentOffset && pos.value === 480);
+                                        const currentPos = (selectedClip.custom_style || {}).position;
+                                        const currentY = (selectedClip.custom_style || {}).posY;
+                                        const isActive = (currentPos === pos.pos) || (currentY === pos.posY) || (!currentPos && !currentY && pos.pos === 'bottom');
                                         return (
                                           <button
                                             key={pos.label}
@@ -8079,6 +8201,7 @@
                                               custom_style: {
                                                 ...(selectedClip.custom_style || {}),
                                                 verticalOffset: pos.value,
+                                                posY: pos.posY,
                                                 position: pos.pos
                                               }
                                             })}
@@ -8091,6 +8214,51 @@
                                         );
                                       })}
                                     </div>
+
+                                    {/* Freeform Hand Drag / Y Position Slider */}
+                                    {(() => {
+                                      const cs = selectedClip.custom_style || {};
+                                      const currentY = typeof cs.posY === 'number'
+                                        ? cs.posY
+                                        : (cs.position === 'top' ? 12 : cs.position === 'center' ? 50 : cs.position === 'lower-third' ? 72 : 84);
+                                      return (
+                                        <div class="mt-2.5 pt-2 border-t border-slate-800/80 bg-slate-950/40 p-2.5 rounded-xl border border-slate-800">
+                                          <div class="flex items-center justify-between mb-1">
+                                            <label class="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-1">
+                                              <span>✋ Haath se Drag / Freeform Y Position</span>
+                                            </label>
+                                            <span class="text-[11px] font-mono text-cyan-300 font-bold">{currentY}%</span>
+                                          </div>
+                                          <div class="flex items-center space-x-2">
+                                            <span class="text-[9px] text-slate-500 font-bold uppercase">Top (8%)</span>
+                                            <input
+                                              type="range"
+                                              min="8"
+                                              max="92"
+                                              step="1"
+                                              value={currentY}
+                                              onInput={(e) => {
+                                                const val = parseInt(e.target.value);
+                                                const vertOffset = Math.round(1920 * (1 - val / 100));
+                                                handleUpdateSelectedClip({
+                                                  custom_style: {
+                                                    ...(selectedClip.custom_style || {}),
+                                                    posY: val,
+                                                    verticalOffset: vertOffset,
+                                                    position: 'custom'
+                                                  }
+                                                });
+                                              }}
+                                              class="flex-1 h-1.5 rounded-full accent-cyan-400 cursor-pointer"
+                                            />
+                                            <span class="text-[9px] text-slate-500 font-bold uppercase">Bottom (92%)</span>
+                                          </div>
+                                          <p class="text-[9px] text-slate-400 italic mt-1">
+                                            💡 Tip: Video player me caption ko cursor ya haath se direct pakad kar upar-niche kahin bhi drag kar sakte hain!
+                                          </p>
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
 
                                   {/* Font Size Slider */}

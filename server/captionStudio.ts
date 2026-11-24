@@ -273,7 +273,9 @@ export class CaptionStudioService {
     const baseWidth = targetWidth < targetHeight ? 1080 : 1920;
     const scaleFactor = Math.max(0.5, targetWidth / baseWidth);
 
-    const baseFontSize = customStyle?.fontSize && customStyle.fontSize !== 54 ? customStyle.fontSize : (targetWidth < targetHeight ? 68 : 44);
+    const baseFontSize = (customStyle?.fontSize && typeof customStyle.fontSize === 'number' && customStyle.fontSize > 0)
+      ? customStyle.fontSize
+      : (targetWidth < targetHeight ? 68 : 44);
     const baseOutlineWidth = customStyle?.outlineWidth !== undefined ? customStyle.outlineWidth : (
       ['outline-caption', 'gaming-captions', 'mrbeast-bold', 'hormozi-bold'].includes(template) ? 6 : (targetWidth < targetHeight ? 5 : 3)
     );
@@ -284,8 +286,11 @@ export class CaptionStudioService {
     // 'center': targetHeight / 2 (or 960px)
     // 'top': targetHeight - 240px (or 1600px)
     // 'lower-third': 320px
+    // 'custom' / posY: percentage from top (8% to 92%)
     let baseVerticalMargin = 480;
-    if (customStyle?.position === 'top') {
+    if (customStyle?.posY !== undefined && typeof customStyle.posY === 'number') {
+      baseVerticalMargin = Math.round(targetHeight * (1 - customStyle.posY / 100));
+    } else if (customStyle?.position === 'top') {
       baseVerticalMargin = targetWidth < targetHeight ? 1620 : 920;
     } else if (customStyle?.position === 'center') {
       baseVerticalMargin = targetWidth < targetHeight ? 960 : 500;
