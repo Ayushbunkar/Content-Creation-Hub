@@ -507,6 +507,8 @@
     function sanitizeClipperText(text) {
       if (!text) return '';
       return String(text)
+        .replace(/&amp;gt;/gi, '')
+        .replace(/&amp;lt;/gi, '')
         .replace(/&gt;/gi, '')
         .replace(/&lt;/gi, '')
         .replace(/&amp;/gi, '&')
@@ -515,6 +517,8 @@
         .replace(/&apos;/gi, "'")
         .replace(/&nbsp;/gi, ' ')
         .replace(/&[a-z0-9#]+;/gi, ' ')
+        .replace(/\bgtgt\b/gi, '')
+        .replace(/\bgt\b/gi, '')
         .replace(/^(\s*>+\s*)+/g, '')
         .replace(/(\s*>+\s*)+/g, ' ')
         .replace(/^(\s*<+\s*)+/g, '')
@@ -522,6 +526,7 @@
         .replace(/\[[^\]]*(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^\]]*\]/gi, '')
         .replace(/\([^)]*(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^)]*\)/gi, '')
         .replace(/\[(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^\]]*/gi, '')
+        .replace(/\[[^\]]*\]/gi, '')
         .replace(/\s+/g, ' ')
         .trim();
     }
@@ -732,6 +737,31 @@
         setIsPlaying(false);
       };
 
+      // Continuous lockstep frame synchronization for Gaming Facecam and 50/50 Split Screen
+      React.useEffect(() => {
+        if (!isPlaying) return;
+        const syncTimer = setInterval(() => {
+          if (!fgRef.current) return;
+          const curTime = fgRef.current.currentTime;
+          const isFgPaused = fgRef.current.paused;
+
+          [bgRef.current, camRef.current].forEach(layer => {
+            if (layer) {
+              if (isFgPaused && !layer.paused) {
+                layer.pause();
+              } else if (!isFgPaused && layer.paused) {
+                layer.currentTime = curTime;
+                layer.play().catch(() => {});
+              } else if (!isFgPaused && Math.abs(layer.currentTime - curTime) > 0.05) {
+                layer.currentTime = curTime;
+              }
+            }
+          });
+        }, 100);
+
+        return () => clearInterval(syncTimer);
+      }, [isPlaying, reframingMode]);
+
       const togglePlay = () => {
         if (!fgRef.current) return;
         if (fgRef.current.paused) {
@@ -886,6 +916,12 @@
                         onLoadedMetadata={(e) => {
                           if (!isRendered && clipStart > 0) e.target.currentTime = clipStart;
                         }}
+                        onCanPlay={(e) => {
+                          if (fgRef.current) {
+                            e.target.currentTime = fgRef.current.currentTime;
+                            if (!fgRef.current.paused) e.target.play().catch(() => {});
+                          }
+                        }}
                         class="absolute inset-0 w-full h-full object-cover filter blur-xl opacity-60 scale-125 pointer-events-none"
                       />
                       <video
@@ -896,6 +932,12 @@
                         playsInline
                         onLoadedMetadata={(e) => {
                           if (!isRendered && clipStart > 0) e.target.currentTime = clipStart;
+                        }}
+                        onCanPlay={(e) => {
+                          if (fgRef.current) {
+                            e.target.currentTime = fgRef.current.currentTime;
+                            if (!fgRef.current.paused) e.target.play().catch(() => {});
+                          }
                         }}
                         class="relative z-10 w-[78%] h-[82%] object-cover rounded-xl border border-indigo-400/40 shadow-2xl"
                       />
@@ -929,6 +971,12 @@
                         preload="auto"
                         onLoadedMetadata={(e) => {
                           if (!isRendered && clipStart > 0) e.target.currentTime = clipStart;
+                        }}
+                        onCanPlay={(e) => {
+                          if (fgRef.current) {
+                            e.target.currentTime = fgRef.current.currentTime;
+                            if (!fgRef.current.paused) e.target.play().catch(() => {});
+                          }
                         }}
                         muted
                         playsInline
@@ -986,10 +1034,9 @@
                   const highlightCol = cs.highlightColor || tmpl.preview.accent || '#FFE600';
                   const highlightMode = cs.highlightMode || 'word-by-word';
 
-                  // Dynamic proportional font scaling: directly scales with slider (36px -> ~8px, 68px -> ~15px, 110px -> ~24.5px)
+                  // Dynamic proportional font scaling: directly scales with slider (36px -> 9px, 52px -> 13px, 68px -> 17px, 110px -> 27.5px)
                   const rawFont = (typeof cs.fontSize === 'number' && cs.fontSize > 0) ? cs.fontSize : 68;
-                  const basePreviewFont = 15;
-                  const fontSize = Math.max(8, Math.min(28, Math.round((rawFont / 68) * basePreviewFont * 10) / 10));
+                  const fontSize = Math.max(9, Math.min(32, Math.round((rawFont / 68) * 17 * 10) / 10));
 
                   // Y Position calculation: supports freeform drag percentage, cs.posY, or safe buttons
                   let currentY = 84;
@@ -1089,13 +1136,13 @@
                       }}
                       title="Click & drag to position caption anywhere with your hand"
                     >
-                      {/* Drag position indicator & hint tooltip */}
-                      <div class={`mb-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-opacity pointer-events-none ${
+                      {/* Drag position indicator & hint handle */}
+                      <div class={`mb-1 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all pointer-events-none flex items-center space-x-1.5 ${
                         isDraggingCaption
-                          ? 'opacity-100 bg-indigo-600 text-white shadow-lg'
-                          : 'opacity-0 group-hover/caption:opacity-100 bg-black/85 text-indigo-300 border border-indigo-500/50'
+                          ? 'opacity-100 bg-indigo-600 text-white shadow-xl scale-110'
+                          : 'opacity-85 hover:opacity-100 bg-slate-950/90 text-cyan-300 border border-cyan-500/40 shadow-sm'
                       }`}>
-                        <span>✋ {isDraggingCaption ? `Position: ${currentY}%` : 'Drag to Move'}</span>
+                        <span>✋ {isDraggingCaption ? `Y: ${currentY}% (Releasing will save)` : `Haath Se Drag Karein • Y: ${currentY}% • ${rawFont}px`}</span>
                       </div>
 
                       <span

@@ -3,6 +3,33 @@ import path from 'path';
 import fs from 'fs';
 import { runQuery, getQuery, allQuery } from './db';
 
+function cleanCaptionText(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/&amp;gt;/gi, '')
+    .replace(/&amp;lt;/gi, '')
+    .replace(/&gt;/gi, '')
+    .replace(/&lt;/gi, '')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&apos;/gi, "'")
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&[a-z0-9#]+;/gi, ' ')
+    .replace(/\bgtgt\b/gi, '')
+    .replace(/\bgt\b/gi, '')
+    .replace(/^(\s*>+\s*)+/g, '')
+    .replace(/(\s*>+\s*)+/g, ' ')
+    .replace(/^(\s*<+\s*)+/g, '')
+    .replace(/(\s*<+\s*)+/g, ' ')
+    .replace(/\[[^\]]*(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^\]]*\]/gi, '')
+    .replace(/\([^)]*(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^)]*\)/gi, '')
+    .replace(/\[(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^\]]*/gi, '')
+    .replace(/\[[^\]]*\]/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export interface MediaProbeInfo {
   filename: string;
   sizeBytes: number;
@@ -431,13 +458,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
 
     // 0. Optional Hook Title Card (First 3.5s)
-    if (customStyle?.hookTitle && customStyle?.showHookTitle !== false) {
+    const rawHookTitle = customStyle?.hookTitle;
+    const cleanHook = rawHookTitle ? cleanCaptionText(rawHookTitle) : '';
+    if (cleanHook && cleanHook.length > 0 && customStyle?.showHookTitle !== false) {
       const hookDur = Math.min(5.0, Math.max(2.0, parseFloat(customStyle.hookDuration || '3.5')));
       const hookEndSec = hookDur;
       const s = Math.floor(hookEndSec);
       const cs = Math.floor((hookEndSec - s) * 100);
       const hookEndStr = `0:00:0${s}.${cs.toString().padStart(2, '0')}`;
-      assContent += `Dialogue: 2,0:00:00.00,${hookEndStr},HookTitle,,0,0,0,,{\\b1\\c&H0000E5FF&}🔥 ${customStyle.hookTitle.toUpperCase()}\\N\n`;
+      assContent += `Dialogue: 2,0:00:00.00,${hookEndStr},HookTitle,,0,0,0,,{\\b1\\c&H0000E5FF&}🔥 ${cleanHook.toUpperCase()}\\N\n`;
     }
 
     // 0b. Optional Watermark Attribution
@@ -448,12 +477,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     // Deduplicate segments that have identical text or overlap within same time
     const cleanSegments: TranscriptSegment[] = [];
     for (const seg of segments) {
+      const cleanedSegText = cleanCaptionText(seg.text);
+      if (!cleanedSegText) continue;
       const prev = cleanSegments[cleanSegments.length - 1];
       if (prev) {
-        if (prev.text.trim() === seg.text.trim()) continue;
-        if (prev.text.includes(seg.text.trim()) && Math.abs(prev.start - seg.start) < 1.2) continue;
+        if (prev.text.trim() === cleanedSegText.trim()) continue;
+        if (prev.text.includes(cleanedSegText.trim()) && Math.abs(prev.start - seg.start) < 1.2) continue;
       }
-      cleanSegments.push(seg);
+      cleanSegments.push({
+        ...seg,
+        text: cleanedSegText
+      });
     }
 
     const highlightMode = customStyle?.highlightMode || (
@@ -476,7 +510,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       const startStr = formatTime(seg.start);
       const endStr = formatTime(seg.end);
 
-      let textFormatted = seg.text.trim();
+      let textFormatted = cleanCaptionText(seg.text).trim();
 
       // Apply Highlighting Modes
       if (highlightMode === 'no-highlighting') {
@@ -486,11 +520,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         // Karaoke word-by-word progressive reveal
         let kText = '';
         for (const w of seg.words) {
+          const cleanW = cleanCaptionText(w.word);
+          if (!cleanW) continue;
           const durCs = Math.max(1, Math.round((w.end - w.start) * 100));
           if (template === 'viral-word-pop' || template === 'dynamic-bounce') {
-            kText += `{\\kf${durCs}\\t(0,${Math.min(durCs * 5, 120)},\\fscx112\\fscy112)\\t(${Math.min(durCs * 5, 120)},${durCs * 10},\\fscx100\\fscy100)}${w.word} `;
+            kText += `{\\kf${durCs}\\t(0,${Math.min(durCs * 5, 120)},\\fscx112\\fscy112)\\t(${Math.min(durCs * 5, 120)},${durCs * 10},\\fscx100\\fscy100)}${cleanW} `;
           } else {
-            kText += `{\\kf${durCs}}${w.word} `;
+            kText += `{\\kf${durCs}}${cleanW} `;
           }
         }
         textFormatted = `{\\b1}${kText.trim()}`;

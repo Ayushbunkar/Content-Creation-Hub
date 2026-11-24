@@ -77,6 +77,8 @@ export interface ClipperClip {
 export function cleanCaptionText(text: string): string {
   if (!text) return '';
   return text
+    .replace(/&amp;gt;/gi, '')
+    .replace(/&amp;lt;/gi, '')
     .replace(/&gt;/gi, '')
     .replace(/&lt;/gi, '')
     .replace(/&amp;/gi, '&')
@@ -85,6 +87,8 @@ export function cleanCaptionText(text: string): string {
     .replace(/&apos;/gi, "'")
     .replace(/&nbsp;/gi, ' ')
     .replace(/&[a-z0-9#]+;/gi, ' ')
+    .replace(/\bgtgt\b/gi, '')
+    .replace(/\bgt\b/gi, '')
     .replace(/^(\s*>+\s*)+/g, '') // remove leading >> or >
     .replace(/(\s*>+\s*)+/g, ' ') // remove inline >>
     .replace(/^(\s*<+\s*)+/g, '')
@@ -92,6 +96,7 @@ export function cleanCaptionText(text: string): string {
     .replace(/\[[^\]]*(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^\]]*\]/gi, '')
     .replace(/\([^)]*(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^)]*\)/gi, '')
     .replace(/\[(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^\]]*/gi, '')
+    .replace(/\[[^\]]*\]/gi, '') // any remaining bracketed transcript cues like [MUSIC]
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -1640,16 +1645,19 @@ except Exception as e:
     const relativeSegments = deduplicatedSegments.map((s, idx) => {
       const relStart = Math.max(0, s.start - clipStartTime);
       const relEnd = Math.max(relStart + 0.1, s.end - clipStartTime);
+      const cleanText = cleanCaptionText(s.text);
       return {
         ...s,
         id: idx,
         start: relStart,
         end: relEnd,
+        text: cleanText,
         words: s.words ? s.words.map(w => ({
           ...w,
+          word: cleanCaptionText(w.word),
           start: Math.max(0, w.start - clipStartTime),
           end: Math.max(0, w.end - clipStartTime)
-        })) : []
+        })).filter(w => w.word && w.word.trim().length > 0) : []
       };
     });
 
@@ -1669,9 +1677,11 @@ except Exception as e:
     }
 
     // Enrich custom style with hook title banner and watermark
+    const rawHookTitle = customStyle.showHookTitle !== false ? (customStyle.hookTitle || clip.hook) : null;
+    const cleanHookTitle = rawHookTitle ? cleanCaptionText(rawHookTitle) : null;
     const enrichedCustomStyle = {
       ...customStyle,
-      hookTitle: customStyle.showHookTitle !== false ? (customStyle.hookTitle || clip.hook) : null,
+      hookTitle: cleanHookTitle && cleanHookTitle.trim().length > 0 ? cleanHookTitle : null,
       watermarkText: customStyle.watermarkText || null
     };
 
