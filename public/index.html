@@ -1478,6 +1478,7 @@
         transcript: '',
         platform: 'both',
         privacyStatus: 'public',
+        isShort: true,
         isGeneratingMetadata: false,
         metadata: {
           youtubeTitle: '',
@@ -1599,6 +1600,24 @@
         const targetClipId = clipData.clipId || (clipData.clipUrl ? clipData.clipUrl.split('/').pop().replace(/\.[^/.]+$/, '') : (`clip_${Date.now()}`));
         const chosenPlatform = clipData.preferredPlatform || 'both';
 
+        // Auto-detect format: vertical 9:16 is Shorts, horizontal 16:9 is Long-Form Video
+        const isDetectedShort = clipData.aspectRatio === '16:9' || clipData.aspect_ratio === '16:9' || clipData.isLongForm === true
+          ? false
+          : true;
+
+        const initialYtTitle = isDetectedShort
+          ? `${streamerName} - ${rawHook} 😂🔥 #shorts`.slice(0, 95)
+          : `${streamerName} - ${rawHook}`.slice(0, 100);
+
+        const initialYtDesc = isDetectedShort
+          ? `${streamerName} has an unreal reaction live on stream! 😂🔥\n\n🎮 Game / Stream: ${clipData.topic || 'Gaming'}\n🎙️ Creator: ${streamerName}\n\nSubscribe for more daily shorts!\n#shorts #viral #trending`
+          : `${streamerName} presents ${rawHook} live on stream!\n\n🎮 Game / Stream: ${clipData.topic || 'Gaming'}\n🎙️ Creator: ${streamerName}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔔 Subscribe to ${streamerName} for full uncut episodes & streams!\n👍 Leave a LIKE and comment your thoughts below!`;
+
+        const initialIgCaption = `${rawHook} 🔥💀\n\n${streamerName} being legendary as always! Tag a friend who needs to see this 😂👇\n.\n.\n#reels #viral #explore`;
+        const initialHashtags = isDetectedShort
+          ? ['#shorts', '#viral', '#trending', '#gaming', '#reels']
+          : ['#gaming', '#video', '#viral', '#highlight', '#stream'];
+
         setSocialPublishModal({
           isOpen: true,
           clipId: targetClipId,
@@ -1612,14 +1631,16 @@
           transcript: clipData.transcript || '',
           platform: chosenPlatform,
           privacyStatus: 'public',
+          isShort: isDetectedShort,
           isGeneratingMetadata: true,
           metadata: {
-            youtubeTitle: `${streamerName} - ${rawHook} 😂🔥 #shorts`.slice(0, 95),
-            youtubeDescription: `${streamerName} has an unreal reaction live on stream! 😂🔥\n\n🎮 Game / Stream: ${clipData.topic || 'Gaming'}\n🎙️ Creator: ${streamerName}\n\nSubscribe for more daily shorts!\n#shorts #viral #trending`,
-            instagramCaption: `${rawHook} 🔥💀\n\n${streamerName} being legendary as always! Tag a friend who needs to see this 😂👇\n.\n.\n#reels #viral #explore`,
-            trendingHashtags: ['#shorts', '#viral', '#trending', '#gaming', '#reels'],
-            suggestedTagsString: '#shorts #viral #trending #gaming #reels',
-            alternativeTitles: []
+            youtubeTitle: initialYtTitle,
+            youtubeDescription: initialYtDesc,
+            instagramCaption: initialIgCaption,
+            trendingHashtags: initialHashtags,
+            suggestedTagsString: initialHashtags.join(' '),
+            alternativeTitles: [],
+            youtubeTags: isDetectedShort ? [streamerName, 'shorts', 'gaming'] : [streamerName, 'video', 'gaming']
           },
           isPublishing: false,
           publishResults: null
@@ -1649,15 +1670,32 @@
               headlineHook: clipData.hook || clipData.clipTitle,
               transcriptSnippet: clipData.transcript,
               gameOrTopic: clipData.topic,
-              platform: 'both'
+              platform: 'both',
+              isShort: isDetectedShort
             })
           });
           const data = await res.json();
           if (data.success && data.metadata) {
+            const rawMeta = data.metadata;
+            const yTitle = rawMeta.youtubeTitle || rawMeta.youtube?.title || initialYtTitle;
+            const yDesc = rawMeta.youtubeDescription || rawMeta.youtube?.description || initialYtDesc;
+            const igCap = rawMeta.instagramCaption || rawMeta.instagram?.caption || initialIgCaption;
+            const tTags = rawMeta.trendingHashtags || rawMeta.hashtags?.allCombined || initialHashtags;
+            const altTitles = rawMeta.alternativeTitles || rawMeta.youtube?.alternativeTitles || [];
+            const yTags = rawMeta.youtubeTags || rawMeta.youtube?.tags || (isDetectedShort ? [streamerName, 'shorts', 'gaming'] : [streamerName, 'video', 'gaming']);
+
             setSocialPublishModal(prev => ({
               ...prev,
               isGeneratingMetadata: false,
-              metadata: data.metadata
+              metadata: {
+                youtubeTitle: yTitle,
+                youtubeDescription: yDesc,
+                instagramCaption: igCap,
+                trendingHashtags: tTags,
+                suggestedTagsString: tTags.join(' '),
+                alternativeTitles: altTitles,
+                youtubeTags: yTags
+              }
             }));
           } else {
             setSocialPublishModal(prev => ({ ...prev, isGeneratingMetadata: false }));
@@ -1666,6 +1704,42 @@
           console.warn('AI metadata generation error:', err);
           setSocialPublishModal(prev => ({ ...prev, isGeneratingMetadata: false }));
         }
+      };
+
+      const togglePublishFormat = (isShort) => {
+        setSocialPublishModal(prev => {
+          let title = prev.metadata?.youtubeTitle || prev.clipTitle || 'Viral Video';
+          let desc = prev.metadata?.youtubeDescription || '';
+          let hashtags = [...(prev.metadata?.trendingHashtags || [])];
+
+          if (isShort) {
+            if (!title.toLowerCase().includes('#shorts')) {
+              title = (title.trim() + ' #shorts').slice(0, 100);
+            }
+            if (!desc.toLowerCase().includes('#shorts')) {
+              desc = desc + '\n\n#shorts #viral #trending';
+            }
+            if (!hashtags.some(t => t.toLowerCase() === '#shorts')) {
+              hashtags.unshift('#shorts');
+            }
+          } else {
+            title = title.replace(/\s*#shorts\b/gi, '').trim();
+            desc = desc.replace(/#shorts\b/gi, '').replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+            hashtags = hashtags.filter(t => !t.toLowerCase().includes('shorts'));
+          }
+
+          return {
+            ...prev,
+            isShort,
+            metadata: {
+              ...prev.metadata,
+              youtubeTitle: title,
+              youtubeDescription: desc,
+              trendingHashtags: hashtags,
+              suggestedTagsString: hashtags.join(' ')
+            }
+          };
+        });
       };
 
       const handleExecuteSocialPublish = async () => {
@@ -1680,6 +1754,11 @@
 
         setSocialPublishModal(prev => ({ ...prev, isPublishing: true, publishResults: null }));
 
+        const finalYtTitle = (socialPublishModal.metadata?.youtubeTitle || socialPublishModal.metadata?.youtube?.title || socialPublishModal.clipTitle || (socialPublishModal.isShort ? 'Viral Reel #shorts' : 'Viral Video')).trim();
+        const finalYtDesc = (socialPublishModal.metadata?.youtubeDescription || socialPublishModal.metadata?.youtube?.description || '').trim();
+        const finalIgCap = (socialPublishModal.metadata?.instagramCaption || socialPublishModal.metadata?.instagram?.caption || '').trim();
+        const finalTags = socialPublishModal.metadata?.trendingHashtags || socialPublishModal.metadata?.hashtags?.allCombined || [];
+
         try {
           const res = await fetch('/api/social/publish', {
             method: 'POST',
@@ -1689,12 +1768,13 @@
               sourcePage: socialPublishModal.sourcePage || 'studio',
               videoPath: socialPublishModal.clipUrl,
               platforms: selectedPlatforms,
-              title: socialPublishModal.metadata.youtubeTitle,
-              description: socialPublishModal.metadata.youtubeDescription,
-              caption: socialPublishModal.metadata.instagramCaption,
-              hashtags: socialPublishModal.metadata.trendingHashtags,
-              youtubeTags: socialPublishModal.metadata.youtubeTags || [socialPublishModal.streamer, 'shorts', 'gaming'],
+              title: finalYtTitle,
+              description: finalYtDesc,
+              caption: finalIgCap,
+              hashtags: finalTags,
+              youtubeTags: socialPublishModal.metadata?.youtubeTags || [socialPublishModal.streamer, socialPublishModal.isShort ? 'shorts' : 'video', 'gaming'],
               privacy: socialPublishModal.privacyStatus,
+              isShort: Boolean(socialPublishModal.isShort),
               streamer: {
                 streamerName: socialPublishModal.streamer,
                 streamerHandle: socialPublishModal.streamerHandle,
@@ -8028,12 +8108,12 @@
                               </button>
 
                               {selectedClip.exported_video && (
-                                <div class="flex items-center space-x-1.5 flex-wrap">
-                                  {clipPublishMap[selectedClip.id]?.youtube && (
-                                    <a href={clipPublishMap[selectedClip.id].youtube} target="_blank" rel="noopener noreferrer" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-red-950 text-red-400 border border-red-800 hover:underline">
-                                      ✓ Shorts ↗
-                                    </a>
-                                  )}
+                                  <div class="flex items-center space-x-1.5 flex-wrap">
+                                    {clipPublishMap[selectedClip.id]?.youtube && (
+                                      <a href={clipPublishMap[selectedClip.id].youtube} target="_blank" rel="noopener noreferrer" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-red-950 text-red-400 border border-red-800 hover:underline">
+                                        {clipPublishMap[selectedClip.id].youtube.includes('/shorts/') ? '✓ Shorts ↗' : '✓ Video ↗'}
+                                      </a>
+                                    )}
                                   {clipPublishMap[selectedClip.id]?.instagram && (
                                     <a href={clipPublishMap[selectedClip.id].instagram} target="_blank" rel="noopener noreferrer" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-pink-950 text-pink-400 border border-pink-800 hover:underline">
                                       ✓ Reel ↗
@@ -10088,7 +10168,7 @@
                                             <div class="flex items-center space-x-1.5">
                                               {pub.youtube && (
                                                 <a href={pub.youtube} target="_blank" rel="noopener noreferrer" class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-950 text-red-400 border border-red-800 hover:underline">
-                                                  ✓ Shorts ↗
+                                                  {pub.youtube.includes('/shorts/') ? '✓ Shorts ↗' : '✓ Video ↗'}
                                                 </a>
                                               )}
                                               {pub.instagram && (
@@ -11922,7 +12002,22 @@
                       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-5">
                         <div class="flex items-center justify-between pb-2 border-b border-slate-800">
                           <span class="text-xs font-bold text-slate-200 uppercase tracking-wider">2. AI-Generated Viral Metadata Package</span>
-                          <span class="text-[10px] text-emerald-400 font-bold">100% Ready for Algorithms</span>
+                          <div class="inline-flex rounded-xl bg-slate-950 p-1 border border-slate-800">
+                            <button
+                              type="button"
+                              onClick={() => togglePublishFormat(true)}
+                              class={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${socialPublishModal.isShort ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                            >
+                              📱 Shorts (9:16)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => togglePublishFormat(false)}
+                              class={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${!socialPublishModal.isShort ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                            >
+                              🖥️ Video (16:9)
+                            </button>
+                          </div>
                         </div>
 
                         {/* YouTube Title */}
@@ -11930,11 +12025,11 @@
                           <div class="flex items-center justify-between">
                             <label class="text-xs font-bold text-red-400 flex items-center space-x-1.5">
                               <span>▶</span>
-                              <span>YouTube Shorts Title (High-CTR Hook)</span>
+                              <span>{socialPublishModal.isShort ? 'YouTube Shorts Title (High-CTR Hook)' : 'YouTube Video Title (16:9 Long-Form)'}</span>
                             </label>
                             <button
                               onClick={() => {
-                                navigator.clipboard.writeText(socialPublishModal.metadata.youtubeTitle);
+                                navigator.clipboard.writeText(socialPublishModal.metadata?.youtubeTitle || '');
                                 showAppModal({ title: 'Copied!', message: 'YouTube Title copied to clipboard.', type: 'success' });
                               }}
                               class="text-[11px] text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer"
@@ -11944,11 +12039,12 @@
                           </div>
                           <input
                             type="text"
-                            value={socialPublishModal.metadata.youtubeTitle}
+                            value={socialPublishModal.metadata?.youtubeTitle || ''}
                             onChange={(e) => setSocialPublishModal(prev => ({
                               ...prev,
                               metadata: { ...prev.metadata, youtubeTitle: e.target.value }
                             }))}
+                            placeholder={socialPublishModal.isShort ? "Whatever You Steal in GTA 6, You Keep! 😂 🔥 #shorts" : "Whatever You Steal in GTA 6, You Keep! (Full Video)"}
                             class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 font-medium focus:outline-none focus:border-red-500"
                           />
                         </div>
@@ -11980,11 +12076,11 @@
                           <div class="flex items-center justify-between">
                             <label class="text-xs font-bold text-red-400 flex items-center space-x-1.5">
                               <span>▶</span>
-                              <span>YouTube Description & Creator Credits</span>
+                              <span>{socialPublishModal.isShort ? 'YouTube Shorts Description & Creator Credits' : 'YouTube Video Description (Long-Form)'}</span>
                             </label>
                             <button
                               onClick={() => {
-                                navigator.clipboard.writeText(socialPublishModal.metadata.youtubeDescription);
+                                navigator.clipboard.writeText(socialPublishModal.metadata?.youtubeDescription || '');
                                 showAppModal({ title: 'Copied!', message: 'YouTube Description copied to clipboard.', type: 'success' });
                               }}
                               class="text-[11px] text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer"
@@ -11994,11 +12090,12 @@
                           </div>
                           <textarea
                             rows={3}
-                            value={socialPublishModal.metadata.youtubeDescription}
+                            value={socialPublishModal.metadata?.youtubeDescription || ''}
                             onChange={(e) => setSocialPublishModal(prev => ({
                               ...prev,
                               metadata: { ...prev.metadata, youtubeDescription: e.target.value }
                             }))}
+                            placeholder="Enter YouTube description..."
                             class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 font-mono focus:outline-none focus:border-red-500 leading-relaxed"
                           ></textarea>
                         </div>
@@ -12012,7 +12109,7 @@
                             </label>
                             <button
                               onClick={() => {
-                                navigator.clipboard.writeText(socialPublishModal.metadata.instagramCaption);
+                                navigator.clipboard.writeText(socialPublishModal.metadata?.instagramCaption || '');
                                 showAppModal({ title: 'Copied!', message: 'Instagram Caption copied to clipboard.', type: 'success' });
                               }}
                               class="text-[11px] text-pink-400 hover:text-pink-300 font-semibold cursor-pointer"
@@ -12022,11 +12119,12 @@
                           </div>
                           <textarea
                             rows={3}
-                            value={socialPublishModal.metadata.instagramCaption}
+                            value={socialPublishModal.metadata?.instagramCaption || ''}
                             onChange={(e) => setSocialPublishModal(prev => ({
                               ...prev,
                               metadata: { ...prev.metadata, instagramCaption: e.target.value }
                             }))}
+                            placeholder="Enter Instagram caption..."
                             class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 font-mono focus:outline-none focus:border-pink-500 leading-relaxed"
                           ></textarea>
                         </div>
@@ -12331,7 +12429,7 @@
                             {publishingHistory.map((item) => (
                               <tr key={item.id} class="hover:bg-slate-800/30 transition">
                                 <td class="py-3 px-3">
-                                  <div class="font-bold text-slate-100 max-w-xs truncate">{item.title || item.clipId}</div>
+                                  <div class="font-bold text-slate-100 max-w-xs truncate" title={item.title || item.caption || item.clipId}>{item.title || item.caption || item.clipId}</div>
                                   <div class="text-[10px] text-slate-500 font-mono">{item.clipId}</div>
                                 </td>
                                 <td class="py-3 px-3">
@@ -12366,7 +12464,7 @@
                                       rel="noopener noreferrer"
                                       class="text-indigo-400 hover:text-indigo-300 hover:underline flex items-center space-x-1 text-[11px]"
                                     >
-                                      <span>{item.platform === 'youtube' ? 'Open Shorts ↗' : 'Open Reel ↗'}</span>
+                                      <span>{item.platform === 'youtube' ? (item.publishedUrl.includes('/shorts/') ? 'Open Shorts ↗' : 'Open Video ↗') : 'Open Reel ↗'}</span>
                                     </a>
                                   ) : (
                                     <span class="text-slate-500 text-[10px]">{item.error || 'Pending output'}</span>
@@ -13579,7 +13677,9 @@
                             🚀
                           </div>
                           <div>
-                            <h3 class="text-base font-black text-slate-100">1-Click Publish to YouTube Shorts & Instagram</h3>
+                            <h3 class="text-base font-black text-slate-100">
+                              {socialPublishModal.isShort ? '1-Click Publish to YouTube Shorts & Instagram' : '1-Click Publish to YouTube Video & Instagram'}
+                            </h3>
                             <p class="text-xs text-slate-400">Triggered from {socialPublishModal.sourcePage} • Streamer: <strong class="text-indigo-300">{socialPublishModal.streamer}</strong></p>
                           </div>
                         </div>
@@ -13607,53 +13707,106 @@
                         </div>
                       </div>
 
-                      {/* AI Generated YouTube Title */}
+                      {/* Format Selection: YouTube Shorts (9:16) vs YouTube Video (16:9 Long-Form) */}
+                      <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center space-x-2">
+                          <span class="text-xs font-bold text-slate-300">Format Mode:</span>
+                          <span class={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase font-mono ${socialPublishModal.isShort ? 'bg-red-950 text-red-400 border border-red-800' : 'bg-indigo-950 text-indigo-400 border border-indigo-800'}`}>
+                            {socialPublishModal.isShort ? '📱 9:16 Shorts' : '🖥️ 16:9 Long-Form Video'}
+                          </span>
+                        </div>
+                        <div class="inline-flex rounded-xl bg-slate-900 p-1 border border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => togglePublishFormat(true)}
+                            class={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center space-x-1.5 ${socialPublishModal.isShort ? 'bg-red-600 text-white shadow-md shadow-red-600/30' : 'text-slate-400 hover:text-slate-200'}`}
+                          >
+                            <span>📱 YouTube Shorts</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => togglePublishFormat(false)}
+                            class={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center space-x-1.5 ${!socialPublishModal.isShort ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'text-slate-400 hover:text-slate-200'}`}
+                          >
+                            <span>🖥️ Long-Form Video</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* YouTube Title */}
                       <div class="space-y-1">
-                        <label class="text-xs font-bold text-red-400 flex items-center space-x-1.5">
-                          <span>▶</span>
-                          <span>YouTube Shorts Title</span>
+                        <label class="text-xs font-bold text-red-400 flex items-center justify-between">
+                          <span class="flex items-center space-x-1.5">
+                            <span>▶</span>
+                            <span>{socialPublishModal.isShort ? 'YouTube Shorts Title' : 'YouTube Video Title (16:9 Long-Form)'}</span>
+                          </span>
+                          <span class="text-[10px] text-slate-400 font-mono">
+                            {(socialPublishModal.metadata?.youtubeTitle || '').length}/100
+                          </span>
                         </label>
                         <input
                           type="text"
-                          value={socialPublishModal.metadata.youtubeTitle}
-                          onChange={(e) => setSocialPublishModal(prev => ({
-                            ...prev,
-                            metadata: { ...prev.metadata, youtubeTitle: e.target.value }
-                          }))}
+                          value={socialPublishModal.metadata?.youtubeTitle || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSocialPublishModal(prev => ({
+                              ...prev,
+                              metadata: { ...prev.metadata, youtubeTitle: val }
+                            }));
+                          }}
+                          placeholder={socialPublishModal.isShort ? "Whatever You Steal in GTA 6, You Keep! 😂 🔥 #shorts" : "Whatever You Steal in GTA 6, You Keep! (Full Video)"}
                           class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 font-medium focus:outline-none focus:border-red-500"
                         />
                       </div>
 
-                      {/* AI Generated YouTube Description */}
+                      {/* YouTube Description */}
                       <div class="space-y-1">
-                        <label class="text-xs font-bold text-red-400 flex items-center space-x-1.5">
-                          <span>▶</span>
-                          <span>YouTube Description</span>
+                        <label class="text-xs font-bold text-red-400 flex items-center justify-between">
+                          <span class="flex items-center space-x-1.5">
+                            <span>▶</span>
+                            <span>{socialPublishModal.isShort ? 'YouTube Shorts Description' : 'YouTube Video Description (Long-Form)'}</span>
+                          </span>
+                          <span class="text-[10px] text-slate-400 font-mono">
+                            {(socialPublishModal.metadata?.youtubeDescription || '').length}/5000
+                          </span>
                         </label>
                         <textarea
-                          rows={2}
-                          value={socialPublishModal.metadata.youtubeDescription}
-                          onChange={(e) => setSocialPublishModal(prev => ({
-                            ...prev,
-                            metadata: { ...prev.metadata, youtubeDescription: e.target.value }
-                          }))}
+                          rows={3}
+                          value={socialPublishModal.metadata?.youtubeDescription || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSocialPublishModal(prev => ({
+                              ...prev,
+                              metadata: { ...prev.metadata, youtubeDescription: val }
+                            }));
+                          }}
+                          placeholder="Enter detailed description with creator credits..."
                           class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-red-500"
                         ></textarea>
                       </div>
 
-                      {/* AI Generated Instagram Caption */}
+                      {/* Instagram Reels Caption */}
                       <div class="space-y-1">
-                        <label class="text-xs font-bold text-pink-400 flex items-center space-x-1.5">
-                          <span>📷</span>
-                          <span>Instagram Reels Caption</span>
+                        <label class="text-xs font-bold text-pink-400 flex items-center justify-between">
+                          <span class="flex items-center space-x-1.5">
+                            <span>📷</span>
+                            <span>Instagram Reels Caption</span>
+                          </span>
+                          <span class="text-[10px] text-slate-400 font-mono">
+                            {(socialPublishModal.metadata?.instagramCaption || '').length}/2200
+                          </span>
                         </label>
                         <textarea
-                          rows={2}
-                          value={socialPublishModal.metadata.instagramCaption}
-                          onChange={(e) => setSocialPublishModal(prev => ({
-                            ...prev,
-                            metadata: { ...prev.metadata, instagramCaption: e.target.value }
-                          }))}
+                          rows={3}
+                          value={socialPublishModal.metadata?.instagramCaption || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSocialPublishModal(prev => ({
+                              ...prev,
+                              metadata: { ...prev.metadata, instagramCaption: val }
+                            }));
+                          }}
+                          placeholder="Enter Instagram caption with viral hook..."
                           class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-pink-500"
                         ></textarea>
                       </div>

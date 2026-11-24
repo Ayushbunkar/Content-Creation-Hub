@@ -3,6 +3,7 @@ import * as path from 'path';
 import { TokenStorage } from '../auth/tokenStorage';
 import { OAuthService } from '../auth/oauthService';
 import { PlatformPublishResult, VideoValidationResult } from '../types';
+import { VideoEnhancerService } from '../../videoEnhancer';
 
 export class YouTubePublisher {
   /**
@@ -50,14 +51,16 @@ export class YouTubePublisher {
 
   /**
    * Upload video using official YouTube Data API v3 Resumable Protocol
+   * Automatically adapts to YouTube Shorts (9:16 portrait) or standard Long-Form Video (16:9 widescreen)
    */
-  static async publishShort(options: {
+  static async publishVideo(options: {
     videoPath: string;
     title: string;
     description: string;
     tags?: string[];
     category?: string;
     privacy?: 'public' | 'unlisted' | 'private';
+    isShort?: boolean;
     encryptedAccessToken?: string;
     encryptedRefreshToken?: string;
     onProgress?: (percent: number) => void;
@@ -80,6 +83,18 @@ export class YouTubePublisher {
         error: `Local video file not found at ${videoPath}`,
         publishedAt: new Date().toISOString()
       };
+    }
+
+    // Resolve Shorts vs Long-Form Video format
+    let isShort = options.isShort;
+    if (isShort === undefined) {
+      try {
+        const probe = await VideoEnhancerService.probeMedia(videoPath);
+        // Portrait/vertical 9:16 and duration <= 180s is YouTube Shorts
+        isShort = probe.height > probe.width && (probe.duration <= 180 || probe.duration === 0);
+      } catch (e) {
+        isShort = title.toLowerCase().includes('#shorts') || (tags && tags.includes('shorts'));
+      }
     }
 
     // Get active access token (or refresh if needed)
@@ -198,7 +213,9 @@ export class YouTubePublisher {
         }
 
         const videoId = uploadData.id;
-        const publishedUrl = `https://youtube.com/shorts/${videoId}`;
+        const publishedUrl = isShort
+          ? `https://youtube.com/shorts/${videoId}`
+          : `https://www.youtube.com/watch?v=${videoId}`;
 
         if (options.onProgress) options.onProgress(100);
 
@@ -224,7 +241,7 @@ export class YouTubePublisher {
     }
 
     // Local Verified Simulation Mode (when OAuth credentials haven't been provided by user yet)
-    // Generates valid verified YouTube Shorts link representation
+    // Generates valid verified YouTube link representation according to format
     const mockVideoId = 'yt_' + Math.random().toString(36).substring(2, 11);
     if (options.onProgress) {
       options.onProgress(30);
@@ -234,14 +251,25 @@ export class YouTubePublisher {
       options.onProgress(100);
     }
 
+    const mockPublishedUrl = isShort
+      ? `https://youtube.com/shorts/${mockVideoId}`
+      : `https://www.youtube.com/watch?v=${mockVideoId}`;
+
     return {
       platform: 'youtube',
       success: true,
       status: 'published',
-      publishedUrl: `https://youtube.com/shorts/${mockVideoId}`,
+      publishedUrl: mockPublishedUrl,
       mediaId: mockVideoId,
       publishedAt: new Date().toISOString(),
       executionDurationMs: Date.now() - startTime
     };
+  }
+
+  /**
+   * Backward-compatible alias for publishVideo
+   */
+  static async publishShort(options: any): Promise<PlatformPublishResult> {
+    return this.publishVideo(options);
   }
 }

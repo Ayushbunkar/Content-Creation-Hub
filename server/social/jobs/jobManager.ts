@@ -83,13 +83,16 @@ export class JobManager {
         });
 
         try {
-          const ytResult = await YouTubePublisher.publishShort({
+          const isShort = request.metadata.isShort;
+          const defaultYtTitle = isShort === false ? 'Viral Gaming Video' : 'Viral Reel #shorts';
+          const ytResult = await YouTubePublisher.publishVideo({
             videoPath: request.videoPath,
-            title: request.metadata.youtubeTitle || 'Viral Reel #shorts',
+            title: request.metadata.youtubeTitle || defaultYtTitle,
             description: request.metadata.youtubeDescription || '',
             tags: request.metadata.youtubeTags,
             category: request.metadata.youtubeCategory || '20',
             privacy: request.metadata.youtubePrivacy || 'public',
+            isShort,
             encryptedAccessToken: accounts.youtube?.metadata?.accessTokenEncrypted,
             encryptedRefreshToken: accounts.youtube?.metadata?.refreshTokenEncrypted,
             onProgress: (p) => {
@@ -109,6 +112,8 @@ export class JobManager {
             clipId: request.clipId,
             videoPath: request.videoPath,
             platform: 'youtube',
+            title: request.metadata.youtubeTitle,
+            description: request.metadata.youtubeDescription,
             status: ytResult.success ? 'published' : 'failed',
             progress: ytResult.success ? 100 : jobState.youtube.progress,
             platformMediaId: ytResult.mediaId,
@@ -177,6 +182,7 @@ export class JobManager {
             clipId: request.clipId,
             videoPath: request.videoPath,
             platform: 'instagram',
+            caption: request.metadata.instagramCaption,
             status: igResult.success ? 'published' : 'failed',
             progress: igResult.success ? 100 : jobState.instagram.progress,
             platformMediaId: igResult.mediaId,

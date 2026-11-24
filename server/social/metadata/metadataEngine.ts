@@ -108,7 +108,7 @@ export class MetadataEngine {
   }
 
   /**
-   * Generate comprehensive platform-specific metadata for a clip
+   * Generate comprehensive platform-specific metadata for a clip (supports YouTube Shorts & Long-Form Video)
    */
   static generateClipMetadata(options: {
     clipId: string;
@@ -118,8 +118,10 @@ export class MetadataEngine {
     gameOrTopic?: string;
     duration?: number;
     privacy?: 'public' | 'unlisted' | 'private';
+    isShort?: boolean;
   }): GeneratedSocialMetadata {
     const { clipId, streamer, headlineHook, transcript = '', duration = 30, privacy = 'public' } = options;
+    const isShort = options.isShort !== undefined ? Boolean(options.isShort) : (duration <= 180);
 
     const creatorName = streamer.streamerName || 'Creator';
     const topic = streamer.gameOrTopic || options.gameOrTopic || 'Gaming';
@@ -134,16 +136,22 @@ export class MetadataEngine {
       platform: 'both'
     });
 
-    // 1. YouTube Shorts Package
-    const youtubeTitle = `${creatorName} ${hook} 😂🔥 #shorts`.slice(0, 95);
-    const alternativeTitles = [
-      `${creatorName} Lost His Mind Here! 😱 #shorts`,
-      `When ${creatorName} Did This On Live Stream! 💀 #shorts`,
-      `${hook} - ${creatorName} Special #shorts`,
-      `Nobody Expected ${creatorName} To Do This! 😂 #shorts`
-    ];
+    let youtubeTitle = '';
+    let alternativeTitles: string[] = [];
+    let youtubeDescription = '';
+    let youtubeTags: string[] = [];
 
-    const youtubeDescription = `${creatorName} has an unreal reaction live on stream! 😂🔥
+    if (isShort) {
+      // 1A. YouTube Shorts Package (Vertical 9:16, <= 60-180s)
+      youtubeTitle = `${creatorName} - ${hook} 😂🔥 #shorts`.slice(0, 95);
+      alternativeTitles = [
+        `${creatorName} Lost His Mind Here! 😱 #shorts`,
+        `When ${creatorName} Did This On Live Stream! 💀 #shorts`,
+        `${hook} - ${creatorName} Special #shorts`,
+        `Nobody Expected ${creatorName} To Do This! 😂 #shorts`
+      ];
+
+      youtubeDescription = `${creatorName} has an unreal reaction live on stream! 😂🔥
 
 🎮 Game / Stream: ${topic}
 🎙️ Creator: ${creatorName} (${streamer.streamerHandle || '@' + creatorName.toLowerCase().replace(/\s+/g, '')})
@@ -156,19 +164,53 @@ export class MetadataEngine {
 
 ${hashtagResult.platformRelevant.join(' ')} ${hashtagResult.streamerSpecific.join(' ')} ${hashtagResult.gameOrTopic.join(' ')} ${hashtagResult.contentSpecific.join(' ')}`;
 
-    // YouTube tags (comma-separated keywords for algorithm)
-    const youtubeTags = [
-      creatorName,
-      creatorName.toLowerCase(),
-      topic,
-      'shorts',
-      'youtube shorts',
-      'viral shorts',
-      'stream highlight',
-      'funny moments',
-      'gaming clips',
-      'best moments'
-    ];
+      youtubeTags = [
+        creatorName,
+        creatorName.toLowerCase(),
+        topic,
+        'shorts',
+        'youtube shorts',
+        'viral shorts',
+        'stream highlight',
+        'funny moments',
+        'gaming clips',
+        'best moments'
+      ];
+    } else {
+      // 1B. YouTube Standard Long-Form Video Package (Horizontal 16:9, Full Duration)
+      youtubeTitle = `${creatorName} - ${hook}`.slice(0, 100);
+      alternativeTitles = [
+        `${creatorName} - ${hook} (Full Gameplay & Highlights)`,
+        `Watch What Happened: ${creatorName} - ${hook}`,
+        `${creatorName} Live Stream Special: ${hook}`,
+        `Best Moments of ${creatorName}: ${hook}`
+      ];
+
+      youtubeDescription = `${creatorName} presents ${hook} live on stream!
+
+🎮 Game / Stream: ${topic}
+🎙️ Creator: ${creatorName} (${streamer.streamerHandle || '@' + creatorName.toLowerCase().replace(/\s+/g, '')})
+💬 Featured Topic: "${hook}"
+⏱️ Video Length: ${Math.round(duration)}s
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔔 Subscribe to ${creatorName}'s official channel for full uncut streams, gameplay & high-action highlights!
+👍 Leave a LIKE, SHARE with your friends, and tell us your favorite moment in the comments below!
+
+${hashtagResult.streamerSpecific.join(' ')} ${hashtagResult.gameOrTopic.join(' ')} ${hashtagResult.contentSpecific.join(' ')}`;
+
+      youtubeTags = [
+        creatorName,
+        creatorName.toLowerCase(),
+        topic,
+        'gameplay',
+        'full video',
+        'stream highlights',
+        'best moments',
+        'gaming video',
+        'stream'
+      ];
+    }
 
     const suggestedPinnedComment = `What was your favorite moment from ${creatorName}'s stream? Comment below! 👇🔥`;
     const suggestedThumbnailText = hook.toUpperCase();
@@ -184,9 +226,20 @@ Drop a '🔥' in comments if you caught this live!
 .
 ${hashtagResult.allCombined.slice(0, 15).join(' ')}`;
 
+    const trendingHashtags = isShort
+      ? hashtagResult.allCombined.slice(0, 15)
+      : hashtagResult.allCombined.filter(t => !t.toLowerCase().includes('shorts')).slice(0, 15);
+
     return {
       clipId,
       streamer,
+      isShort,
+      youtubeTitle,
+      youtubeDescription,
+      instagramCaption,
+      trendingHashtags,
+      alternativeTitles,
+      youtubeTags,
       youtube: {
         title: youtubeTitle,
         alternativeTitles,
@@ -195,7 +248,9 @@ ${hashtagResult.allCombined.slice(0, 15).join(' ')}`;
         category: '20', // YouTube Gaming category
         categoryName: 'Gaming',
         suggestedPinnedComment,
-        callToAction: `Subscribe to ${creatorName} and like for more daily highlights!`,
+        callToAction: isShort
+          ? `Subscribe to ${creatorName} and like for more daily shorts!`
+          : `Subscribe to ${creatorName} and like for more full videos!`,
         suggestedThumbnailText,
         attributionText: `Original gameplay & broadcast by ${creatorName}`
       },

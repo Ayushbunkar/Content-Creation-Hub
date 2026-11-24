@@ -36,6 +36,13 @@ export interface SocialAccountsState {
 export interface GeneratedSocialMetadata {
   clipId: string;
   streamer: StreamerIdentity;
+  isShort?: boolean;
+  youtubeTitle?: string;
+  youtubeDescription?: string;
+  instagramCaption?: string;
+  trendingHashtags?: string[];
+  alternativeTitles?: string[];
+  youtubeTags?: string[];
   youtube: {
     title: string;
     alternativeTitles: string[];
@@ -102,6 +109,7 @@ export interface PublishRequest {
     youtubeTags?: string[];
     youtubeCategory?: string;
     youtubePrivacy?: 'public' | 'unlisted' | 'private';
+    isShort?: boolean;
     instagramCaption?: string;
     instagramHashtags?: string[];
     instagramShareToFeed?: boolean;

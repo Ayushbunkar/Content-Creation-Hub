@@ -2657,7 +2657,7 @@ app.post('/api/social/validate-video', (req, res) => {
 // Generate Comprehensive Platform-Specific AI Metadata & Hashtags
 app.post('/api/social/generate-metadata', (req, res) => {
   try {
-    const { clipId, streamer, streamerName, headlineHook, transcriptSnippet, transcript, gameOrTopic, duration, privacy } = req.body;
+    const { clipId, streamer, streamerName, headlineHook, transcriptSnippet, transcript, gameOrTopic, duration, privacy, isShort } = req.body;
     
     // Resolve streamer identity with priority
     const resolvedStreamer = streamer && streamer.streamerName
@@ -2673,7 +2673,8 @@ app.post('/api/social/generate-metadata', (req, res) => {
       transcript: transcript || transcriptSnippet || '',
       gameOrTopic: gameOrTopic || resolvedStreamer.gameOrTopic,
       duration: duration || 30,
-      privacy: privacy || 'public'
+      privacy: privacy || 'public',
+      isShort: isShort !== undefined ? Boolean(isShort) : undefined
     });
 
     res.json({ success: true, metadata });
@@ -2685,7 +2686,7 @@ app.post('/api/social/generate-metadata', (req, res) => {
 // 1-Click Direct Publishing to YouTube Shorts and/or Instagram Reels
 app.post('/api/social/publish', async (req, res) => {
   try {
-    const { clipId, sourcePage, projectId, filePath, videoPath, platforms, title, description, caption, hashtags, youtubeTags, privacy, streamer, streamerName } = req.body;
+    const { clipId, sourcePage, projectId, filePath, videoPath, platforms, title, description, caption, hashtags, youtubeTags, privacy, streamer, streamerName, isShort } = req.body;
     const targetVideo = videoPath || filePath;
 
     if (!targetVideo) {
@@ -2721,6 +2722,7 @@ app.post('/api/social/publish', async (req, res) => {
         youtubeDescription: description,
         youtubeTags,
         youtubePrivacy: privacy || 'public',
+        isShort: isShort !== undefined ? Boolean(isShort) : undefined,
         instagramCaption: caption,
         instagramHashtags: hashtags
       }

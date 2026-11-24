@@ -89,6 +89,7 @@ export class SocialPublishingService {
     gameOrTopic?: string;
     duration?: number;
     privacy?: 'public' | 'unlisted' | 'private';
+    isShort?: boolean;
   }): GeneratedSocialMetadata {
     return MetadataEngine.generateClipMetadata(options);
   }

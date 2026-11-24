@@ -234,6 +234,9 @@ export class PublishingStore {
         published_url = excluded.published_url,
         error_message = excluded.error_message,
         retry_count = social_publications.retry_count + 1,
+        title = CASE WHEN excluded.title IS NOT NULL AND excluded.title != '' THEN excluded.title ELSE social_publications.title END,
+        description = CASE WHEN excluded.description IS NOT NULL AND excluded.description != '' THEN excluded.description ELSE social_publications.description END,
+        caption = CASE WHEN excluded.caption IS NOT NULL AND excluded.caption != '' THEN excluded.caption ELSE social_publications.caption END,
         published_at = excluded.published_at,
         updated_at = excluded.updated_at
     `, [
