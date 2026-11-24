@@ -598,6 +598,18 @@
       const reframingMode = clip.reframing_mode || 'blur_background';
       const aspectRatio = clip.aspect_ratio || '9:16';
 
+      // Auto-switch to live edit mode whenever any style, preset, framing, or zoom option is clicked
+      React.useEffect(() => {
+        setPlayerMode('live');
+      }, [
+        clip.caption_template,
+        clip.aspect_ratio,
+        clip.reframing_mode,
+        clip.start_time,
+        clip.end_time,
+        JSON.stringify(clip.custom_style)
+      ]);
+
       // Duration & time window
       const clipStart = clip.start_time || 0;
       const clipEnd = clip.end_time || (clipStart + (clip.duration || 30));
@@ -847,10 +859,12 @@
                     onPause={pauseAllLayers}
                     muted={isMuted}
                     playsInline
-                    style={(!isRendered && (clip.custom_style || {}).cameraPreset !== 'static_professional_frame' && isPlaying)
-                      ? { transform: `scale(${parseFloat((clip.custom_style || {}).zoomIntensity || 1.15)})`, transition: 'transform 3s cubic-bezier(0.25, 1, 0.5, 1)' }
-                      : { transform: 'scale(1)', transition: 'transform 0.5s ease-out' }
-                    }
+                    style={{
+                      transform: (!isRendered && (clip.custom_style || {}).cameraPreset !== 'static_professional_frame')
+                        ? `scale(${parseFloat((clip.custom_style || {}).zoomIntensity || 1.15)})`
+                        : 'scale(1)',
+                      transition: isPlaying ? 'transform 3s cubic-bezier(0.25, 1, 0.5, 1)' : 'transform 0.3s ease-out'
+                    }}
                     class={`relative z-10 transition-transform origin-[50%_36%] ${
                       reframingMode === 'center_crop'
                         ? 'w-full h-full object-cover'
@@ -873,9 +887,13 @@
                 {/* 4. Live Interactive Animated Caption Overlay with Proportional Size & Hand Drag */}
                 {(() => {
                   const cs = clip.custom_style || {};
-                  const fontFam = cs.fontFamily || 'Montserrat';
-                  const highlightCol = cs.highlightColor || '#FFE600';
-                  const textCol = cs.color || '#FFFFFF';
+                  const currentTmplId = clip.caption_template || 'minimal-montserrat';
+                  const tmpl = CAPTION_TEMPLATES.find(t => t.id === currentTmplId) || CAPTION_TEMPLATES[0];
+
+                  const fontFam = cs.fontFamily || tmpl.font || 'Montserrat';
+                  const textCol = cs.color || tmpl.preview.text || '#FFFFFF';
+                  const highlightCol = cs.highlightColor || tmpl.preview.accent || '#FFE600';
+                  const highlightMode = cs.highlightMode || 'word-by-word';
 
                   // Dynamic proportional font scaling: directly scales with slider (36px -> ~8px, 68px -> ~15px, 110px -> ~24.5px)
                   const rawFont = (typeof cs.fontSize === 'number' && cs.fontSize > 0) ? cs.fontSize : 68;
@@ -919,6 +937,51 @@
 
                   const words = subtitleToRender.split(' ').filter(Boolean);
 
+                  // Template-accurate styles
+                  let badgeBg = 'rgba(0,0,0,0.76)';
+                  if (['boxed-caption','netflix-doc','news-broadcast','cinematic-two-line','centered-impact'].includes(currentTmplId)) {
+                    badgeBg = 'rgba(0,0,0,0.88)';
+                  } else if (currentTmplId === 'yellow-box-highlight') {
+                    badgeBg = '#FFD700';
+                  } else if (currentTmplId === 'magazine-paper') {
+                    badgeBg = '#F5F0E8';
+                  } else if (currentTmplId === 'typewriter') {
+                    badgeBg = '#022c22';
+                  } else if (currentTmplId === 'news-lower-third') {
+                    badgeBg = '#001B6B';
+                  } else if (['minimal-light','clean-subtitle','outline-caption'].includes(currentTmplId)) {
+                    badgeBg = 'transparent';
+                  }
+
+                  let textShadow = '1px 1px 3px rgba(0,0,0,0.95)';
+                  if (tmpl.preview.glow || currentTmplId === 'neon-captions' || currentTmplId === 'neon-glow') {
+                    textShadow = `0 0 10px ${textCol}, 0 0 20px ${textCol}`;
+                  }
+
+                  let textStroke = undefined;
+                  if (currentTmplId === 'outline-caption' || currentTmplId === 'gaming-captions') {
+                    textStroke = '0.9px black';
+                  }
+
+                  let textTransform = 'none';
+                  if (['hormozi-bold', 'mrbeast-bold', 'gaming-captions', 'centered-impact'].includes(currentTmplId) || (tmpl.preview.style && tmpl.preview.style.includes('uppercase'))) {
+                    textTransform = 'uppercase';
+                  }
+
+                  let fontWeight = '800';
+                  if (currentTmplId === 'minimal-light' || (tmpl.preview.style && tmpl.preview.style.includes('font-light'))) {
+                    fontWeight = '400';
+                  } else if (['hormozi-bold', 'mrbeast-bold', 'viral-word-pop'].includes(currentTmplId)) {
+                    fontWeight = '900';
+                  }
+
+                  let letterSpacing = 'normal';
+                  if (currentTmplId === 'netflix-doc') {
+                    letterSpacing = '0.08em';
+                  } else if (['hormozi-bold', 'centered-impact'].includes(currentTmplId)) {
+                    letterSpacing = '-0.02em';
+                  }
+
                   return (
                     <div
                       onMouseDown={handleCaptionPointerDown}
@@ -942,13 +1005,18 @@
                       </div>
 
                       <span
-                        class="inline-block max-w-full px-3 py-1.5 rounded-xl font-black shadow-2xl backdrop-blur-md break-words whitespace-normal leading-snug transition-transform"
+                        class="inline-block max-w-full px-3 py-1.5 rounded-xl shadow-2xl backdrop-blur-md break-words whitespace-normal leading-snug transition-all"
                         style={{
-                          backgroundColor: ['boxed-caption','netflix-doc','news-broadcast','yellow-box-highlight','yellow-karaoke'].includes(clip.caption_template) ? 'rgba(0,0,0,0.88)' : 'rgba(0,0,0,0.72)',
+                          backgroundColor: badgeBg,
                           color: textCol,
                           fontSize: `${fontSize}px`,
                           fontFamily: `${fontFam}, sans-serif`,
-                          border: isDraggingCaption ? '2px dashed #818cf8' : '1px solid rgba(255,255,255,0.22)',
+                          fontWeight: fontWeight,
+                          textTransform: textTransform,
+                          letterSpacing: letterSpacing,
+                          textShadow: textShadow,
+                          WebkitTextStroke: textStroke,
+                          border: isDraggingCaption ? '2px dashed #818cf8' : (badgeBg === 'transparent' ? 'none' : '1px solid rgba(255,255,255,0.20)'),
                           boxSizing: 'border-box',
                           wordBreak: 'break-word',
                           overflowWrap: 'break-word',
@@ -957,17 +1025,49 @@
                           maxWidth: '100%'
                         }}
                       >
-                        {words.map((w, i) => (
-                          <span
-                            key={i}
-                            style={{
-                              color: (i === 1 || i === words.length - 1) ? highlightCol : textCol,
-                              display: 'inline'
-                            }}
-                          >
-                            {w}{i < words.length - 1 ? ' ' : ''}
-                          </span>
-                        ))}
+                        {currentTmplId === 'news-broadcast' && <span style={{color: '#FF0000', fontWeight: '900', marginRight: '4px'}}>⬤</span>}
+                        {words.map((w, i) => {
+                          let isHighlighted = false;
+                          if (highlightMode === 'no-highlighting') {
+                            isHighlighted = false;
+                          } else if (highlightMode === 'entire-sentence') {
+                            isHighlighted = true;
+                          } else if (highlightMode === 'word-by-word') {
+                            if (isPlaying) {
+                              const wordIndex = Math.min(words.length - 1, Math.floor(((currentTime % 2) / 2) * words.length));
+                              isHighlighted = (i === wordIndex);
+                            } else {
+                              isHighlighted = (i === 1 || i === Math.floor(words.length / 2));
+                            }
+                          } else {
+                            // keyword-emphasis
+                            isHighlighted = (i === 1 || i === words.length - 1);
+                          }
+
+                          const wordColor = isHighlighted
+                            ? (currentTmplId === 'yellow-box-highlight' ? '#000000' : highlightCol)
+                            : (currentTmplId === 'yellow-box-highlight' ? '#111827' : textCol);
+
+                          const wordBg = (currentTmplId === 'yellow-box-highlight' && isHighlighted)
+                            ? '#FFFFFF'
+                            : undefined;
+
+                          return (
+                            <span
+                              key={i}
+                              style={{
+                                color: wordColor,
+                                backgroundColor: wordBg,
+                                padding: wordBg ? '1px 5px' : undefined,
+                                borderRadius: wordBg ? '4px' : undefined,
+                                display: 'inline',
+                                textShadow: isHighlighted && (currentTmplId === 'neon-glow' || currentTmplId === 'neon-captions') ? `0 0 12px ${highlightCol}` : undefined
+                              }}
+                            >
+                              {w}{i < words.length - 1 ? ' ' : ''}
+                            </span>
+                          );
+                        })}
                       </span>
                     </div>
                   );

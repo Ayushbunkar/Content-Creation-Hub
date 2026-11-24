@@ -1644,6 +1644,11 @@ app.put('/api/clipper/clips/:clipId', async (req, res) => {
       audio_settings
     } = req.body;
 
+    const currentCustomStyle = clip.custom_style ? JSON.parse(clip.custom_style) : {};
+    const mergedCustomStyle = custom_style !== undefined
+      ? (typeof custom_style === 'object' && custom_style !== null ? { ...currentCustomStyle, ...custom_style } : custom_style)
+      : null;
+
     const start = start_time !== undefined ? parseFloat(start_time) : clip.start_time;
     const end = end_time !== undefined ? parseFloat(end_time) : clip.end_time;
     const duration = Math.max(1, Math.round(end - start));
@@ -1683,7 +1688,7 @@ app.put('/api/clipper/clips/:clipId', async (req, res) => {
       reframing_mode !== undefined ? reframing_mode : null,
       caption_template !== undefined ? caption_template : null,
       caption_language !== undefined ? caption_language : null,
-      custom_style ? JSON.stringify(custom_style) : null,
+      mergedCustomStyle ? JSON.stringify(mergedCustomStyle) : null,
       transcript_segments ? JSON.stringify(transcript_segments) : null,
       virality_metrics ? JSON.stringify(virality_metrics) : null,
       platform_metadata ? JSON.stringify(platform_metadata) : null,
