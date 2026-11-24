@@ -24,7 +24,8 @@ import { QualityControlEngine } from './qualityControlEngine';
 import { PerformanceResourceManager } from './resourceManager';
 import { SocialPublishingService } from './social';
 import { ReelStudioEngine, REEL_STYLE_PRESETS } from './reelStudioEngine';
-import { ensureVideoH264 } from './viralClipper';
+import { ClipStudioEngine } from './clipStudioEngine';
+import { ensureVideoH264, safeParseJson } from './viralClipper';
 
 // Load .env configuration
 try {
@@ -2947,6 +2948,230 @@ app.post('/api/reel-studio/projects/:id/render', async (req, res) => {
     });
 
     res.json({ success: true, message: 'Rendering started. Track progress in real time.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// AI CLIP STUDIO — STREAM TO VIRAL CLIPS API
+// ==========================================
+
+// Probe Source URL metadata
+app.post('/api/clip-studio/probe-url', async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: 'URL is required' });
+    const meta = await ClipStudioEngine.fetchSourceMetadata(url);
+    res.json({ success: true, metadata: meta });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// List all Clip Studio projects
+app.get('/api/clip-studio/projects', async (req, res) => {
+  try {
+    const projects = await allQuery<any>('SELECT * FROM clip_studio_projects ORDER BY created_at DESC');
+    res.json({ success: true, projects });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Create Clip Studio Project
+app.post('/api/clip-studio/projects', async (req, res) => {
+  try {
+    const project = await ClipStudioEngine.createProject(req.body);
+    res.json({ success: true, project });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get Project and its Items
+app.get('/api/clip-studio/projects/:id', async (req, res) => {
+  try {
+    const project = await getQuery<any>('SELECT * FROM clip_studio_projects WHERE id = ?', [req.params.id]);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const rawItems = await allQuery<any>('SELECT * FROM clip_studio_items WHERE project_id = ? ORDER BY clip_number ASC', [req.params.id]);
+    const items = rawItems.map((item: any) => ({
+      ...item,
+      score_breakdown: safeParseJson(item.score_breakdown, {}),
+      transcript_segments: safeParseJson(item.transcript_segments, []),
+      custom_style: safeParseJson(item.custom_style, {}),
+      timeline_data: safeParseJson(item.timeline_data, null),
+      thumbnail_variations: safeParseJson(item.thumbnail_variations, []),
+      youtube_metadata: safeParseJson(item.youtube_metadata, null)
+    }));
+    res.json({
+      success: true,
+      project: {
+        ...project,
+        transcript_json: safeParseJson(project.transcript_json, []),
+        metadata_json: safeParseJson(project.metadata_json, {})
+      },
+      items
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Analyze Video with AI & Detect Best Moments
+app.post('/api/clip-studio/projects/:id/analyze', async (req, res) => {
+  try {
+    const items = await ClipStudioEngine.analyzeVideoWithAI(req.params.id, req.body);
+    res.json({ success: true, items });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Auto-Edit Clip Item
+app.post('/api/clip-studio/items/:id/auto-edit', async (req, res) => {
+  try {
+    const updated = await ClipStudioEngine.autoEditClipItem(req.params.id, req.body.stylePreset);
+    res.json({ success: true, item: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update Clip Item
+app.put('/api/clip-studio/items/:id', async (req, res) => {
+  try {
+    const { title, hook, start_time, end_time, duration, aspect_ratio, transcript_segments, youtube_metadata, selected_thumbnail } = req.body;
+    await runQuery(`
+      UPDATE clip_studio_items SET
+        title = COALESCE(?, title),
+        hook = COALESCE(?, hook),
+        start_time = COALESCE(?, start_time),
+        end_time = COALESCE(?, end_time),
+        duration = COALESCE(?, duration),
+        aspect_ratio = COALESCE(?, aspect_ratio),
+        transcript_segments = COALESCE(?, transcript_segments),
+        youtube_metadata = COALESCE(?, youtube_metadata),
+        selected_thumbnail = COALESCE(?, selected_thumbnail),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [
+      title || null,
+      hook || null,
+      start_time !== undefined ? parseFloat(start_time) : null,
+      end_time !== undefined ? parseFloat(end_time) : null,
+      duration !== undefined ? parseFloat(duration) : null,
+      aspect_ratio || null,
+      transcript_segments ? JSON.stringify(transcript_segments) : null,
+      youtube_metadata ? JSON.stringify(youtube_metadata) : null,
+      selected_thumbnail || null,
+      req.params.id
+    ]);
+    const updated = await getQuery<any>('SELECT * FROM clip_studio_items WHERE id = ?', [req.params.id]);
+    res.json({
+      success: true,
+      item: {
+        ...updated,
+        score_breakdown: safeParseJson(updated.score_breakdown, {}),
+        transcript_segments: safeParseJson(updated.transcript_segments, []),
+        thumbnail_variations: safeParseJson(updated.thumbnail_variations, []),
+        youtube_metadata: safeParseJson(updated.youtube_metadata, null),
+        timeline_data: safeParseJson(updated.timeline_data, null)
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Render Clip Item to MP4
+app.post('/api/clip-studio/items/:id/render', async (req, res) => {
+  try {
+    const result = await ClipStudioEngine.renderClipItem(req.params.id, req.body);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Publish Clip Item to YouTube
+app.post('/api/clip-studio/items/:id/publish-youtube', async (req, res) => {
+  try {
+    const result = await ClipStudioEngine.publishItemToYouTube(req.params.id, req.body);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Open Clip Item in AI Reel Studio (Shared Editing Engine Bridge)
+app.post('/api/clip-studio/items/:id/open-in-reel-studio', async (req, res) => {
+  try {
+    const item = await getQuery<any>('SELECT * FROM clip_studio_items WHERE id = ?', [req.params.id]);
+    if (!item) return res.status(404).json({ error: 'Clip item not found' });
+    const project = await getQuery<any>('SELECT * FROM clip_studio_projects WHERE id = ?', [item.project_id]);
+    if (!project) return res.status(404).json({ error: 'Parent project not found' });
+
+    // Ensure timeline data exists
+    let timeline = item.timeline_data ? safeParseJson(item.timeline_data, null) : null;
+    if (!timeline) {
+      const autoEdited = await ClipStudioEngine.autoEditClipItem(item.id, item.suggested_style || 'hormozi-bold');
+      timeline = autoEdited.timeline_data;
+    }
+
+    // Create or find matching reel_project
+    const reelProjId = `reel_${item.id}`;
+    const existing = await getQuery<any>('SELECT id FROM reel_projects WHERE id = ?', [reelProjId]);
+    if (!existing) {
+      await runQuery(`
+        INSERT INTO reel_projects (
+          id, title, video_path, aspect_ratio, duration, preset, status, progress, transcript_json, timeline_data
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        reelProjId,
+        item.title,
+        project.video_path,
+        item.aspect_ratio || '9:16',
+        item.duration,
+        item.suggested_style || 'hormozi-bold',
+        'ready',
+        100,
+        item.transcript_segments || '[]',
+        JSON.stringify(timeline)
+      ]);
+    } else {
+      await runQuery(`
+        UPDATE reel_projects SET
+          timeline_data = ?,
+          duration = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `, [JSON.stringify(timeline), item.duration, reelProjId]);
+    }
+
+    res.json({ success: true, reelProjectId: reelProjId });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Create Long-Form Repurposed Video
+app.post('/api/clip-studio/projects/:id/long-form', async (req, res) => {
+  try {
+    const result = await ClipStudioEngine.createLongFormRepurposed(req.params.id, req.body);
+    res.json({ success: true, compilation: result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete Project
+app.delete('/api/clip-studio/projects/:id', async (req, res) => {
+  try {
+    await runQuery('DELETE FROM clip_studio_items WHERE project_id = ?', [req.params.id]);
+    await runQuery('DELETE FROM clip_studio_longform WHERE project_id = ?', [req.params.id]);
+    await runQuery('DELETE FROM clip_studio_projects WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

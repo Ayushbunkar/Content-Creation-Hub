@@ -50,6 +50,8 @@
 
   <!-- AI Reel Editing Studio Modular Component -->
   <script type="text/babel" src="/reelStudio.js"></script>
+  <!-- AI Clip Studio — Stream to Viral Clips Modular Component -->
+  <script type="text/babel" src="/clipStudio.js"></script>
 
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
@@ -4565,6 +4567,7 @@
             <div class="flex-1 overflow-y-auto custom-scrollbar p-3">
               <nav class="space-y-1.5">
                 {[
+                  { id: 'clip_studio', label: 'AI Clip Studio', badge: 'Viral Repurpose 🚀' },
                   { id: 'stream_clipper', label: 'Stream Chat Clipper', badge: 'Live / VOD ⚡' },
                   { id: 'paper', label: 'Paper Animation Studio', badge: 'Paper 📜' },
                   { id: 'documentary', label: 'Cinematic Doc Engine', badge: 'Doc Engine 🎬' },
@@ -4631,7 +4634,7 @@
               <div class="flex items-center space-x-3 min-w-0">
                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0 shadow-lg shadow-emerald-400/50"></span>
                 <h2 class="text-xs sm:text-sm font-black tracking-wide text-slate-100 uppercase truncate">
-                  {currentTab === 'stream_clipper' ? 'Stream Chat Viral Clipper — Indian & Global Stream Extraction Engine' : currentTab === 'paper' ? 'Paper Animation Studio — Master Explainer Engine' : currentTab === 'documentary' ? 'CINEMATIC DOCUMENTARY ENGINE — TOPIC & SCRIPT INVESTIGATION' : currentTab === 'enhancement' ? 'Video Quality & Cinematic Production Engine' : currentTab === 'audio_police' ? 'Audio Copyright Police — Pre-Export Gate & Asset Registry' : currentTab === 'clipper' ? 'AI Viral Clipper — YouTube & Podcast Auto-Shorts' : currentTab === 'reel_studio' ? 'AI REEL EDITING STUDIO — OCCLUSION, GLASSMORPHISM & DUCKED AUDIO' : currentTab === 'captions' ? 'Caption Studio — Video & Animated Subtitles' : currentTab.toUpperCase()}
+                  {currentTab === 'clip_studio' ? 'AI CLIP STUDIO — STREAM TO VIRAL CLIPS & YOUTUBE REPURPOSING' : currentTab === 'stream_clipper' ? 'Stream Chat Viral Clipper — Indian & Global Stream Extraction Engine' : currentTab === 'paper' ? 'Paper Animation Studio — Master Explainer Engine' : currentTab === 'documentary' ? 'CINEMATIC DOCUMENTARY ENGINE — TOPIC & SCRIPT INVESTIGATION' : currentTab === 'enhancement' ? 'Video Quality & Cinematic Production Engine' : currentTab === 'audio_police' ? 'Audio Copyright Police — Pre-Export Gate & Asset Registry' : currentTab === 'clipper' ? 'AI Viral Clipper — YouTube & Podcast Auto-Shorts' : currentTab === 'reel_studio' ? 'AI REEL EDITING STUDIO — OCCLUSION, GLASSMORPHISM & DUCKED AUDIO' : currentTab === 'captions' ? 'Caption Studio — Video & Animated Subtitles' : currentTab.toUpperCase()}
                 </h2>
               </div>
               <div class="text-xs text-slate-400 flex items-center space-x-3 flex-shrink-0">
@@ -9386,6 +9389,25 @@
                     </div>
                   )}
 
+                </div>
+              )}
+
+              {/* ===================== AI CLIP STUDIO — STREAM TO VIRAL CLIPS ===================== */}
+              {currentTab === 'clip_studio' && (
+                <div class="h-full flex-1 overflow-hidden -m-4 sm:-m-6 flex flex-col">
+                  {window.ClipStudioWorkspace ? (
+                    <window.ClipStudioWorkspace
+                      onOpenInReelStudio={(reelProjId) => {
+                        loadReelProject(reelProjId);
+                        setCurrentTab('reel_studio');
+                      }}
+                      onOpenInCaptionStudio={() => setCurrentTab('captions')}
+                    />
+                  ) : (
+                    <div class="h-full flex items-center justify-center p-8 text-slate-400">
+                      Loading AI Clip Studio...
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -342,7 +342,92 @@ export function initDatabase(): Promise<void> {
             `, (reelErr) => {
               if (reelErr) return reject(reelErr);
               db.run(`CREATE INDEX IF NOT EXISTS idx_reel_proj_status ON reel_projects(status)`, () => {});
-              resolve();
+
+              // AI Clip Studio — Stream to Viral Clips & Video Repurposing
+              db.run(`
+                CREATE TABLE IF NOT EXISTS clip_studio_projects (
+                  id TEXT PRIMARY KEY,
+                  title TEXT NOT NULL,
+                  source_type TEXT DEFAULT 'upload',
+                  source_url TEXT,
+                  video_path TEXT NOT NULL,
+                  audio_path TEXT,
+                  thumbnail_url TEXT,
+                  duration REAL DEFAULT 0,
+                  width INTEGER DEFAULT 1920,
+                  height INTEGER DEFAULT 1080,
+                  fps REAL DEFAULT 30,
+                  status TEXT DEFAULT 'ready',
+                  progress INTEGER DEFAULT 0,
+                  error_message TEXT,
+                  transcript_json TEXT,
+                  metadata_json TEXT,
+                  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+              `, (csProjErr) => {
+                if (csProjErr) return reject(csProjErr);
+                db.run(`CREATE INDEX IF NOT EXISTS idx_cs_proj_status ON clip_studio_projects(status)`, () => {});
+
+                db.run(`
+                  CREATE TABLE IF NOT EXISTS clip_studio_items (
+                    id TEXT PRIMARY KEY,
+                    project_id TEXT NOT NULL,
+                    clip_number INTEGER DEFAULT 1,
+                    title TEXT NOT NULL,
+                    hook TEXT,
+                    summary TEXT,
+                    topic TEXT,
+                    start_time REAL NOT NULL,
+                    end_time REAL NOT NULL,
+                    duration REAL NOT NULL,
+                    quality_score INTEGER DEFAULT 85,
+                    score_breakdown TEXT,
+                    ai_reason TEXT,
+                    suggested_style TEXT DEFAULT 'hormozi-bold',
+                    aspect_ratio TEXT DEFAULT '9:16',
+                    transcript_segments TEXT,
+                    custom_style TEXT,
+                    timeline_data TEXT,
+                    thumbnail_variations TEXT,
+                    selected_thumbnail TEXT,
+                    youtube_metadata TEXT,
+                    publishing_status TEXT DEFAULT 'draft',
+                    published_video_id TEXT,
+                    published_url TEXT,
+                    scheduled_time TEXT,
+                    exported_video TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                  )
+                `, (csItemErr) => {
+                  if (csItemErr) return reject(csItemErr);
+                  db.run(`CREATE INDEX IF NOT EXISTS idx_cs_item_proj ON clip_studio_items(project_id)`, () => {});
+
+                  db.run(`
+                    CREATE TABLE IF NOT EXISTS clip_studio_longform (
+                      id TEXT PRIMARY KEY,
+                      project_id TEXT NOT NULL,
+                      title TEXT NOT NULL,
+                      target_duration REAL DEFAULT 300,
+                      selected_item_ids TEXT,
+                      sequence_data TEXT,
+                      timeline_data TEXT,
+                      status TEXT DEFAULT 'draft',
+                      rendered_video TEXT,
+                      youtube_metadata TEXT,
+                      publishing_status TEXT DEFAULT 'draft',
+                      published_url TEXT,
+                      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                  `, (csLfErr) => {
+                    if (csLfErr) return reject(csLfErr);
+                    db.run(`CREATE INDEX IF NOT EXISTS idx_cs_lf_proj ON clip_studio_longform(project_id)`, () => {});
+                    resolve();
+                  });
+                });
+              });
             });
           });
         });

@@ -10,6 +10,7 @@ out/
 
 # Temporary video render caches
 public/videos/cache/
+public/cache/
 
 # Python virtual environment & caches
 .venv-tts/
