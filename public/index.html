@@ -529,6 +529,7 @@
     function ClipperLivePlayer({ clip, project, onUpdate, onOpenConcat }) {
       const fgRef = React.useRef(null);
       const bgRef = React.useRef(null);
+      const camRef = React.useRef(null);
       const containerRef = React.useRef(null);
       const [isPlaying, setIsPlaying] = React.useState(false);
       const [currentTime, setCurrentTime] = React.useState(0);
@@ -602,33 +603,38 @@
       const clipEnd = clip.end_time || (clipStart + (clip.duration || 30));
       const clipDuration = Math.max(1, clipEnd - clipStart);
 
-      // Reset playback state when clip or mode changes
+      // Synchronize all active video layers (gameplay, bottom split, and facecam)
       React.useEffect(() => {
         setIsPlaying(false);
         setCurrentTime(0);
         setActiveSubtitle('');
-        if (fgRef.current) {
-          if (!isRendered) {
-            fgRef.current.currentTime = clipStart;
-          } else {
-            fgRef.current.currentTime = 0;
-          }
-        }
-        if (bgRef.current) {
-          bgRef.current.currentTime = clipStart;
-        }
-      }, [clip.id, isRendered, clipStart]);
+        const targetTime = (!isRendered && clipStart > 0) ? clipStart : 0;
+        if (fgRef.current) fgRef.current.currentTime = targetTime;
+        if (bgRef.current) bgRef.current.currentTime = targetTime;
+        if (camRef.current) camRef.current.currentTime = targetTime;
+      }, [clip.id, isRendered, clipStart, reframingMode]);
+
+      // Unified Play / Pause for all active split layers
+      const playAllLayers = () => {
+        if (fgRef.current && fgRef.current.paused) fgRef.current.play().catch(() => {});
+        if (bgRef.current && bgRef.current.paused) bgRef.current.play().catch(() => {});
+        if (camRef.current && camRef.current.paused) camRef.current.play().catch(() => {});
+        setIsPlaying(true);
+      };
+
+      const pauseAllLayers = () => {
+        if (fgRef.current && !fgRef.current.paused) fgRef.current.pause();
+        if (bgRef.current && !bgRef.current.paused) bgRef.current.pause();
+        if (camRef.current && !camRef.current.paused) camRef.current.pause();
+        setIsPlaying(false);
+      };
 
       const togglePlay = () => {
         if (!fgRef.current) return;
         if (fgRef.current.paused) {
-          fgRef.current.play();
-          if (bgRef.current) bgRef.current.play();
-          setIsPlaying(true);
+          playAllLayers();
         } else {
-          fgRef.current.pause();
-          if (bgRef.current) bgRef.current.pause();
-          setIsPlaying(false);
+          pauseAllLayers();
         }
       };
 
@@ -646,16 +652,32 @@
           if (cur >= clipEnd || cur < clipStart - 0.5) {
             fgRef.current.currentTime = clipStart;
             if (bgRef.current) bgRef.current.currentTime = clipStart;
+            if (camRef.current) camRef.current.currentTime = clipStart;
             setCurrentTime(0);
             return;
           }
           const relTime = cur - clipStart;
           setCurrentTime(relTime);
 
-          // Sync background video if blurred backdrop mode
-          if (bgRef.current && reframingMode === 'blur_background') {
-            if (Math.abs(bgRef.current.currentTime - cur) > 0.15) {
+          // Real-time lockstep frame synchronization for ALL split & backdrop layers (< 0.08s drift)
+          if (bgRef.current) {
+            if (Math.abs(bgRef.current.currentTime - cur) > 0.08) {
               bgRef.current.currentTime = cur;
+            }
+            if (!fgRef.current.paused && bgRef.current.paused) {
+              bgRef.current.play().catch(() => {});
+            } else if (fgRef.current.paused && !bgRef.current.paused) {
+              bgRef.current.pause();
+            }
+          }
+          if (camRef.current) {
+            if (Math.abs(camRef.current.currentTime - cur) > 0.08) {
+              camRef.current.currentTime = cur;
+            }
+            if (!fgRef.current.paused && camRef.current.paused) {
+              camRef.current.play().catch(() => {});
+            } else if (fgRef.current.paused && !camRef.current.paused) {
+              camRef.current.pause();
             }
           }
 
@@ -682,8 +704,10 @@
           if (isRendered) {
             fgRef.current.currentTime = val;
           } else {
-            fgRef.current.currentTime = clipStart + val;
-            if (bgRef.current) bgRef.current.currentTime = clipStart + val;
+            const targetT = clipStart + val;
+            fgRef.current.currentTime = targetT;
+            if (bgRef.current) bgRef.current.currentTime = targetT;
+            if (camRef.current) camRef.current.currentTime = targetT;
           }
         }
       };
@@ -730,7 +754,7 @@
 
                 {/* 2. Primary Foreground Layer: Handles Full, Center Crop, or Split Layouts */}
                 {reframingMode === 'split_facecam' ? (
-                  // Gaming Facecam Stack: 58% Gameplay on top, 42% Cam on bottom
+                  // Gaming Facecam Stack: 58% Gameplay on top, 42% Cam on bottom (100% time synchronized)
                   <div class="w-full h-full flex flex-col relative z-10">
                     <div class="h-[58%] w-full overflow-hidden relative border-b-2 border-indigo-500/50">
                       <video
@@ -741,13 +765,13 @@
                           if (!isRendered && clipStart > 0) e.target.currentTime = clipStart;
                         }}
                         onTimeUpdate={handleTimeUpdate}
-                        onPlay={() => setIsPlaying(true)}
-                        onPause={() => setIsPlaying(false)}
+                        onPlay={playAllLayers}
+                        onPause={pauseAllLayers}
                         muted={isMuted}
                         playsInline
                         class="w-full h-full object-cover scale-110"
                       />
-                      <span class="absolute bottom-1 right-2 px-1.5 py-0.5 rounded text-[8px] font-bold bg-black/70 text-indigo-300 uppercase">Gameplay</span>
+                      <span class="absolute bottom-1 right-2 px-1.5 py-0.5 rounded text-[8px] font-bold bg-black/70 text-indigo-300 uppercase pointer-events-none">Gameplay</span>
                     </div>
                     <div class="h-[42%] w-full overflow-hidden relative bg-slate-950 flex items-center justify-center">
                       <video
@@ -756,20 +780,27 @@
                         preload="auto"
                         muted
                         playsInline
-                        class="absolute inset-0 w-full h-full object-cover filter blur-xl opacity-60 scale-125"
+                        onLoadedMetadata={(e) => {
+                          if (!isRendered && clipStart > 0) e.target.currentTime = clipStart;
+                        }}
+                        class="absolute inset-0 w-full h-full object-cover filter blur-xl opacity-60 scale-125 pointer-events-none"
                       />
                       <video
+                        ref={camRef}
                         src={`/${project.video_path}`}
                         preload="auto"
                         muted
                         playsInline
+                        onLoadedMetadata={(e) => {
+                          if (!isRendered && clipStart > 0) e.target.currentTime = clipStart;
+                        }}
                         class="relative z-10 w-[78%] h-[82%] object-cover rounded-xl border border-indigo-400/40 shadow-2xl"
                       />
-                      <span class="absolute bottom-1 right-2 px-1.5 py-0.5 rounded text-[8px] font-bold bg-black/70 text-cyan-300 uppercase">Cam</span>
+                      <span class="absolute bottom-1 right-2 px-1.5 py-0.5 rounded text-[8px] font-bold bg-black/70 text-cyan-300 uppercase pointer-events-none z-20">Cam</span>
                     </div>
                   </div>
                 ) : reframingMode === 'split_screen' ? (
-                  // Two-Person Podcast Stack: 50% Top Speaker, 50% Bottom Speaker
+                  // Two-Person Podcast Stack: 50% Top Speaker, 50% Bottom Speaker (100% time synchronized)
                   <div class="w-full h-full flex flex-col relative z-10">
                     <div class="h-1/2 w-full overflow-hidden relative border-b border-indigo-500/40">
                       <video
@@ -780,22 +811,27 @@
                           if (!isRendered && clipStart > 0) e.target.currentTime = clipStart;
                         }}
                         onTimeUpdate={handleTimeUpdate}
-                        onPlay={() => setIsPlaying(true)}
-                        onPause={() => setIsPlaying(false)}
+                        onPlay={playAllLayers}
+                        onPause={pauseAllLayers}
                         muted={isMuted}
                         playsInline
                         class="w-full h-full object-cover origin-left scale-125"
                       />
+                      <span class="absolute top-1 right-2 px-1.5 py-0.5 rounded text-[8px] font-bold bg-black/70 text-purple-300 uppercase pointer-events-none">Top Speaker</span>
                     </div>
                     <div class="h-1/2 w-full overflow-hidden relative">
                       <video
                         ref={bgRef}
                         src={`/${project.video_path}`}
                         preload="auto"
+                        onLoadedMetadata={(e) => {
+                          if (!isRendered && clipStart > 0) e.target.currentTime = clipStart;
+                        }}
                         muted
                         playsInline
                         class="w-full h-full object-cover origin-right scale-125"
                       />
+                      <span class="absolute bottom-1 right-2 px-1.5 py-0.5 rounded text-[8px] font-bold bg-black/70 text-pink-300 uppercase pointer-events-none">Bottom Speaker</span>
                     </div>
                   </div>
                 ) : (
@@ -807,14 +843,8 @@
                       if (!isRendered && clipStart > 0) e.target.currentTime = clipStart;
                     }}
                     onTimeUpdate={handleTimeUpdate}
-                    onPlay={() => {
-                      setIsPlaying(true);
-                      if (bgRef.current && bgRef.current.paused) bgRef.current.play();
-                    }}
-                    onPause={() => {
-                      setIsPlaying(false);
-                      if (bgRef.current && !bgRef.current.paused) bgRef.current.pause();
-                    }}
+                    onPlay={playAllLayers}
+                    onPause={pauseAllLayers}
                     muted={isMuted}
                     playsInline
                     style={(!isRendered && (clip.custom_style || {}).cameraPreset !== 'static_professional_frame' && isPlaying)
