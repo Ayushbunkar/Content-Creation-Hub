@@ -225,22 +225,12 @@ export class InstagramPublisher {
       }
     }
 
-    // Local Verified Simulation Mode (when Meta developer credentials haven't been provided by user yet)
-    const mockShortcode = 'C' + Math.random().toString(36).substring(2, 11).toUpperCase();
-    if (options.onProgress) {
-      options.onProgress(30);
-      await new Promise(r => setTimeout(r, 200));
-      options.onProgress(75);
-      await new Promise(r => setTimeout(r, 200));
-      options.onProgress(100);
-    }
-
+    // When Meta developer credentials haven't been connected yet
     return {
       platform: 'instagram',
-      success: true,
-      status: 'published',
-      publishedUrl: `https://www.instagram.com/reel/${mockShortcode}/`,
-      mediaId: mockShortcode,
+      success: false,
+      status: 'failed',
+      error: 'Instagram Professional account is not connected via Meta OAuth. Meta Content Publishing API requires an authorized Instagram Creator/Business account linked to a Facebook Page. Use the 1-Click Instagram Post Helper to upload directly via Instagram Web with copied captions and downloaded MP4.',
       publishedAt: new Date().toISOString(),
       executionDurationMs: Date.now() - startTime
     };

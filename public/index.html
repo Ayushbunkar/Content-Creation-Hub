@@ -12153,7 +12153,52 @@
                                   </span>
                                 </div>
 
-                                {hasQuotaError && (
+                                {socialPublishModal.publishResults.some(r => r.platform === 'instagram' && !r.success) && (
+                              <div class="p-3 bg-purple-950/40 border border-purple-700/60 rounded-xl text-xs space-y-2.5">
+                                <div class="font-bold text-purple-300 flex items-center justify-between">
+                                  <span class="flex items-center space-x-1.5">
+                                    <span>📷</span>
+                                    <span>Instagram 1-Click Post Helper</span>
+                                  </span>
+                                  <span class="text-[10px] bg-purple-900/60 text-purple-200 px-2 py-0.5 rounded-full font-mono">Meta API Setup Optional</span>
+                                </div>
+                                <p class="text-slate-300 text-[11px] leading-relaxed">
+                                  Meta Graph API requires an authorized Instagram Professional/Creator account connected to a Facebook Page.
+                                  <strong class="text-white block mt-0.5">You can post your Reel directly to Instagram in seconds:</strong>
+                                </p>
+                                <div class="flex flex-wrap items-center gap-2 pt-1">
+                                  <a
+                                    href="https://www.instagram.com/create/select/"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="px-3 py-1.5 bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold text-xs rounded-lg transition inline-flex items-center space-x-1.5 shadow-md shadow-pink-600/30"
+                                  >
+                                    <span>📷 Open Instagram Post / Reel ↗</span>
+                                  </a>
+                                  <button
+                                    onClick={() => {
+                                      const capText = `${socialPublishModal.instagramCaption || socialPublishModal.caption || ''}\n\n${(socialPublishModal.instagramHashtags || socialPublishModal.hashtags || []).join(' ')}`.trim();
+                                      navigator.clipboard.writeText(capText);
+                                      alert('Copied Instagram Caption & Hashtags to clipboard!');
+                                    }}
+                                    class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-lg transition inline-flex items-center space-x-1 border border-slate-700 cursor-pointer"
+                                  >
+                                    <span>📋 Copy Caption & Hashtags</span>
+                                  </button>
+                                  {socialPublishModal.clipUrl && (
+                                    <a
+                                      href={socialPublishModal.clipUrl}
+                                      download
+                                      class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition inline-flex items-center space-x-1"
+                                    >
+                                      <span>⬇️ Download Reel (MP4)</span>
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {hasQuotaError && (
                                   <div class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs space-y-2">
                                     <div class="font-bold text-amber-300 flex items-center space-x-1.5">
                                       <span>⚠️</span>
