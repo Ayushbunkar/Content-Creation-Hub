@@ -12328,6 +12328,18 @@
                                   </div>
                                 )}
 
+                                {socialPublishModal.publishResults.some(r => r.platform === 'youtube' && (r.publishedUrl || r.status === 'published')) && (
+                                  <div class="p-2.5 bg-indigo-950/40 border border-indigo-800/60 rounded-lg text-xs space-y-1">
+                                    <div class="font-bold text-indigo-300 flex items-center space-x-1.5">
+                                      <span>⏱️</span>
+                                      <span>YouTube HD Processing Status</span>
+                                    </div>
+                                    <p class="text-slate-300 text-[11px] leading-relaxed">
+                                      YouTube requires <strong>1 to 2 minutes</strong> to transcode HD resolutions and complete automated copyright checks. If clicking the link immediately shows <strong class="text-amber-300">"This video is unavailable"</strong>, wait ~60 seconds and refresh — your video will play normally!
+                                    </p>
+                                  </div>
+                                )}
+
                                 <div class="space-y-1.5 text-xs">
                                   {socialPublishModal.publishResults.map((res, rIdx) => {
                                     const isErr = !res.success && res.status !== 'published';
@@ -13936,6 +13948,18 @@
                                     </a>
                                   )}
                                 </div>
+                              </div>
+                            )}
+
+                            {socialPublishModal.publishResults.some(r => r.platform === 'youtube' && (r.publishedUrl || r.status === 'published')) && (
+                              <div class="p-2.5 bg-indigo-950/40 border border-indigo-800/60 rounded-lg text-xs space-y-1">
+                                <div class="font-bold text-indigo-300 flex items-center space-x-1.5">
+                                  <span>⏱️</span>
+                                  <span>YouTube HD Processing Status</span>
+                                </div>
+                                <p class="text-slate-300 text-[11px] leading-relaxed">
+                                  YouTube requires <strong>1 to 2 minutes</strong> to transcode HD resolutions and complete automated copyright checks. If clicking the link immediately shows <strong class="text-amber-300">"This video is unavailable"</strong>, wait ~60 seconds and refresh — your video will play normally!
+                                </p>
                               </div>
                             )}
 
