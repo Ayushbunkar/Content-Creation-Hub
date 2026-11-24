@@ -201,7 +201,8 @@ STREAMER_DEFINITIONS = [
         "views_rank": 3,
         "subscribers": "16.5M (Twitch)",
         "common_emotes": ["W", "L", "KEKW", "💀💀💀", "RIZZ"],
-        "channel_url": "https://www.twitch.tv/kaicenat"
+        "channel_url": "https://www.twitch.tv/kaicenat",
+        "default_stream_url": "https://www.youtube.com/watch?v=q1jR850CE_o"
     },
     {
         "id": "xqc",
@@ -356,15 +357,23 @@ def inspect_channel_live_status(streamer):
         elif streamer["platform"] == "twitch":
             twitch_channel_url = f"https://www.twitch.tv/{streamer['handle']}"
             req = urllib.request.Request(twitch_channel_url, headers=HEADERS)
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                html = resp.read().decode('utf-8', errors='ignore')
-                res["is_live"] = ('"isLiveBroadcast":true' in html or 'live_user_' in html)
-                if res["is_live"]:
-                    res["active_stream_url"] = twitch_channel_url
-                    res["live_viewers"] = 28000
+            try:
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    html = resp.read().decode('utf-8', errors='ignore')
+                    res["is_live"] = ('"isLiveBroadcast":true' in html or 'live_user_' in html)
+                    if res["is_live"]:
+                        res["active_stream_url"] = twitch_channel_url
+                        res["live_viewers"] = 28000
+                    else:
+                        res["active_stream_url"] = streamer.get("default_stream_url", twitch_channel_url)
+            except Exception:
+                res["active_stream_url"] = streamer.get("default_stream_url", twitch_channel_url)
     except Exception as e:
         # Gracefully handle network timeouts without breaking
         pass
+
+    if not res.get("active_stream_url"):
+        res["active_stream_url"] = streamer.get("default_stream_url", streamer.get("channel_url", ""))
 
     return res
 

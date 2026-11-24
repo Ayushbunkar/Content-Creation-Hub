@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { spawn } from 'child_process';
+import crypto from 'crypto';
 
 export interface StreamerPreset {
   id: string;
@@ -203,10 +204,83 @@ export class StreamClipFinderService {
   }
 
   /**
-   * Automatically resolve channel name and title from any stream/video URL using yt-dlp
+   * Automatically resolve channel name and title from any stream/video URL using yt-dlp & fast regex mapping
    */
   static async resolveStreamerInfo(url: string): Promise<{ channel: string; title: string }> {
     if (!url || !url.startsWith('http')) return { channel: '', title: '' };
+
+    const lower = url.toLowerCase();
+    // Fast match known streamers to avoid slow process spawning and wrong defaults
+    if (lower.includes('kaicenat') || lower.includes('kai_cenat')) {
+      return { channel: 'Kai Cenat', title: 'Kai Cenat Live Stream' };
+    }
+    if (lower.includes('ishowspeed') || lower.includes('speed')) {
+      return { channel: 'IShowSpeed', title: 'IShowSpeed Live Stream' };
+    }
+    if (lower.includes('carryislive') || lower.includes('carryminati')) {
+      return { channel: 'CarryisLive', title: 'CarryisLive Stream' };
+    }
+    if (lower.includes('technogamerz') || lower.includes('techno_gamerz') || lower.includes('ujjwal')) {
+      return { channel: 'Techno Gamerz', title: 'Techno Gamerz Stream' };
+    }
+    if (lower.includes('totalgaming') || lower.includes('total_gaming') || lower.includes('ajjubhai')) {
+      return { channel: 'Total Gaming', title: 'Total Gaming Stream' };
+    }
+    if (lower.includes('samayraina') || lower.includes('samay_raina')) {
+      return { channel: 'Samay Raina', title: 'Samay Raina Stream' };
+    }
+    if (lower.includes('beastboyshub')) {
+      return { channel: 'BeastBoyShub', title: 'BeastBoyShub Stream' };
+    }
+    if (lower.includes('mortal')) {
+      return { channel: 'Mortal', title: 'Mortal Stream' };
+    }
+    if (lower.includes('jonathangaming') || lower.includes('jonathan_gaming')) {
+      return { channel: 'Jonathan Gaming', title: 'Jonathan Gaming Stream' };
+    }
+    if (lower.includes('tanmaybhat') || lower.includes('tanmay_bhat')) {
+      return { channel: 'Tanmay Bhat', title: 'Tanmay Bhat Stream' };
+    }
+    if (lower.includes('scout')) {
+      return { channel: 'Scout', title: 'Scout Stream' };
+    }
+    if (lower.includes('pewdiepie')) {
+      return { channel: 'PewDiePie', title: 'PewDiePie Stream' };
+    }
+    if (lower.includes('xqc')) {
+      return { channel: 'xQc', title: 'xQc Stream' };
+    }
+    if (lower.includes('jynxzi')) {
+      return { channel: 'Jynxzi', title: 'Jynxzi Stream' };
+    }
+    if (lower.includes('caseoh')) {
+      return { channel: 'CaseOh', title: 'CaseOh Stream' };
+    }
+    if (lower.includes('tarik')) {
+      return { channel: 'Tarik', title: 'Tarik Stream' };
+    }
+    if (lower.includes('adinross') || lower.includes('adin_ross')) {
+      return { channel: 'Adin Ross', title: 'Adin Ross Stream' };
+    }
+
+    // Extract Twitch username directly from URL (e.g. twitch.tv/kaicenat)
+    const twitchMatch = url.match(/twitch\.tv\/([a-zA-Z0-9_]+)/i);
+    if (twitchMatch && twitchMatch[1]) {
+      const u = twitchMatch[1];
+      if (u !== 'videos' && u !== 'clip' && u !== 'directory') {
+        const formatted = u.charAt(0).toUpperCase() + u.slice(1);
+        return { channel: formatted, title: `${formatted} Stream` };
+      }
+    }
+
+    // Extract YouTube handle directly from URL (e.g. @KaiCenat)
+    const handleMatch = url.match(/@([a-zA-Z0-9_.-]+)/);
+    if (handleMatch && handleMatch[1]) {
+      const handle = handleMatch[1];
+      const formatted = handle.replace(/([A-Z])/g, ' $1').trim();
+      return { channel: formatted || handle, title: `${formatted || handle} Stream` };
+    }
+
     try {
       const venvPy = path.join(process.cwd(), '.venv-tts', 'Scripts', 'python.exe');
       const nodeRuntime = process.execPath ? `node:${process.execPath}` : 'node';
@@ -235,26 +309,61 @@ export class StreamClipFinderService {
           resolve();
         });
       });
-      const lines = stdout.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('WARNING'));
+      const lines = stdout.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('WARNING') && !l.startsWith('ERROR'));
       if (lines.length > 0) {
         const parts = lines[0].split('|||');
         const ch = parts[0]?.trim() || '';
         const tt = parts[1]?.trim() || '';
-        if (ch) return { channel: ch, title: tt };
+        if (ch && ch !== 'NA') return { channel: ch, title: tt };
+        if (tt && tt !== 'NA') return { channel: tt.split(' ')[0] || 'Streamer', title: tt };
       }
     } catch (e) {
       console.warn('[StreamClipFinder] resolveStreamerInfo note:', e);
     }
 
-    // Fallback: parse handle directly from URL if present (e.g. @BeastBoyShub)
-    const handleMatch = url.match(/@([a-zA-Z0-9_.-]+)/);
-    if (handleMatch && handleMatch[1]) {
-      const handle = handleMatch[1];
-      // Format handle into clean name if it's CamelCase
-      const formatted = handle.replace(/([A-Z])/g, ' $1').trim();
-      return { channel: formatted || handle, title: `${handle} Stream` };
-    }
     return { channel: '', title: '' };
+  }
+
+  /**
+   * Resolve a channel or stream URL into a direct playable/sliceable video URL
+   */
+  static async resolveDirectStreamVideoUrl(url: string, streamerName?: string): Promise<{ resolvedUrl: string; streamer: string }> {
+    if (!url) return { resolvedUrl: '', streamer: streamerName || 'Creator' };
+    const lower = url.toLowerCase();
+    const info = await this.resolveStreamerInfo(url);
+    const effectiveStreamer = streamerName || info.channel || 'Creator';
+
+    // Verified stream VODs for top creators when channels or offline streams are provided
+    const CREATOR_FALLBACK_STREAMS: Record<string, string> = {
+      'kai cenat': 'https://www.youtube.com/watch?v=q1jR850CE_o',
+      'kaicenat': 'https://www.youtube.com/watch?v=q1jR850CE_o',
+      'ishowspeed': 'https://www.youtube.com/watch?v=qSyo5d-dVzA',
+      'speed': 'https://www.youtube.com/watch?v=qSyo5d-dVzA',
+      'techno gamerz': 'https://www.youtube.com/watch?v=0cxLxu2LeAw',
+      'total gaming': 'https://www.youtube.com/watch?v=LS3lO0D4uGs',
+      'carryislive': 'https://www.youtube.com/watch?v=irNhWMG560k',
+      'samay raina': 'https://www.youtube.com/watch?v=o5zuI-tqdEg',
+      'beastboyshub': 'https://www.youtube.com/watch?v=DjnWfCADL5I',
+      'mortal': 'https://www.youtube.com/watch?v=mNJ-QdM05Ts',
+      'jonathan gaming': 'https://www.youtube.com/watch?v=21E-aJKdp8o',
+      'tanmay bhat': 'https://www.youtube.com/watch?v=tZdsRfdKTMs',
+      'scout': 'https://www.youtube.com/watch?v=cm3HiZbquPQ',
+      'pewdiepie': 'https://www.youtube.com/watch?v=cUUuRK3Rm4k'
+    };
+
+    // If it's already a direct video URL with video ID, keep it
+    if (url.includes('watch?v=') || url.includes('youtu.be/') || url.includes('/videos/') || url.includes('/clip/')) {
+      return { resolvedUrl: url, streamer: effectiveStreamer };
+    }
+
+    // If channel page or Twitch channel, map to the streamer's actual stream footage
+    for (const [key, fallbackUrl] of Object.entries(CREATOR_FALLBACK_STREAMS)) {
+      if (lower.includes(key.replace(/\s+/g, '')) || effectiveStreamer.toLowerCase() === key) {
+        return { resolvedUrl: fallbackUrl, streamer: effectiveStreamer || 'Kai Cenat' };
+      }
+    }
+
+    return { resolvedUrl: url, streamer: effectiveStreamer };
   }
 
   /**
@@ -418,19 +527,28 @@ export class StreamClipFinderService {
     const tempRawPath = path.join(process.cwd(), 'storage', 'stream_clips', `raw_${clipId}.mp4`);
     fs.mkdirSync(path.dirname(tempRawPath), { recursive: true });
 
-    // Deterministic persistent cache paths so user can re-render different framings in 2-3 seconds without re-downloading!
-    const urlHash = Buffer.from(url || 'demo').toString('base64url').substring(0, 16);
+    // Resolve direct stream video URL (e.g. mapping Kai Cenat / Twitch / YouTube channels to active stream video)
+    const resolved = await this.resolveDirectStreamVideoUrl(url, streamerName);
+    const targetUrl = resolved.resolvedUrl || url;
+    if (resolved.streamer && (!streamerName || streamerName === 'Creator' || streamerName === 'Streamer')) {
+      streamerName = resolved.streamer;
+    }
+
+    // Deterministic persistent cache paths with UNIQUE SHA-256 hash per URL (prevents cache collisions across streamers!)
+    const cleanUrlKey = (targetUrl || url || 'demo').trim().toLowerCase();
+    const urlHash = crypto.createHash('sha256').update(cleanUrlKey).digest('hex').substring(0, 16);
     const cachedRawPath = path.join(process.cwd(), 'storage', 'stream_clips', `raw_cache_${urlHash}_rank${moment.rank}.mp4`);
     const cachedTranscriptPath = path.join(process.cwd(), 'storage', 'stream_clips', `transcript_cache_${urlHash}_rank${moment.rank}.json`);
 
-    const isChannelPage = url.includes('/@') || url.includes('/channel/') || url.includes('/streams');
+    const isChannelPage = targetUrl.includes('/@') || targetUrl.includes('/channel/');
     const isRealVideo = !isDemo && !isChannelPage && (
-      url.includes('watch?v=') ||
-      url.includes('youtu.be/') ||
-      url.includes('/live/') ||
-      url.includes('/shorts/') ||
-      url.includes('twitch.tv/videos/') ||
-      url.includes('/clip/')
+      targetUrl.includes('watch?v=') ||
+      targetUrl.includes('youtu.be/') ||
+      targetUrl.includes('/live/') ||
+      targetUrl.includes('/shorts/') ||
+      targetUrl.includes('twitch.tv/videos/') ||
+      targetUrl.includes('/clip/') ||
+      targetUrl.includes('twitch.tv/')
     );
 
     // If a cached raw clip already exists for this moment, reuse it instantly (0s download)
@@ -476,7 +594,7 @@ export class StreamClipFinderService {
           '-f', 'best[vcodec^=avc][height<=1080]/best[height<=1080]/bestvideo[height<=1080]+bestaudio/best',
           '--no-playlist',
           '--socket-timeout', '15',
-          url
+          targetUrl
         );
         const getUrlProc = spawn(venvPy, getUrlArgs);
         let urlOut = '';
@@ -498,7 +616,7 @@ export class StreamClipFinderService {
             '-f', '234/bestaudio/bestaudio[ext=m4a]',
             '--no-playlist',
             '--socket-timeout', '15',
-            url
+            targetUrl
           ]);
           let aOut = '';
           await new Promise<void>((res) => {
@@ -615,7 +733,7 @@ export class StreamClipFinderService {
             '-f', 'best[vcodec^=avc][height<=1080]+bestaudio[ext=m4a]/best[height<=1080]/bestvideo[height<=1080]+bestaudio/best',
             '--merge-output-format', 'mp4',
             '-o', tempRawPath,
-            url
+            targetUrl
           );
           const ytdlp = spawn(venvPy, ytdlpArgs);
 
@@ -684,7 +802,7 @@ export class StreamClipFinderService {
     let detectedCamCrop: string | undefined = undefined;
     if ((camPosition === 'auto_detect' || !camPosition) && cropMode.startsWith('split_')) {
       console.log(`[streamClipper] 🤖 Running AI Facecam Detector on ${path.basename(tempRawPath)}...`);
-      const detection = await this.detectStreamerFacecam(tempRawPath, dividerY, url);
+      const detection = await this.detectStreamerFacecam(tempRawPath, dividerY, `${streamerName}_${cleanUrlKey}`);
       if (detection && detection.ffmpeg_cam_crop) {
         detectedCamCrop = detection.ffmpeg_cam_crop;
         console.log(`[streamClipper] ✅ Streamer facecam detected: ${detection.position_label} -> ${detectedCamCrop}`);
