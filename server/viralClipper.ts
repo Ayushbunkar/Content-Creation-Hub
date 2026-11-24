@@ -71,6 +71,84 @@ export interface ClipperClip {
   updated_at: string;
 }
 
+/**
+ * Clean caption/transcript text from HTML entities, bracketed audio/music markers, and speaker cues
+ */
+export function cleanCaptionText(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/&gt;/gi, '>')
+    .replace(/&lt;/gi, '<')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&apos;/gi, "'")
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/^(\s*>+\s*)+/g, '') // remove leading >> or >
+    .replace(/(\s*>+\s*)+/g, ' ') // remove inline >>
+    .replace(/\[(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^\]]*\]/gi, '')
+    .replace(/\((?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^)]*\)/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Ensure video file is encoded with universal H.264 (avc1) for 100% browser compatibility
+ */
+export async function ensureVideoH264(filePath: string): Promise<string> {
+  return new Promise((resolve) => {
+    if (!fs.existsSync(filePath)) return resolve(filePath);
+    const probe = spawn('ffprobe', [
+      '-v', 'error',
+      '-select_streams', 'v:0',
+      '-show_entries', 'stream=codec_name',
+      '-of', 'default=noprint_wrappers=1:nokey=1',
+      filePath
+    ]);
+    let codec = '';
+    probe.stdout.on('data', d => { codec += d.toString().trim(); });
+    probe.on('close', () => {
+      if (codec && codec.toLowerCase() === 'h264') {
+        return resolve(filePath);
+      }
+      console.log(`[ViralClipper] Video ${path.basename(filePath)} is encoded as '${codec || 'unknown'}'. Transcoding to standard H.264 for browser compatibility...`);
+      const ext = path.extname(filePath);
+      const tempOutput = filePath.replace(new RegExp(`\\${ext}$`), `_h264${ext}`);
+      // Try NVENC first for lightning-fast hardware transcode, fallback to libx264 ultrafast
+      const nvencArgs = ['-y', '-i', filePath, '-c:v', 'h264_nvenc', '-preset', 'p4', '-cq', '23', '-c:a', 'copy', tempOutput];
+      const trans = spawn('ffmpeg', nvencArgs);
+      trans.on('close', (code) => {
+        if (code === 0 && fs.existsSync(tempOutput)) {
+          try {
+            fs.renameSync(tempOutput, filePath);
+            console.log('[ViralClipper] Successfully converted video to H.264 via NVENC');
+            return resolve(filePath);
+          } catch (e) {
+            return resolve(tempOutput);
+          }
+        }
+        console.log('[ViralClipper] NVENC unavailable or failed, transcoding with libx264 ultrafast...');
+        const cpuArgs = ['-y', '-i', filePath, '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '22', '-c:a', 'copy', tempOutput];
+        const transCpu = spawn('ffmpeg', cpuArgs);
+        transCpu.on('close', (c2) => {
+          if (c2 === 0 && fs.existsSync(tempOutput)) {
+            try {
+              fs.renameSync(tempOutput, filePath);
+              console.log('[ViralClipper] Successfully converted video to H.264 via libx264');
+              return resolve(filePath);
+            } catch (e) {
+              return resolve(tempOutput);
+            }
+          }
+          resolve(filePath);
+        });
+      });
+      trans.on('error', () => resolve(filePath));
+    });
+    probe.on('error', () => resolve(filePath));
+  });
+}
+
 export class ViralClipperService {
   private static listeners: Array<(update: any) => void> = [];
 
@@ -224,13 +302,13 @@ export class ViralClipperService {
   static async downloadSourceVideo(url: string, outputTemplate: string, onProgress?: (pct: number) => void, projectId?: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const nodeRuntime = process.execPath ? `node:${process.execPath}` : 'node';
-      // Prefer standard 1080p/720p mp4 for smooth Remotion/FFmpeg processing
+      // Prefer standard H.264 (avc) 1080p/720p mp4 for smooth browser & Remotion decoding
       const args = [
         '-m', 'yt_dlp',
         '--js-runtimes', nodeRuntime,
         '--remote-components', 'ejs:github',
         '--no-playlist',
-        '-f', 'bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/230+234/231+234/311+234/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+        '-f', 'bestvideo[vcodec^=avc][height<=1080]+bestaudio[ext=m4a]/bestvideo[ext=mp4][vcodec^=avc]+bestaudio/best[vcodec^=avc]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
         '--merge-output-format', 'mp4',
         '-o', outputTemplate,
         url
@@ -253,27 +331,35 @@ export class ViralClipperService {
       });
       p.stderr.on('data', (d) => { stderr += d.toString(); });
 
-      p.on('close', (code) => {
+      p.on('close', async (code) => {
         // Find actual written file
         const dir = path.dirname(outputTemplate);
         const base = path.basename(outputTemplate).replace(/\.%\(ext\)s$/, '');
         const files = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
         const found = files.find(f => f.startsWith(base) && /\.(mp4|mkv|webm)$/i.test(f));
 
+        let finalPath = '';
         if (found) {
-          return resolve(path.join(dir, found));
+          finalPath = path.join(dir, found);
+        } else if (code === 0) {
+          finalPath = outputTemplate.replace('.%(ext)s', '.mp4');
         }
 
-        if (code === 0) {
-          resolve(outputTemplate.replace('.%(ext)s', '.mp4'));
-        } else {
-          const cleanErr = (stderr || stdout || '')
-            .split('\n')
-            .filter(l => !l.trim().startsWith('WARNING:') && !l.trim().startsWith('[youtube]') && l.trim().length > 0)
-            .join('\n')
-            .trim();
-          reject(new Error(`Download failed: ${cleanErr || 'Video download exited unexpectedly. Please retry or upload a clip directly.'}`));
+        if (finalPath && fs.existsSync(finalPath)) {
+          try {
+            const h264Path = await ensureVideoH264(finalPath);
+            return resolve(h264Path);
+          } catch {
+            return resolve(finalPath);
+          }
         }
+
+        const cleanErr = (stderr || stdout || '')
+          .split('\n')
+          .filter(l => !l.trim().startsWith('WARNING:') && !l.trim().startsWith('[youtube]') && l.trim().length > 0)
+          .join('\n')
+          .trim();
+        reject(new Error(`Download failed: ${cleanErr || 'Video download exited unexpectedly. Please retry or upload a clip directly.'}`));
       });
       p.on('error', reject);
     });
@@ -532,11 +618,14 @@ export class ViralClipperService {
         while (i < lines.length && lines[i].trim() && !timePattern.test(lines[i])) {
           let clean = lines[i].trim().replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ');
           if (clean && !clean.startsWith('align:') && !clean.startsWith('position:') && !clean.startsWith('line:')) {
-            textLines.push(clean);
+            clean = cleanCaptionText(clean);
+            if (clean) {
+              textLines.push(clean);
+            }
           }
           i++;
         }
-        let cleanText = textLines.join(' ').trim();
+        let cleanText = cleanCaptionText(textLines.join(' '));
         cleanText = cleanText.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
 
         const isTitleCard = line.includes('line:0%') || line.includes('line:10%');
@@ -1163,8 +1252,8 @@ except Exception as e:
       let currentDuration = 0;
       let textAcc = '';
       let windowSegments: TranscriptSegment[] = [];
-      const firstSentence = segments[i]?.text.trim() || '';
-      const firstWords = firstSentence.split(/\s+/).slice(0, 8).join(' ');
+      const firstSentence = cleanCaptionText(segments[i]?.text || '');
+      const firstWords = cleanCaptionText(firstSentence.split(/\s+/).slice(0, 8).join(' '));
 
       for (let j = i; j < segments.length; j++) {
         const seg = segments[j];

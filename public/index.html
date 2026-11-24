@@ -501,6 +501,23 @@
     // SYNCHRONIZED CLIPPER LIVE STUDIO PLAYER
     // Live dual-layer blurred backdrop simulation + burned animated caption overlay
     // ==========================================
+    function sanitizeClipperText(text) {
+      if (!text) return '';
+      return String(text)
+        .replace(/&gt;/gi, '')
+        .replace(/&lt;/gi, '')
+        .replace(/&amp;/gi, '&')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'")
+        .replace(/&apos;/gi, "'")
+        .replace(/^(\s*>+\s*)+/g, '')
+        .replace(/(\s*>+\s*)+/g, ' ')
+        .replace(/\[(?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^\]]*\]/gi, '')
+        .replace(/\((?:music|applause|laughter|cheering|sound|silence|audio|screaming)[^)]*\)/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
     function ClipperLivePlayer({ clip, project, onUpdate, onOpenConcat }) {
       const fgRef = React.useRef(null);
       const bgRef = React.useRef(null);
@@ -587,7 +604,7 @@
           if (Array.isArray(segs) && segs.length > 0) {
             const seg = segs.find(s => cur >= s.start && cur <= s.end);
             if (seg) {
-              setActiveSubtitle(seg.text);
+              setActiveSubtitle(sanitizeClipperText(seg.text));
             } else {
               setActiveSubtitle('');
             }
@@ -638,8 +655,12 @@
                   <video
                     ref={bgRef}
                     src={`/${project.video_path}`}
+                    preload="auto"
                     muted
                     playsInline
+                    onLoadedMetadata={(e) => {
+                      if (!isRendered && clipStart > 0) e.target.currentTime = clipStart;
+                    }}
                     class="absolute inset-0 w-full h-full object-cover filter blur-2xl scale-125 opacity-75 brightness-75 pointer-events-none"
                   />
                 )}
@@ -652,6 +673,10 @@
                       <video
                         ref={fgRef}
                         src={`/${project.video_path}`}
+                        preload="auto"
+                        onLoadedMetadata={(e) => {
+                          if (!isRendered && clipStart > 0) e.target.currentTime = clipStart;
+                        }}
                         onTimeUpdate={handleTimeUpdate}
                         onPlay={() => setIsPlaying(true)}
                         onPause={() => setIsPlaying(false)}
@@ -665,12 +690,14 @@
                       <video
                         ref={bgRef}
                         src={`/${project.video_path}`}
+                        preload="auto"
                         muted
                         playsInline
                         class="absolute inset-0 w-full h-full object-cover filter blur-xl opacity-60 scale-125"
                       />
                       <video
                         src={`/${project.video_path}`}
+                        preload="auto"
                         muted
                         playsInline
                         class="relative z-10 w-[78%] h-[82%] object-cover rounded-xl border border-indigo-400/40 shadow-2xl"
@@ -685,6 +712,10 @@
                       <video
                         ref={fgRef}
                         src={`/${project.video_path}`}
+                        preload="auto"
+                        onLoadedMetadata={(e) => {
+                          if (!isRendered && clipStart > 0) e.target.currentTime = clipStart;
+                        }}
                         onTimeUpdate={handleTimeUpdate}
                         onPlay={() => setIsPlaying(true)}
                         onPause={() => setIsPlaying(false)}
@@ -697,6 +728,7 @@
                       <video
                         ref={bgRef}
                         src={`/${project.video_path}`}
+                        preload="auto"
                         muted
                         playsInline
                         class="w-full h-full object-cover origin-right scale-125"
@@ -707,6 +739,10 @@
                   <video
                     ref={fgRef}
                     src={`/${project.video_path}`}
+                    preload="auto"
+                    onLoadedMetadata={(e) => {
+                      if (!isRendered && clipStart > 0) e.target.currentTime = clipStart;
+                    }}
                     onTimeUpdate={handleTimeUpdate}
                     onPlay={() => {
                       setIsPlaying(true);
@@ -735,7 +771,7 @@
                   <div class="absolute top-10 left-1/2 -translate-x-1/2 w-[88%] z-30 flex justify-center text-center pointer-events-none transition-all">
                     <div class="px-3 py-1 rounded-xl bg-black/90 border border-yellow-400/90 shadow-2xl backdrop-blur-md max-w-full animate-pulse">
                       <span class="text-[11px] font-black uppercase tracking-wider text-yellow-300 flex items-center justify-center gap-1.5 break-words">
-                        🔥 {clip.hook}
+                        🔥 {sanitizeClipperText(clip.hook)}
                       </span>
                     </div>
                   </div>
@@ -7450,8 +7486,8 @@
 
                                 {/* Title & Hook */}
                                 <div>
-                                  <h4 class="font-bold text-sm text-slate-100 line-clamp-1">{clip.title}</h4>
-                                  <p class="text-xs text-amber-300/90 italic mt-1 line-clamp-2">"{clip.hook}"</p>
+                                  <h4 class="font-bold text-sm text-slate-100 line-clamp-1">{sanitizeClipperText(clip.title)}</h4>
+                                  <p class="text-xs text-amber-300/90 italic mt-1 line-clamp-2">"{sanitizeClipperText(clip.hook)}"</p>
                                 </div>
 
                                 {/* Timestamps & Duration */}
@@ -8043,8 +8079,8 @@
                                     const tmpl = CAPTION_TEMPLATES.find(t => t.id === currentTmplId) || CAPTION_TEMPLATES[0];
                                     const cs = selectedClip.custom_style || {};
                                     const cameraP = CAMERA_PRESETS.find(p => p.id === (cs.cameraPreset || 'automatic_smart_zoom')) || CAMERA_PRESETS[0];
-                                    const previewText = selectedClip.hook ? selectedClip.hook.substring(0, 42) : 'मैंने दुनिया के सबसे बड़े एथलीट्स...';
-                                    const words = previewText.split(' ');
+                                    const previewText = sanitizeClipperText(selectedClip.hook ? selectedClip.hook.substring(0, 42) : 'मैंने दुनिया के सबसे बड़े एथलीट्स...');
+                                    const words = previewText.split(' ').filter(Boolean);
                                     return (
                                       <div class="rounded-xl overflow-hidden border border-slate-700 mt-2">
                                         <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider px-2.5 py-1 bg-slate-900 flex items-center justify-between">
