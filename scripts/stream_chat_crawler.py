@@ -703,34 +703,68 @@ def analyze_chat_spikes(messages, bucket_sec=10, rolling_window_sec=300, min_mul
     selected.sort(key=lambda c: (c["multiplier"] * 1.5 + c["msg_count"]), reverse=True)
 
     VIRAL_HOOK_TEMPLATES = [
-        ("BRO FORGOT HE WAS LIVE 💀", "Unhinged Streamer Moment"),
-        ("HE REALLY THOUGHT HE WAS SAFE 😭", "Instant Plot Twist"),
-        ("BRO ALMOST CRASHED OUT LIVE 💀🔥", "Maximum Rage & Shock"),
-        ("WAIT TILL YOU SEE HIS REACTION 💀", "Viral Ending"),
-        ("NO WAY HE ACTUALLY DID THIS 😭", "Pure Chaos"),
-        ("BRO FORGOT IT'S JUST A GAME 😂", "Comedy Gold"),
-        ("NAHH BRO'S FACE SAYS IT ALL 💀", "Hilarious Realization"),
-        ("HE WAS FIGHTING FOR HIS LIFE 😭🔥", "High Stakes Clutch"),
-        ("BRO THOUGHT NOBODY NOTICED 💀", "Caught In 4K"),
-        ("HE ACTUALLY CANNOT BE SERIOUS 😭", "Shocking Revelation"),
-        ("BRO'S CONTROLLER IS IN DANGER 💀🔥", "Setup Threatening Meltdown"),
-        ("NO WAY BRO JUST SURVIVED THAT 🤯", "Impossible Escape"),
-        ("BRO REALLY COOKED HIMSELF 😭💀", "Self Destruction"),
-        ("HE WAS NOT READY FOR THIS AT ALL 💀", "Instant Regret"),
-        ("BRO'S BRAIN COMPLETELY FROZE 😭", "Mental Shutdown"),
-        ("HE REALLY TRIED TO ACT NATURAL 💀", "Awkward Encounter"),
-        ("BRO THOUGHT HE WAS HIM 😭", "Humbling Moment"),
-        ("LOOK AT HIS REACTION AT THE END 💀🔥", "Top Tier Expression"),
-        ("NAHH HE IS DEFINITELY LOGGING OFF 😭💀", "Game Over Ragequit"),
-        ("BRO GOT CAUGHT IN 4K 📸💀", "Exposed On Stream"),
-        ("HE LOST HIS ENTIRE MIND HERE 😭", "Uncontrollable Meltdown"),
-        ("BRO ALMOST BROKE HIS SETUP 💀🔥", "Physical Crashout"),
-        ("HE COULD NOT BELIEVE HIS EYES 🤯", "Mind Blown"),
-        ("BRO TOOK IT WAY TOO PERSONALLY 😭💀", "Ego Check"),
-        ("HE REALIZED HE MESSED UP BIG TIME 💀", "Point Of No Return")
+        ("YE KYA HO GAYA LIVE STREAM PE?! 😱", "Pure Chaos"),
+        ("WAIT FOR THE LAST 3 SECONDS 🤯🔥", "Viral Ending"),
+        ("ISNE YE KAISE KAR DIYA?! 💀🔥", "Impossible Moment"),
+        ("HAS HAS KE PET DARD HO GAYA 😂💀", "Comedy Gold"),
+        ("BRO THOUGHT NOBODY SAW THIS 📸💀", "Caught In 4K"),
+        ("1 SECOND ME GAME PALAT GAYA 😱🔥", "Instant Plot Twist"),
+        ("CHAT WENT COMPLETELY CRAZY HERE 😭🔥", "Maximum Hype"),
+        ("INSTANT KARMA IN 2 SECONDS 💀", "Instant Regret"),
+        ("KEYBOARD TODNE WALA THA BHAI 😭🔥", "Maximum Rage"),
+        ("NOBODY EXPECTED THIS ENDING 🤯", "Shocking Twist"),
+        ("BRO'S REACTION AT THE END 😂💀", "Hilarious Reaction"),
+        ("LAST SECOND CLUTCH OR CHOKE?! 😱", "High Stakes"),
+        ("BRO FORGOT HIS MIC WAS ON 💀", "Unhinged Moment"),
+        ("YE DEKH KE MOOD FRESH HO GAYA 😂", "Wholesome Comedy"),
+        ("1000 IQ PLAY ON LIVE STREAM 🧠🔥", "Genius Move"),
+        ("HE IMMEDIATELY REGRETTED THIS 😭💀", "Point Of No Return"),
+        ("BRO ROASTED HIM SO HARD 💀🔥", "Savage Moment"),
+        ("WAIT TILL YOU HEAR WHAT HE SAID 😳", "Viral Quote"),
+        ("IMPOSSIBLE COMEBACK AT 1 HP 🏆🔥", "Godlike Clutch"),
+        ("NAHH HE ACTUALLY LOGGED OFF 💀😭", "Ragequit Moment")
     ]
 
-    # Format output moments
+    CONTEXT_HOOK_POOLS = {
+        "chase": [
+            "POLICE CHASE GONE COMPLETELY WRONG 🚔💀",
+            "1000 IQ ESCAPE FROM COPS 🔥🚔",
+            "BRO WAS DRIVING FOR HIS LIFE 😭🚔"
+        ],
+        "death": [
+            "1 SECOND ME SAB KHATAM HO GAYA 💀",
+            "HE DID NOT SEE THIS COMING AT ALL 😱",
+            "INSTANT KARMA IN 2 SECONDS 💀🔥"
+        ],
+        "comedy": [
+            "HAS HAS KE PET DARD HO GAYA 😂💀",
+            "BRO FORGOT IT'S JUST A GAME 😂",
+            "WAIT FOR HIS FUNNY REACTION 😂🔥"
+        ],
+        "rage": [
+            "KEYBOARD TODNE WALA THA BHAI 😭🔥",
+            "BRO ALMOST CRASHED OUT LIVE 💀🔥",
+            "RAGE LEVEL 1000% UNLOCKED 😭💀"
+        ],
+        "caught": [
+            "CAUGHT IN 4K ON LIVE CAMERA 📸💀",
+            "BRO THOUGHT NOBODY NOTICED 💀",
+            "EXPOSED LIVE IN FRONT OF CHAT 📸🔥"
+        ],
+        "clutch": [
+            "1 HP PE POORA SQUAD WIPE 😱🔥",
+            "NO WAY BRO JUST SURVIVED THAT 🤯",
+            "IMPOSSIBLE CLUTCH AT LAST SECOND 🏆"
+        ],
+        "dono": [
+            "CRAZY SUPERCHAT REACTION ON LIVE 😭💰",
+            "BRO'S FACE AFTER THIS DONO 💀💰",
+            "CHAT WENT WILD FOR THIS DONO 🔥💰"
+        ]
+    }
+
+    # Format output moments (ensure every clip gets a unique, catchy hook)
+    used_hooks = set()
     moments = []
     for rank, s in enumerate(selected, 1):
         pt = s["peak_time"]
@@ -746,33 +780,44 @@ def analyze_chat_spikes(messages, bucket_sec=10, rolling_window_sec=300, min_mul
         emotes_str = " ".join(top_emotes).lower()
         messages_text = " ".join(s.get("sample_messages", [])).lower()
         combined_context = f"{emotes_str} {messages_text}"
-        
+
+        def pick_unique(pool, fallback_tpl):
+            for candidate in pool:
+                if candidate not in used_hooks:
+                    used_hooks.add(candidate)
+                    return candidate
+            for tpl_h, _ in VIRAL_HOOK_TEMPLATES:
+                if tpl_h not in used_hooks:
+                    used_hooks.add(tpl_h)
+                    return tpl_h
+            return fallback_tpl
+
         hook_tpl = VIRAL_HOOK_TEMPLATES[(rank - 1) % len(VIRAL_HOOK_TEMPLATES)]
-        
-        # Context-aware Gen-Z viral hook based on what chat was screaming about
+
+        # Context-aware high-CTR viral hook based on what chat was screaming about
         if any(k in combined_context for k in ['car', 'drive', 'cops', 'police', 'crash', 'driving', 'road', 'gta']):
             sentiment = "High Speed Chase / Driving Action"
-            hook = "BRO WAS DRIVING FOR HIS LIFE 😭🚔"
+            hook = pick_unique(CONTEXT_HOOK_POOLS["chase"], hook_tpl[0])
         elif any(k in combined_context for k in ['die', 'dead', 'khatam', 'kill', 'rip', 'killed', 'wasted']):
             sentiment = "Instant Disaster / Death"
-            hook = "HE DID NOT SEE THIS COMING! 💀"
+            hook = pick_unique(CONTEXT_HOOK_POOLS["death"], hook_tpl[0])
         elif any(k in combined_context for k in ['😂', '🤣', 'lmao', 'kekw', 'omegalul', 'lol', 'icant', 'haha', 'roast']):
             sentiment = "Pure Comedy / LMAO Spurt"
-            hook = "BRO FORGOT IT'S JUST A GAME 😂"
+            hook = pick_unique(CONTEXT_HOOK_POOLS["comedy"], hook_tpl[0])
         elif any(k in combined_context for k in ['rage', 'mad', 'cheat', 'smash', 'scream', 'crashout', 'angry']):
             sentiment = "Streamer Crashout"
-            hook = "BRO ALMOST CRASHED OUT LIVE 💀🔥"
+            hook = pick_unique(CONTEXT_HOOK_POOLS["rage"], hook_tpl[0])
         elif any(k in combined_context for k in ['wtf', 'caught', '4k', 'nahh', 'cheating', 'exposed']):
             sentiment = "Caught In 4K / Shock"
-            hook = "BRO GOT CAUGHT IN 4K 📸💀"
+            hook = pick_unique(CONTEXT_HOOK_POOLS["caught"], hook_tpl[0])
         elif any(k in combined_context for k in ['clutch', 'god', 'goat', 'insane', 'op', 'fire', '🔥']):
             sentiment = "Unreal Clutch Play"
-            hook = "NO WAY BRO JUST SURVIVED THAT 🤯"
+            hook = pick_unique(CONTEXT_HOOK_POOLS["clutch"], hook_tpl[0])
         elif any(k in combined_context for k in ['dono', 'superchat', 'money', 'gift', 'donation']):
             sentiment = "Donation / Superchat Peak"
-            hook = "BRO'S REACTION TO THIS DONO 😭💰"
+            hook = pick_unique(CONTEXT_HOOK_POOLS["dono"], hook_tpl[0])
         else:
-            hook = hook_tpl[0]
+            hook = pick_unique([hook_tpl[0]], hook_tpl[0])
             sentiment = hook_tpl[1]
 
         moments.append({

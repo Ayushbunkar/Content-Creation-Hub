@@ -29,17 +29,38 @@ def clean_word(w: str) -> str:
     # Allow alphanumeric, Hindi unicode (\u0900-\u097F), punctuation
     return re.sub(r'[^\w\s\u0900-\u097F\'!\?-]', '', w).strip()
 
-def format_hook_for_center(text: str) -> str:
+def strip_unsupported_emojis(text: str) -> str:
+    """Remove color emojis that Windows FFmpeg/libass renders as blank □ boxes, keeping crisp text & punctuation."""
     if not text:
         return ""
-    text = text.strip().upper()
+    cleaned = re.sub(r'[\U00010000-\U0010ffff\u2600-\u27BF\uFE0F]', '', text)
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    return cleaned
+
+def format_hook_for_center(text: str, highlight_hex: str = "&H0000D7FF&", base_hex: str = "&H00FFFFFF&") -> str:
+    if not text:
+        return ""
+    text = strip_unsupported_emojis(text).upper()
     # Remove (#rank) suffix if present
     text = re.sub(r'\s*\(\s*#\d+\s*\)\s*$', '', text).strip()
+    if not text:
+        return ""
     words = text.split()
-    if len(words) <= 3 or len(text) <= 22:
-        return text
+    if len(words) <= 2:
+        return f"{{\\c{highlight_hex}\\b1}}{text}"
+    # Highlight the last 2 punchy words in gold/amber for high-CTR visual contrast
+    split_idx = max(1, len(words) - 2)
+    if len(words) <= 3 or len(text) <= 20:
+        lead = " ".join(words[:split_idx])
+        punch = " ".join(words[split_idx:])
+        return f"{{\\c{base_hex}\\b1}}{lead} {{\\c{highlight_hex}\\b1}}{punch}"
+    # Balanced 2-line wrap so it never overflows 1080px width
     half = (len(words) + 1) // 2
-    return " ".join(words[:half]) + "\\N" + " ".join(words[half:])
+    line1_words = words[:half]
+    line2_words = words[half:]
+    line1 = f"{{\\c{base_hex}\\b1}}{' '.join(line1_words)}"
+    line2 = f"{{\\c{highlight_hex}\\b1}}{' '.join(line2_words)}"
+    return f"{line1}\\N{line2}"
 
 def build_ass_content(
     cues,
@@ -52,8 +73,17 @@ def build_ass_content(
     clip_duration=30.0
 ):
     primary_color = "&H00FFFFFF"
+    highlight_color = "&H0000D7FF&"
+    box_bg = "&HBB090912"
+    box_border_style = 3
+    box_outline = 18
+
     if caption_style == "yellow_black":
         primary_color = "&H0000FFFF"
+        highlight_color = "&H00FFFFFF&"
+    elif caption_style == "white_black":
+        box_border_style = 1
+        box_outline = 8
 
     header = f"""[Script Info]
 Title: AI Stream Clipper Viral Captions
@@ -64,19 +94,22 @@ WrapStyle: 2
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Segoe UI,54,&H00FFFFFF,&H0000E5FF,&H00000000,&H90000000,1,0,0,0,100,100,0,0,1,6,3,2,60,60,{margin_v},1
-Style: CenterHook,Impact,56,{primary_color},&H0000FFFF,&H00000000,&H90000000,-1,0,0,0,100,100,0,0,1,7,3,5,40,40,0,1
+Style: Default,Segoe UI,54,&H00FFFFFF,&H0000E5FF,&H00000000,&H90000000,-1,0,0,0,100,100,0,0,1,6,3,2,60,60,{margin_v},1
+Style: CenterHook,Arial Black,52,{primary_color},&H0000D7FF,{box_bg},&HD0000000,-1,0,0,0,100,100,1,0,{box_border_style},{box_outline},4,5,55,55,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     events = []
 
-    # 1. Add Center Hook Banner (Speed Reel Style) if requested or available
+    # 1. Add Styled On-Screen Hook Banner (pop-in animation + dual-tone highlight)
     if center_hook and caption_style != "bottom_standard":
-        formatted_hook = format_hook_for_center(center_hook)
-        dur_str = format_ass_time(clip_duration)
-        events.append(f"Dialogue: 2,0:00:00.00,{dur_str},CenterHook,,0,0,0,,{{\\pos(540,{split_divider_y})\\an5\\b1}}{formatted_hook}\n")
+        formatted_hook = format_hook_for_center(center_hook, highlight_hex=highlight_color, base_hex=primary_color)
+        if formatted_hook:
+            dur_str = format_ass_time(clip_duration)
+            events.append(
+                f"Dialogue: 2,0:00:00.00,{dur_str},CenterHook,,0,0,0,,{{\\pos(540,{split_divider_y})\\an5\\fscx88\\fscy88\\t(0,180,\\fscx100\\fscy100)}}{formatted_hook}\n"
+            )
 
     # 2. Add Spoken Voice Word-by-Word Captions with gap-free highlight transitions
     if caption_style != "center_only":
@@ -156,6 +189,24 @@ def main():
     has_speech = False
     temp_wav = ass_path.parent / f"temp_whisper_{ass_path.stem}.wav"
 
+    # Pre-write styled Center Hook ASS immediately so even if Whisper times out, the on-screen title is guaranteed!
+    initial_hook = re.sub(r'\s*\(\s*#\d+\s*\)\s*$', '', (args.center_hook or args.hook or 'UNREAL MOMENT').strip()).strip()
+    try:
+        pre_ass = build_ass_content(
+            [],
+            target_width=1080,
+            target_height=1920,
+            margin_v=420,
+            center_hook=initial_hook,
+            caption_style=args.caption_style,
+            split_divider_y=args.divider_y,
+            clip_duration=args.duration
+        )
+        with open(ass_path, 'w', encoding='utf-8') as f:
+            f.write(pre_ass)
+    except Exception:
+        pass
+
     try:
         # Pre-extract normalized 16kHz audio for maximum transcription accuracy
         has_wav = extract_audio_wav(input_path, temp_wav)
@@ -179,6 +230,8 @@ def main():
             segments, info = fw_model.transcribe(
                 audio_src,
                 word_timestamps=True,
+                beam_size=1,
+                vad_filter=True,
                 initial_prompt="Namaste doston! Bhai ye dekho, kya scene hai, let's go carry mortal dynamo gaming stream."
             )
             for seg in segments:
@@ -302,27 +355,35 @@ def main():
     active_hook = (args.center_hook or args.hook or '').strip()
     active_hook = re.sub(r'\s*\(\s*#\d+\s*\)\s*$', '', active_hook).strip()
 
-    # Intelligent Gen-Z Moment-Matching Hook derived from speech and dialogue
-    spoken_text = " ".join(c.get('text', '') for c in cues).lower()
-    if spoken_text:
-        if any(k in spoken_text for k in ['die', 'dying', 'dead', 'kill', 'killed', 'rip', 'survive']):
-            active_hook = "HE WAS FIGHTING FOR HIS LIFE 😭💀"
-        elif any(k in spoken_text for k in ['calm', 'fine', 'chill', 'relax']):
-            active_hook = "BRO FORGOT IT'S JUST A GAME 😂"
-        elif any(k in spoken_text for k in ['car', 'drive', 'cops', 'police', 'crash', 'driving']):
-            active_hook = "BRO WAS DRIVING FOR HIS LIFE 😭🚔"
-        elif any(k in spoken_text for k in ['money', 'dono', 'paid', 'dollar', 'superchat', 'rich']):
-            active_hook = "BRO'S REACTION TO THIS DONO 😭💰"
-        elif any(k in spoken_text for k in ['no way', 'nah', 'bro what', 'wait wait']):
-            active_hook = "NO WAY HE ACTUALLY DID THIS 😭"
-        elif any(k in spoken_text for k in ['stop', 'shut up', 'mad', 'scream', 'help']):
-            active_hook = "BRO ALMOST CRASHED OUT LIVE 💀🔥"
-        elif any(k in spoken_text for k in ['win', 'won', 'lose', 'lost', 'choke']):
-            active_hook = "HE REALLY THOUGHT HE WAS SAFE 😭"
-        elif not active_hook or "MASSIVE W" in active_hook or "UNREAL MOMENT" in active_hook or "CHAT EXPLODED" in active_hook:
-            active_hook = "WAIT TILL YOU SEE HIS REACTION 💀"
-    elif not active_hook or "MASSIVE W" in active_hook or "UNREAL MOMENT" in active_hook or "CHAT EXPLODED" in active_hook:
-        active_hook = "BRO FORGOT HE WAS LIVE 💀"
+    is_generic_hook = (
+        not active_hook
+        or "MASSIVE W" in active_hook.upper()
+        or "UNREAL MOMENT" in active_hook.upper()
+        or "CHAT EXPLODED" in active_hook.upper()
+    )
+
+    # Only fill in a speech-derived hook if no custom/pipeline hook was provided
+    if is_generic_hook:
+        spoken_text = " ".join(c.get('text', '') for c in cues).lower()
+        if spoken_text:
+            if any(k in spoken_text for k in ['die', 'dying', 'dead', 'kill', 'killed', 'rip', 'survive']):
+                active_hook = "1 HP PE POORA SQUAD WIPE"
+            elif any(k in spoken_text for k in ['calm', 'fine', 'chill', 'relax']):
+                active_hook = "BRO FORGOT IT'S JUST A GAME"
+            elif any(k in spoken_text for k in ['car', 'drive', 'cops', 'police', 'crash', 'driving']):
+                active_hook = "POLICE CHASE GONE WRONG"
+            elif any(k in spoken_text for k in ['money', 'dono', 'paid', 'dollar', 'superchat', 'rich']):
+                active_hook = "CRAZY SUPERCHAT REACTION"
+            elif any(k in spoken_text for k in ['no way', 'nah', 'bro what', 'wait wait']):
+                active_hook = "WAIT FOR THE LAST 3 SECONDS"
+            elif any(k in spoken_text for k in ['stop', 'shut up', 'mad', 'scream', 'help']):
+                active_hook = "KEYBOARD TODNE WALA THA BHAI"
+            elif any(k in spoken_text for k in ['win', 'won', 'lose', 'lost', 'choke']):
+                active_hook = "1 SECOND ME GAME PALAT GAYA"
+            else:
+                active_hook = "WAIT TILL YOU SEE THIS REACTION"
+        else:
+            active_hook = "YE KYA HO GAYA LIVE STREAM PE?!"
 
     ass_text = build_ass_content(
         cues,

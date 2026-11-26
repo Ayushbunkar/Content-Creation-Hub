@@ -791,12 +791,15 @@ export class StreamClipFinderService {
       try { fs.copyFileSync(tempRawPath, cachedRawPath); } catch (e) {}
     }
 
-    // Step 2: Calculate split divider Y and generate Center Hook + Spoken captions
+    // Step 2: Calculate exact on-screen hook Y-position per framing mode and generate Center Hook + Spoken captions
     let dividerY = 768;
     if (cropMode === 'split_50_50') dividerY = 960;
     else if (cropMode === 'split_30_70') dividerY = 576;
     else if (cropMode === 'split_70_30') dividerY = 1344;
     else if (cropMode === 'split_speed_60_40' || cropMode === 'split_40_60') dividerY = 768;
+    else if (cropMode === 'blur_pad') dividerY = 360;
+    else if (cropMode === 'center_crop' || cropMode === 'smart_zoom') dividerY = 320;
+    else if (cropMode === 'square_1_1' || cropMode === 'source_16_9') dividerY = 170;
     else dividerY = 768;
 
     let detectedCamCrop: string | undefined = undefined;
@@ -967,14 +970,54 @@ export class StreamClipFinderService {
       proc.stdout.on('data', (d) => { stdout += d.toString(); });
       proc.stderr.on('data', (d) => { stderr += d.toString(); });
 
+      const ensureHookAssExists = () => {
+        if (fs.existsSync(outputAssPath) || captionStyle === 'bottom_standard') return;
+        try {
+          const cleanHook = (moment.headline_hook || 'UNREAL MOMENT')
+            .replace(/[\u{10000}-\u{10FFFF}\u2600-\u27BF\uFE0F]/gu, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toUpperCase();
+          if (!cleanHook) return;
+          const words = cleanHook.split(' ');
+          let formattedHook = cleanHook;
+          if (words.length > 2) {
+            const half = Math.ceil(words.length / 2);
+            formattedHook = `{\\c&H00FFFFFF&\\b1}${words.slice(0, half).join(' ')}\\N{\\c&H0000D7FF&\\b1}${words.slice(half).join(' ')}`;
+          }
+          const durSec = Math.max(5, moment.duration || 30);
+          const mins = Math.floor(durSec / 60);
+          const secs = Math.floor(durSec % 60);
+          const durStr = `0:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.00`;
+          const fallbackAss = `[Script Info]
+Title: AI Stream Clipper Viral Hook
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 2
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: CenterHook,Arial Black,52,&H00FFFFFF,&H0000D7FF,&HBB090912,&HD0000000,-1,0,0,0,100,100,1,0,3,18,4,5,55,55,0,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 2,0:00:00.00,${durStr},CenterHook,,0,0,0,,{\\pos(540,${dividerY || 768})\\an5\\fscx88\\fscy88\\t(0,180,\\fscx100\\fscy100)}${formattedHook}
+`;
+          fs.writeFileSync(outputAssPath, fallbackAss, 'utf-8');
+        } catch (e) {}
+      };
+
       const timer = setTimeout(() => {
         try { proc.kill(); } catch (e) {}
-        console.warn('[streamClipper] Caption generation timed out after 25s');
+        console.warn('[streamClipper] Caption generation timed out after 35s; ensuring on-screen hook ASS.');
+        ensureHookAssExists();
         resolve({ cues: [], hasSpeech: false });
-      }, 25000);
+      }, 35000);
 
       proc.on('close', () => {
         clearTimeout(timer);
+        ensureHookAssExists();
         try {
           if (fs.existsSync(outputJsonPath)) {
             const data = JSON.parse(fs.readFileSync(outputJsonPath, 'utf-8'));
@@ -987,6 +1030,7 @@ export class StreamClipFinderService {
 
       proc.on('error', () => {
         clearTimeout(timer);
+        ensureHookAssExists();
         resolve({ cues: [], hasSpeech: false });
       });
     });
