@@ -2700,6 +2700,24 @@ app.post('/api/stream-clipper/batch-clip', async (req, res) => {
   }
 });
 
+// 6. Fast raw clip locator for instant client-side live framing preview
+app.get('/api/stream-clipper/raw-clip/:rank', (req, res) => {
+  try {
+    const rank = req.params.rank;
+    const streamClipsDir = path.join(process.cwd(), 'storage', 'stream_clips');
+    if (!fs.existsSync(streamClipsDir)) return res.json({ found: false });
+    const files = fs.readdirSync(streamClipsDir);
+    // Find matching raw_cache_*_rank{rank}.mp4
+    const match = files.find(f => f.startsWith('raw_cache_') && f.endsWith(`_rank${rank}.mp4`));
+    if (match) {
+      return res.json({ found: true, rawClipUrl: `/storage/stream_clips/${match}` });
+    }
+    res.json({ found: false });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // System performance and hardware telemetry endpoint
 app.get('/api/system/performance', (req, res) => {
   try {

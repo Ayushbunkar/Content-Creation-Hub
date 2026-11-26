@@ -117,13 +117,13 @@ def detect_facecam(video_path: str, target_cam_h: int = 768, target_cam_w: int =
     cap.release()
 
     if not all_faces:
-        # Fallback to tight middle-left safe window
+        # Fallback to bottom-left safe window for gaming streams
         return {
             "success": True,
             "face_detected": False,
-            "position_label": "center_left",
-            "ffmpeg_cam_crop": "crop=iw*0.24:ih*0.30:0:ih*0.38",
-            "message": "No clear face detected, using safe center-left streamer layout"
+            "position_label": "bottom_left",
+            "ffmpeg_cam_crop": "crop=iw*0.25:ih*0.32:0:ih*0.68",
+            "message": "No clear face detected, using safe bottom-left streamer layout"
         }
 
     # Group faces by spatial proximity to find the stationary streamer webcam box (< 80px variance)

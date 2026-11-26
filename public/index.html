@@ -1346,6 +1346,283 @@
       );
     }
 
+    // =========================================================================
+    // STREAM LIVE FRAMED PLAYER — 0-SECOND CLIENT-SIDE REALTIME COMPOSITOR
+    // Renders dual split (Top Cam / Bottom Game), blur pad, center crop,
+    // and smart zoom instantly with synchronized playback without re-rendering!
+    // =========================================================================
+    function StreamMomentPlayer({
+      moment,
+      renderedData,
+      currentCrop,
+      currentCam,
+      currentBlur,
+      hasFramingChanged,
+      onCamChange
+    }) {
+      const topVideoRef = React.useRef(null);
+      const masterVideoRef = React.useRef(null);
+      const bgVideoRef = React.useRef(null);
+      const [resolvedRawUrl, setResolvedRawUrl] = React.useState(renderedData?.rawClipUrl || null);
+
+      // Auto-resolve pristine 16:9 uncropped stream clip from server cache if not already in state
+      React.useEffect(() => {
+        if (!resolvedRawUrl && renderedData) {
+          fetch(`/api/stream-clipper/raw-clip/${moment.rank}`)
+            .then(r => r.json())
+            .then(d => {
+              if (d && d.found && d.rawClipUrl) {
+                setResolvedRawUrl(d.rawClipUrl);
+              }
+            })
+            .catch(() => {});
+        }
+      }, [moment.rank, renderedData, resolvedRawUrl]);
+
+      // If user changed framing or raw clip is available, use pristine uncropped video; else fallback to clipUrl
+      const videoSource = (hasFramingChanged && resolvedRawUrl) ? resolvedRawUrl : (resolvedRawUrl || renderedData?.clipUrl);
+
+      // Camera coordinates mapping (origin & scale) for crisp facecam zoom
+      const camConfigs = {
+        'bottom_left': { origin: '7% 91%', scale: 3.2, label: '↙ Bottom-Left' },
+        'top_left': { origin: '7% 9%', scale: 3.2, label: '↖ Top-Left' },
+        'bottom_right': { origin: '93% 91%', scale: 3.2, label: '↘ Bottom-Right' },
+        'top_right': { origin: '93% 9%', scale: 3.2, label: '↗ Top-Right' },
+        'center_left': { origin: '7% 45%', scale: 3.2, label: '⬅ Middle-Left' },
+        'center_right': { origin: '93% 45%', scale: 3.2, label: '➡ Middle-Right' },
+        'auto_center': { origin: '50% 22%', scale: 2.6, label: '🎯 Center' },
+        'auto_detect': { origin: '7% 91%', scale: 3.2, label: '🤖 Auto (Bottom-Left)' }
+      };
+      const activeCam = camConfigs[currentCam] || camConfigs['bottom_left'];
+
+      // Dynamic split ratio calculation
+      let camHeightPercent = 40;
+      if (currentCrop === 'split_50_50') camHeightPercent = 50;
+      else if (currentCrop === 'split_30_70') camHeightPercent = 30;
+      else if (currentCrop === 'split_70_30') camHeightPercent = 70;
+
+      // Synchronize video players (play, pause, scrub)
+      const handlePlay = () => {
+        if (topVideoRef.current && topVideoRef.current.paused) topVideoRef.current.play().catch(() => {});
+        if (bgVideoRef.current && bgVideoRef.current.paused) bgVideoRef.current.play().catch(() => {});
+      };
+      const handlePause = () => {
+        if (topVideoRef.current && !topVideoRef.current.paused) topVideoRef.current.pause();
+        if (bgVideoRef.current && !bgVideoRef.current.paused) bgVideoRef.current.pause();
+      };
+      const handleTimeUpdate = (e) => {
+        const t = e.target.currentTime;
+        if (topVideoRef.current && Math.abs(topVideoRef.current.currentTime - t) > 0.15) {
+          topVideoRef.current.currentTime = t;
+        }
+        if (bgVideoRef.current && Math.abs(bgVideoRef.current.currentTime - t) > 0.15) {
+          bgVideoRef.current.currentTime = t;
+        }
+      };
+      const handleSeeked = (e) => {
+        const t = e.target.currentTime;
+        if (topVideoRef.current) topVideoRef.current.currentTime = t;
+        if (bgVideoRef.current) bgVideoRef.current.currentTime = t;
+      };
+
+      const isSplit = currentCrop.startsWith('split_');
+      const isBlur = currentCrop === 'blur_pad';
+      const isCenterCrop = currentCrop === 'center_crop';
+      const isSmartZoom = currentCrop === 'smart_zoom';
+      const isSquare = currentCrop === 'square_1_1';
+      const isOriginal169 = currentCrop === 'source_16_9';
+
+      const blurPx = currentBlur === 'subtle' ? 10 : currentBlur === 'heavy' ? 45 : 25;
+
+      return (
+        <div class={`relative w-full rounded-2xl overflow-hidden border-2 bg-black shadow-2xl flex flex-col group select-none transition-all duration-300 ${
+          isOriginal169 ? 'aspect-video max-h-80 border-slate-700' : isSquare ? 'aspect-square max-h-80 border-slate-700' : 'aspect-[9/16] max-h-96 border-indigo-500/50'
+        }`}>
+          {/* Live Framing Badge */}
+          <div class="absolute top-2 left-2 z-30 pointer-events-none flex items-center gap-1.5">
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500 text-slate-950 border border-emerald-300 shadow flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-slate-950 animate-pulse"></span>
+              <span>LIVE 0s PREVIEW</span>
+            </span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-black/80 text-amber-300 border border-amber-500/40 backdrop-blur-sm uppercase font-mono">
+              {currentCrop.replace('split_', '').replace('_', '/')}
+            </span>
+          </div>
+
+          {/* Quick Camera Corner Switcher for Split Modes */}
+          {isSplit && (
+            <div class="absolute top-2 right-2 z-30 flex items-center gap-1 bg-black/80 p-1 rounded-lg border border-slate-700/80 backdrop-blur-sm">
+              <span class="text-[9px] text-slate-400 font-bold px-1">Cam:</span>
+              {[
+                { id: 'bottom_left', label: '↙ BL' },
+                { id: 'top_left', label: '↖ TL' },
+                { id: 'bottom_right', label: '↘ BR' },
+                { id: 'top_right', label: '↗ TR' }
+              ].map(c => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => onCamChange && onCamChange(c.id)}
+                  class={`px-1.5 py-0.5 rounded text-[9px] font-black transition cursor-pointer ${
+                    currentCam === c.id ? 'bg-amber-400 text-slate-950 shadow-sm' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                  title={`Switch webcam corner to ${c.label}`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* A: SPLIT SCREEN (40/60, 50/50, 30/70, 70/30) */}
+          {isSplit && (
+            <div class="w-full h-full flex flex-col overflow-hidden">
+              {/* Top Facecam Box */}
+              <div
+                class="relative w-full overflow-hidden bg-black shrink-0 transition-all duration-300"
+                style={{ height: `${camHeightPercent}%` }}
+              >
+                <video
+                  ref={topVideoRef}
+                  src={videoSource}
+                  muted
+                  playsInline
+                  class="w-full h-full object-cover pointer-events-none transition-all duration-300"
+                  style={{
+                    transformOrigin: activeCam.origin,
+                    transform: `scale(${activeCam.scale})`
+                  }}
+                />
+              </div>
+
+              {/* Center Hook Neon Divider */}
+              <div class="h-6 w-full py-0.5 bg-gradient-to-r from-red-600 via-amber-400 to-red-600 shadow-md flex items-center justify-center shrink-0 z-20 border-y border-amber-300/40">
+                <span class="text-[9px] font-black uppercase text-slate-950 px-2 py-0.2 bg-amber-300 rounded font-mono shadow tracking-wider truncate max-w-[90%]">
+                  🔥 {moment.headline_hook || 'UNREAL MOMENT'}
+                </span>
+              </div>
+
+              {/* Bottom Gameplay Box */}
+              <div class="relative w-full flex-1 overflow-hidden bg-black">
+                <video
+                  ref={masterVideoRef}
+                  src={videoSource}
+                  controls
+                  playsInline
+                  onPlay={handlePlay}
+                  onPause={handlePause}
+                  onTimeUpdate={handleTimeUpdate}
+                  onSeeked={handleSeeked}
+                  class="w-full h-full object-cover object-center"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* B: GAUSSIAN BLUR PAD */}
+          {isBlur && (
+            <div class="relative w-full h-full flex items-center justify-center overflow-hidden">
+              {/* Blurred Background Video */}
+              <video
+                ref={bgVideoRef}
+                src={videoSource}
+                muted
+                playsInline
+                class="absolute inset-0 w-full h-full object-cover pointer-events-none transition-all duration-300"
+                style={{
+                  filter: `blur(${blurPx}px) brightness(0.55)`,
+                  transform: 'scale(1.2)'
+                }}
+              />
+              {/* Top Hook Pill */}
+              <div class="absolute top-10 left-1/2 -translate-x-1/2 z-20 w-[90%] text-center pointer-events-none">
+                <span class="inline-block px-3 py-1 rounded-full text-[10px] font-black bg-black/80 text-amber-300 border border-amber-500/40 shadow-lg tracking-wider">
+                  🔥 {moment.headline_hook || 'UNREAL MOMENT'}
+                </span>
+              </div>
+              {/* Centered 16:9 Foreground Video */}
+              <div class="relative z-10 w-full px-2">
+                <video
+                  ref={masterVideoRef}
+                  src={videoSource}
+                  controls
+                  playsInline
+                  onPlay={handlePlay}
+                  onPause={handlePause}
+                  onTimeUpdate={handleTimeUpdate}
+                  onSeeked={handleSeeked}
+                  class="w-full aspect-video rounded-xl shadow-2xl border border-white/20 object-contain bg-black"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* C: DIRECT CENTER CROP */}
+          {isCenterCrop && (
+            <div class="relative w-full h-full overflow-hidden bg-black flex items-center justify-center">
+              <div class="absolute top-10 left-1/2 -translate-x-1/2 z-20 w-[90%] text-center pointer-events-none">
+                <span class="inline-block px-3 py-1 rounded-full text-[10px] font-black bg-black/80 text-amber-300 border border-amber-500/40 shadow-lg tracking-wider">
+                  ✂️ {moment.headline_hook || 'UNREAL MOMENT'}
+                </span>
+              </div>
+              <video
+                ref={masterVideoRef}
+                src={videoSource}
+                controls
+                playsInline
+                class="w-full h-full object-cover object-center"
+              />
+            </div>
+          )}
+
+          {/* D: SMART SPEAKER ZOOM */}
+          {isSmartZoom && (
+            <div class="relative w-full h-full overflow-hidden bg-black flex items-center justify-center">
+              <div class="absolute top-10 left-1/2 -translate-x-1/2 z-20 w-[90%] text-center pointer-events-none">
+                <span class="inline-block px-3 py-1 rounded-full text-[10px] font-black bg-black/80 text-amber-300 border border-amber-500/40 shadow-lg tracking-wider">
+                  🔍 {moment.headline_hook || 'UNREAL MOMENT'}
+                </span>
+              </div>
+              <video
+                ref={masterVideoRef}
+                src={videoSource}
+                controls
+                playsInline
+                class="w-full h-full object-cover transition-transform duration-500"
+                style={{ transform: 'scale(1.25)', transformOrigin: 'center center' }}
+              />
+            </div>
+          )}
+
+          {/* E: 1:1 SQUARE */}
+          {isSquare && (
+            <div class="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
+              <video
+                ref={masterVideoRef}
+                src={videoSource}
+                controls
+                playsInline
+                class="w-full h-full object-cover object-center"
+              />
+            </div>
+          )}
+
+          {/* F: 16:9 ORIGINAL */}
+          {isOriginal169 && (
+            <div class="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
+              <video
+                ref={masterVideoRef}
+                src={videoSource}
+                controls
+                playsInline
+                class="w-full h-full object-contain"
+              />
+            </div>
+          )}
+        </div>
+      );
+    }
+
     function App() {
       const [currentTab, setCurrentTab] = useState('captions'); // Default to Caption Studio
       const [projects, setProjects] = useState([]);
@@ -5360,27 +5637,31 @@
                                       )}
                                     </div>
 
-                                    {/* Instant Re-Generate Banner when framing or webcam is changed after render */}
+                                    {/* Live 0-Second Framed Indicator Banner */}
                                     {hasFramingChanged && (
-                                      <div class="p-3 rounded-xl bg-gradient-to-r from-amber-950/60 via-orange-950/40 to-slate-900 border border-amber-500/60 flex items-center justify-between gap-3 shadow-lg shadow-amber-950/40">
+                                      <div class="p-2.5 rounded-xl bg-gradient-to-r from-emerald-950/70 via-slate-900 to-indigo-950/70 border border-emerald-500/50 flex items-center justify-between gap-3 shadow-lg shadow-emerald-950/30">
                                         <div class="flex items-center space-x-2">
-                                          <span class="text-base">⚡</span>
+                                          <span class="text-base text-emerald-400">✨</span>
                                           <div>
-                                            <div class="text-xs font-bold text-amber-300 flex items-center space-x-1">
-                                              <span>New Framing Selected:</span>
-                                              <span class="text-white bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/40 uppercase font-mono text-[11px]">
+                                            <div class="text-xs font-bold text-emerald-300 flex items-center space-x-1.5">
+                                              <span>Live 0s Edit Active:</span>
+                                              <span class="text-white bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/40 uppercase font-mono text-[11px]">
                                                 {currentCrop.replace('split_', '').replace('_', '/')}
                                               </span>
+                                              <span class="text-amber-300 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40 uppercase font-mono text-[10px]">
+                                                {currentCam.replace('_', ' ')}
+                                              </span>
                                             </div>
-                                            <div class="text-[10px] text-amber-400/80">Uses cached stream — renders in 2 seconds without re-downloading!</div>
+                                            <div class="text-[10px] text-slate-300">Live preview reflects immediately above without re-rendering! Click to bake final MP4 whenever you're ready.</div>
                                           </div>
                                         </div>
                                         <button
                                           onClick={() => handleRenderStreamClip(moment)}
                                           disabled={isRenderingThis}
-                                          class="px-4 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 shadow-lg shadow-amber-500/30 flex items-center space-x-1.5 cursor-pointer transition active:scale-95 shrink-0"
+                                          class="px-3.5 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/25 flex items-center space-x-1.5 cursor-pointer transition active:scale-95 shrink-0"
+                                          title="Bake this framing into final downloadable MP4"
                                         >
-                                          <span>{isRenderingThis ? '⏳ Generating in 2s...' : '⚡ Apply & Re-Generate (2s)'}</span>
+                                          <span>{isRenderingThis ? '⏳ Baking in 2s...' : '💾 Save & Render MP4 (2s)'}</span>
                                         </button>
                                       </div>
                                     )}
@@ -5391,17 +5672,20 @@
                               {/* Rendered Preview Player OR Initial Render Button */}
                               {renderedData ? (
                                 <div class="space-y-3 pt-2 border-t border-slate-800">
-                                  <div class="relative w-full rounded-xl overflow-hidden border border-slate-800 bg-black aspect-[9/16] max-h-80 flex items-center justify-center group">
-                                    <video src={renderedData.clipUrl} controls class="w-full h-full object-contain"></video>
-
-                                    {/* Visual Split Overlay Indicator showing framing layout */}
-                                    <div class="absolute top-2 left-2 z-10 pointer-events-none">
-                                      <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-black/70 text-indigo-300 border border-indigo-500/40 backdrop-blur-sm">
-                                        {(renderedData.appliedCropMode === 'split_speed_60_40' || renderedData.appliedCropMode === 'split_40_60' ? 'SPLIT 40/60' : (renderedData.appliedCropMode || 'split_40_60').replace('split_', '').replace('_', '/')).toUpperCase()} REEL
-                                      </span>
-                                    </div>
-                                  </div>
-
+                                  <StreamMomentPlayer
+                                    moment={moment}
+                                    renderedData={renderedData}
+                                    currentCrop={currentCrop}
+                                    currentCam={currentCam}
+                                    currentBlur={(momentFramingOverrides[moment.rank]?.blurIntensity) || streamBlurIntensity}
+                                    hasFramingChanged={hasFramingChanged}
+                                    onCamChange={(newCam) => {
+                                      setMomentFramingOverrides(prev => ({
+                                        ...prev,
+                                        [moment.rank]: { ...(prev[moment.rank] || {}), camPosition: newCam }
+                                      }));
+                                    }}
+                                  />
                                   {/* Publication Badges if already published */}
                                   {(() => {
                                     const mClipId = `stream_moment_${moment.rank || (idx + 1)}`;

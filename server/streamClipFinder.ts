@@ -828,12 +828,19 @@ export class StreamClipFinderService {
     const stats = fs.statSync(finalClipPath);
     const fileSizeMb = Number((stats.size / (1024 * 1024)).toFixed(2));
 
+    const hasCachedRaw = fs.existsSync(cachedRawPath);
+    const rawClipUrl = hasCachedRaw
+      ? `/storage/stream_clips/${path.basename(cachedRawPath)}`
+      : `/output/stream_clips/${path.basename(finalClipPath)}`;
+
     return {
       success: true,
       clipUrl: `/output/stream_clips/${path.basename(finalClipPath)}`,
+      rawClipUrl,
       filePath: finalClipPath,
       fileSizeMb,
       duration: moment.duration,
+      detectedCamPosition: detectedCamCrop ? (detection?.position_label || camPosition) : camPosition,
       transcript: captionResult?.cues || []
     };
   }
@@ -864,8 +871,8 @@ export class StreamClipFinderService {
       return {
         success: false,
         face_detected: false,
-        position_label: 'center_left',
-        ffmpeg_cam_crop: 'crop=iw*0.24:ih*0.30:0:ih*0.38'
+        position_label: 'bottom_left',
+        ffmpeg_cam_crop: 'crop=iw*0.25:ih*0.32:0:ih*0.68'
       };
     }
 
@@ -879,12 +886,12 @@ export class StreamClipFinderService {
 
       const timer = setTimeout(() => {
         try { proc.kill(); } catch (e) {}
-        console.warn('[FacecamDetector] Timed out after 12s, using safe tight center-left');
+        console.warn('[FacecamDetector] Timed out after 12s, using safe bottom-left corner');
         resolve({
           success: false,
           face_detected: false,
-          position_label: 'center_left',
-          ffmpeg_cam_crop: 'crop=iw*0.24:ih*0.30:0:ih*0.38'
+          position_label: 'bottom_left',
+          ffmpeg_cam_crop: 'crop=iw*0.25:ih*0.32:0:ih*0.68'
         });
       }, 12000);
 
@@ -903,8 +910,8 @@ export class StreamClipFinderService {
           resolve({
             success: false,
             face_detected: false,
-            position_label: 'center_left',
-            ffmpeg_cam_crop: 'crop=iw*0.24:ih*0.30:0:ih*0.38'
+            position_label: 'bottom_left',
+            ffmpeg_cam_crop: 'crop=iw*0.25:ih*0.32:0:ih*0.68'
           });
         }
       });
@@ -914,8 +921,8 @@ export class StreamClipFinderService {
         resolve({
           success: false,
           face_detected: false,
-          position_label: 'center_left',
-          ffmpeg_cam_crop: 'crop=iw*0.24:ih*0.30:0:ih*0.38'
+          position_label: 'bottom_left',
+          ffmpeg_cam_crop: 'crop=iw*0.25:ih*0.32:0:ih*0.68'
         });
       });
     });
