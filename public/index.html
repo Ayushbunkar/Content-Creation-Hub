@@ -1359,8 +1359,10 @@
       currentBlur,
       customCamRect,
       hasFramingChanged,
+      isSaving,
       onCamChange,
-      onCustomRectChange
+      onCustomRectChange,
+      onSaveFrame
     }) {
       const topVideoRef = React.useRef(null);
       const masterVideoRef = React.useRef(null);
@@ -1424,6 +1426,24 @@
       );
       const cx = Math.max(0.04, Math.min(0.96, activeRect.x + activeRect.w / 2));
       const cy = Math.max(0.04, Math.min(0.96, activeRect.y + activeRect.h / 2));
+      const currentZoom = Number((0.25 / Math.max(0.07, activeRect.w)).toFixed(2));
+
+      const applyZoom = (newZoom) => {
+        const clampedZoom = Math.max(0.5, Math.min(3.5, newZoom));
+        const aspect = activeRect.h / Math.max(0.05, activeRect.w);
+        const newW = Math.max(0.07, Math.min(0.85, 0.25 / clampedZoom));
+        const newH = Math.max(0.07, Math.min(0.90, newW * aspect));
+        const newX = Math.max(0, Math.min(1 - newW, cx - newW / 2));
+        const newY = Math.max(0, Math.min(1 - newH, cy - newH / 2));
+        onCustomRectChange && onCustomRectChange({ x: newX, y: newY, w: newW, h: newH });
+      };
+
+      const handleTopWheel = (e) => {
+        if (!isSplit) return;
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.15 : -0.15;
+        applyZoom(currentZoom + delta);
+      };
 
       // Direct Mouse Drag (pan) inside Top Facecam Box
       const handleTopPanStart = (e) => {
@@ -1675,9 +1695,10 @@
                 {/* Top Facecam Box — supports direct mouse drag pan! */}
                 <div
                   onMouseDown={handleTopPanStart}
+                  onWheel={handleTopWheel}
                   class={`relative w-full overflow-hidden bg-black shrink-0 transition-all duration-150 ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
                   style={{ height: `${camHeightPercent}%` }}
-                  title="Drag with mouse to adjust streamer face position, or click 📐Draw to draw rectangle"
+                  title="Drag with mouse to move face, scroll wheel to zoom, or click 📐Draw"
                 >
                   <video
                     ref={topVideoRef}
@@ -1814,6 +1835,59 @@
               </div>
             )}
           </div>
+
+          {/* Facecam Zoom + Instant Save Bar (for Split Modes) */}
+          {isSplit && (
+            <div class="mx-auto w-[285px] sm:w-[305px] bg-slate-950/90 border border-slate-800 rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 shadow-lg">
+              <div class="flex items-center gap-1.5 flex-1 min-w-0">
+                <span class="text-[10px] font-bold text-slate-400 shrink-0">🔍</span>
+                <button
+                  type="button"
+                  onClick={() => applyZoom(currentZoom - 0.15)}
+                  class="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-black flex items-center justify-center cursor-pointer shrink-0"
+                  title="Zoom out facecam"
+                >
+                  -
+                </button>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="3.5"
+                  step="0.05"
+                  value={currentZoom}
+                  onChange={(e) => applyZoom(parseFloat(e.target.value))}
+                  class="w-full accent-amber-400 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+                  title="Adjust streamer facecam zoom"
+                />
+                <button
+                  type="button"
+                  onClick={() => applyZoom(currentZoom + 0.15)}
+                  class="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-black flex items-center justify-center cursor-pointer shrink-0"
+                  title="Zoom in facecam"
+                >
+                  +
+                </button>
+                <span class="text-[10px] font-mono font-bold text-amber-300 w-8 text-right shrink-0">
+                  {currentZoom.toFixed(1)}x
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => onSaveFrame && onSaveFrame()}
+                disabled={isSaving || !hasFramingChanged}
+                class={`px-2 py-1 rounded-lg text-[10px] font-black transition shrink-0 cursor-pointer ${
+                  isSaving
+                    ? 'bg-amber-500 text-slate-950 animate-pulse'
+                    : hasFramingChanged
+                      ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow shadow-emerald-500/30'
+                      : 'bg-slate-800 text-emerald-400 border border-emerald-500/30 cursor-default'
+                }`}
+                title={hasFramingChanged ? 'Save dragged/zoomed facecam to MP4' : 'Current framing is saved to MP4'}
+              >
+                {isSaving ? '⏳ Saving...' : hasFramingChanged ? '💾 Save' : '✅ Saved'}
+              </button>
+            </div>
+          )}
         </div>
       );
     }
@@ -2849,14 +2923,17 @@
           if (!res.ok || !data.success) {
             throw new Error(data.error || 'Failed to render clip');
           }
+          const appliedCustomRectStr = override.customCamRect ? JSON.stringify(override.customCamRect) : null;
+          const updatedEntry = {
+            ...data,
+            appliedCropMode: chosenCropMode,
+            appliedCamPosition: chosenCam,
+            appliedBlur: chosenBlur,
+            appliedCustomRect: appliedCustomRectStr
+          };
           setRenderedStreamClips(prev => ({
             ...prev,
-            [moment.rank]: {
-              ...data,
-              appliedCropMode: chosenCropMode,
-              appliedCamPosition: chosenCam,
-              appliedBlur: chosenBlur
-            }
+            [moment.rank]: updatedEntry
           }));
           return data;
         } catch (e) {
@@ -5623,9 +5700,13 @@
                           const renderedData = renderedStreamClips[moment.rank];
                           const currentCrop = (momentFramingOverrides[moment.rank]?.cropMode) || streamCropMode;
                           const currentCam = (momentFramingOverrides[moment.rank]?.camPosition) || streamCamPosition;
+                          const currentCustomRectStr = momentFramingOverrides[moment.rank]?.customCamRect
+                            ? JSON.stringify(momentFramingOverrides[moment.rank].customCamRect)
+                            : null;
                           const hasFramingChanged = renderedData && (
                             currentCrop !== (renderedData.appliedCropMode || streamCropMode) ||
-                            currentCam !== (renderedData.appliedCamPosition || streamCamPosition)
+                            currentCam !== (renderedData.appliedCamPosition || streamCamPosition) ||
+                            currentCustomRectStr !== (renderedData.appliedCustomRect || null)
                           );
 
                           return (
@@ -5873,6 +5954,8 @@
                                     currentBlur={(momentFramingOverrides[moment.rank]?.blurIntensity) || streamBlurIntensity}
                                     customCamRect={momentFramingOverrides[moment.rank]?.customCamRect || null}
                                     hasFramingChanged={hasFramingChanged}
+                                    isSaving={isRenderingThis}
+                                    onSaveFrame={() => handleRenderStreamClip(moment)}
                                     onCamChange={(newCam) => {
                                       setMomentFramingOverrides(prev => ({
                                         ...prev,
@@ -5924,81 +6007,88 @@
                                       >
                                         <span>{isRenderingThis ? '⏳' : '🔄'} Re-Render</span>
                                       </button>
-                                      <button
-                                        onClick={() => openSocialPublishModal({
-                                          clipId: `stream_moment_${moment.rank || (idx + 1)}`,
-                                          preferredPlatform: 'both',
-                                          sourcePage: 'Stream Chat Clipper',
-                                          clipUrl: renderedData.clipUrl,
-                                          clipTitle: `${streamAnalysisResult?.streamerName || 'Streamer'} - ${moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment'}`,
-                                          hook: moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment',
-                                          streamer: streamAnalysisResult?.streamerName || 'Streamer',
-                                          topic: 'Gaming Stream Highlight',
-                                          transcript: (renderedData.transcript || []).map(t => t.text).join(' ')
-                                        })}
-                                        class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center space-x-1 cursor-pointer"
-                                        title="Edit AI Metadata before publishing"
-                                      >
-                                        <span>✏️ Metadata</span>
-                                      </button>
-                                      <button
-                                        onClick={() => openSocialPublishModal({
-                                          clipId: `stream_moment_${moment.rank || (idx + 1)}`,
-                                          preferredPlatform: 'youtube',
-                                          sourcePage: 'Stream Chat Clipper',
-                                          clipUrl: renderedData.clipUrl,
-                                          clipTitle: `${streamAnalysisResult?.streamerName || 'Streamer'} - ${moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment'}`,
-                                          hook: moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment',
-                                          streamer: streamAnalysisResult?.streamerName || 'Streamer',
-                                          topic: 'Gaming Stream Highlight',
-                                          transcript: (renderedData.transcript || []).map(t => t.text).join(' ')
-                                        })}
-                                        class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-500/30 transition flex items-center space-x-1 cursor-pointer"
-                                        title="Publish directly to YouTube Shorts"
-                                      >
-                                        <span>▶ YouTube</span>
-                                      </button>
-                                      <button
-                                        onClick={() => openSocialPublishModal({
-                                          clipId: `stream_moment_${moment.rank || (idx + 1)}`,
-                                          preferredPlatform: 'instagram',
-                                          sourcePage: 'Stream Chat Clipper',
-                                          clipUrl: renderedData.clipUrl,
-                                          clipTitle: `${streamAnalysisResult?.streamerName || 'Streamer'} - ${moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment'}`,
-                                          hook: moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment',
-                                          streamer: streamAnalysisResult?.streamerName || 'Streamer',
-                                          topic: 'Gaming Stream Highlight',
-                                          transcript: (renderedData.transcript || []).map(t => t.text).join(' ')
-                                        })}
-                                        class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-pink-600/20 hover:bg-pink-600/40 text-pink-400 border border-pink-500/30 transition flex items-center space-x-1 cursor-pointer"
-                                        title="Publish directly to Instagram Reels"
-                                      >
-                                        <span>📷 Instagram</span>
-                                      </button>
-                                      <button
-                                        onClick={() => openSocialPublishModal({
-                                          clipId: `stream_moment_${moment.rank || (idx + 1)}`,
-                                          preferredPlatform: 'both',
-                                          sourcePage: 'Stream Chat Clipper',
-                                          clipUrl: renderedData.clipUrl,
-                                          clipTitle: `${streamAnalysisResult?.streamerName || 'Streamer'} - ${moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment'}`,
-                                          hook: moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment',
-                                          streamer: streamAnalysisResult?.streamerName || 'Streamer',
-                                          topic: 'Gaming Stream Highlight',
-                                          transcript: (renderedData.transcript || []).map(t => t.text).join(' ')
-                                        })}
-                                        class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-red-600 via-pink-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white transition flex items-center space-x-1.5 shadow-lg shadow-pink-600/30 cursor-pointer active:scale-95"
-                                        title="1-Click Publish to both YouTube Shorts and Instagram Reels"
-                                      >
-                                        <span>🚀 1-Click Both</span>
-                                      </button>
-                                      <a
-                                        href={renderedData.clipUrl}
-                                        download={`stream_clip_moment_${moment.rank}.mp4`}
-                                        class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center space-x-1 shadow-lg shadow-emerald-600/30"
-                                      >
-                                        <span>⬇️ MP4</span>
-                                      </a>
+                                      {(() => {
+                                        const publishWithLatestFrame = async (platform) => {
+                                          let finalUrl = renderedData.clipUrl;
+                                          let finalTranscript = renderedData.transcript || [];
+                                          if (hasFramingChanged) {
+                                            const fresh = await handleRenderStreamClip(moment);
+                                            if (fresh && fresh.clipUrl) {
+                                              finalUrl = fresh.clipUrl;
+                                              finalTranscript = fresh.transcript || finalTranscript;
+                                            }
+                                          }
+                                          openSocialPublishModal({
+                                            clipId: `stream_moment_${moment.rank || (idx + 1)}`,
+                                            preferredPlatform: platform,
+                                            sourcePage: 'Stream Chat Clipper',
+                                            clipUrl: finalUrl,
+                                            clipTitle: `${streamAnalysisResult?.streamerName || 'Streamer'} - ${moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment'}`,
+                                            hook: moment.headline_hook || moment.hook || moment.title || 'Viral Stream Moment',
+                                            streamer: streamAnalysisResult?.streamerName || 'Streamer',
+                                            topic: 'Gaming Stream Highlight',
+                                            transcript: finalTranscript.map(t => t.text).join(' ')
+                                          });
+                                        };
+                                        const downloadWithLatestFrame = async () => {
+                                          let finalUrl = renderedData.clipUrl;
+                                          if (hasFramingChanged) {
+                                            const fresh = await handleRenderStreamClip(moment);
+                                            if (fresh && fresh.clipUrl) finalUrl = fresh.clipUrl;
+                                          }
+                                          const a = document.createElement('a');
+                                          a.href = `http://127.0.0.1:3000${finalUrl}`;
+                                          a.download = '';
+                                          document.body.appendChild(a);
+                                          a.click();
+                                          document.body.removeChild(a);
+                                        };
+                                        return (
+                                          <React.Fragment>
+                                            <button
+                                              onClick={() => publishWithLatestFrame('both')}
+                                              disabled={isRenderingThis}
+                                              class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center space-x-1 cursor-pointer"
+                                              title="Edit AI Metadata before publishing"
+                                            >
+                                              <span>✏️ Metadata</span>
+                                            </button>
+                                            <button
+                                              onClick={() => publishWithLatestFrame('youtube')}
+                                              disabled={isRenderingThis}
+                                              class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-500/30 transition flex items-center space-x-1 cursor-pointer"
+                                              title="Publish directly to YouTube Shorts (auto-saves current drag/zoom)"
+                                            >
+                                              <span>{isRenderingThis ? '⏳ Saving...' : '▶ YouTube'}</span>
+                                            </button>
+                                            <button
+                                              onClick={() => publishWithLatestFrame('instagram')}
+                                              disabled={isRenderingThis}
+                                              class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-pink-600/20 hover:bg-pink-600/40 text-pink-400 border border-pink-500/30 transition flex items-center space-x-1 cursor-pointer"
+                                              title="Publish directly to Instagram Reels (auto-saves current drag/zoom)"
+                                            >
+                                              <span>{isRenderingThis ? '⏳ Saving...' : '📷 Instagram'}</span>
+                                            </button>
+                                            <button
+                                              onClick={() => publishWithLatestFrame('both')}
+                                              disabled={isRenderingThis}
+                                              class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white shadow-md transition flex items-center space-x-1 cursor-pointer"
+                                              title="Publish simultaneously to YouTube Shorts & Instagram Reels (auto-saves current drag/zoom)"
+                                            >
+                                              <span>{isRenderingThis ? '⏳ Saving...' : '🚀 1-Click Both'}</span>
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={downloadWithLatestFrame}
+                                              disabled={isRenderingThis}
+                                              class="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md flex items-center space-x-1 cursor-pointer"
+                                              title="Download MP4 with your exact dragged & zoomed framing"
+                                            >
+                                              <span>{isRenderingThis ? '⏳ Saving...' : '⬇️ MP4'}</span>
+                                            </button>
+                                          </React.Fragment>
+                                        );
+                                      })()}
                                     </div>
                                   </div>
 
