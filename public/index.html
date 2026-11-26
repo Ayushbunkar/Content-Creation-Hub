@@ -5676,34 +5676,6 @@
                                       )}
                                     </div>
 
-                                    {/* Live 0-Second Framed Indicator Banner */}
-                                    {hasFramingChanged && (
-                                      <div class="p-2.5 rounded-xl bg-gradient-to-r from-emerald-950/70 via-slate-900 to-indigo-950/70 border border-emerald-500/50 flex items-center justify-between gap-3 shadow-lg shadow-emerald-950/30">
-                                        <div class="flex items-center space-x-2">
-                                          <span class="text-base text-emerald-400">✨</span>
-                                          <div>
-                                            <div class="text-xs font-bold text-emerald-300 flex items-center space-x-1.5">
-                                              <span>Live 0s Edit Active:</span>
-                                              <span class="text-white bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/40 uppercase font-mono text-[11px]">
-                                                {currentCrop.replace('split_', '').replace('_', '/')}
-                                              </span>
-                                              <span class="text-amber-300 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40 uppercase font-mono text-[10px]">
-                                                {currentCam.replace('_', ' ')}
-                                              </span>
-                                            </div>
-                                            <div class="text-[10px] text-slate-300">Live preview reflects immediately above without re-rendering! Click to bake final MP4 whenever you're ready.</div>
-                                          </div>
-                                        </div>
-                                        <button
-                                          onClick={() => handleRenderStreamClip(moment)}
-                                          disabled={isRenderingThis}
-                                          class="px-3.5 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/25 flex items-center space-x-1.5 cursor-pointer transition active:scale-95 shrink-0"
-                                          title="Bake this framing into final downloadable MP4"
-                                        >
-                                          <span>{isRenderingThis ? '⏳ Baking in 2s...' : '💾 Save & Render MP4 (2s)'}</span>
-                                        </button>
-                                      </div>
-                                    )}
                                   </div>
 
                               {/* Rendered Preview Player OR Initial Render Button */}
