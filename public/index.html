@@ -1357,17 +1357,29 @@
       currentCrop,
       currentCam,
       currentBlur,
+      customCamRect,
       hasFramingChanged,
-      onCamChange
+      onCamChange,
+      onCustomRectChange
     }) {
       const topVideoRef = React.useRef(null);
       const masterVideoRef = React.useRef(null);
       const bgVideoRef = React.useRef(null);
+      const pickerVideoRef = React.useRef(null);
+      const pickerBoxRef = React.useRef(null);
+
       const [resolvedRawUrl, setResolvedRawUrl] = React.useState(renderedData?.rawClipUrl || null);
+      const [isDrawMode, setIsDrawMode] = React.useState(false);
+      const [drawStart, setDrawStart] = React.useState(null);
+      const [drawCurrent, setDrawCurrent] = React.useState(null);
+      const [isPanning, setIsPanning] = React.useState(false);
+      const panStartRef = React.useRef(null);
 
       // Auto-resolve pristine 16:9 uncropped stream clip from server cache if not already in state
       React.useEffect(() => {
-        if (!resolvedRawUrl && renderedData) {
+        if (renderedData?.rawClipUrl && renderedData.rawClipUrl !== resolvedRawUrl) {
+          setResolvedRawUrl(renderedData.rawClipUrl);
+        } else if (!resolvedRawUrl && renderedData) {
           fetch(`/api/stream-clipper/raw-clip/${moment.rank}`)
             .then(r => r.json())
             .then(d => {
@@ -1377,29 +1389,125 @@
             })
             .catch(() => {});
         }
-      }, [moment.rank, renderedData, resolvedRawUrl]);
+      }, [moment.rank, renderedData]);
 
-      // If user changed framing or raw clip is available, use pristine uncropped video; else fallback to clipUrl
-      const videoSource = (hasFramingChanged && resolvedRawUrl) ? resolvedRawUrl : (resolvedRawUrl || renderedData?.clipUrl);
+      const videoSource = resolvedRawUrl || renderedData?.clipUrl;
 
-      // Camera coordinates mapping (origin & scale) for crisp facecam zoom
-      const camConfigs = {
-        'bottom_left': { origin: '7% 91%', scale: 3.2, label: '↙ Bottom-Left' },
-        'top_left': { origin: '7% 9%', scale: 3.2, label: '↖ Top-Left' },
-        'bottom_right': { origin: '93% 91%', scale: 3.2, label: '↘ Bottom-Right' },
-        'top_right': { origin: '93% 9%', scale: 3.2, label: '↗ Top-Right' },
-        'center_left': { origin: '7% 45%', scale: 3.2, label: '⬅ Middle-Left' },
-        'center_right': { origin: '93% 45%', scale: 3.2, label: '➡ Middle-Right' },
-        'auto_center': { origin: '50% 22%', scale: 2.6, label: '🎯 Center' },
-        'auto_detect': { origin: '7% 91%', scale: 3.2, label: '🤖 Auto (Bottom-Left)' }
+      // Preset normalized rectangles (x, y, w, h in 0..1 of 16:9 source frame)
+      const presetRects = {
+        'bottom_left':  { x: 0.00, y: 0.68, w: 0.25, h: 0.32 },
+        'top_left':     { x: 0.00, y: 0.00, w: 0.25, h: 0.32 },
+        'bottom_right': { x: 0.75, y: 0.68, w: 0.25, h: 0.32 },
+        'top_right':    { x: 0.75, y: 0.00, w: 0.25, h: 0.32 },
+        'center_left':  { x: 0.00, y: 0.34, w: 0.25, h: 0.32 },
+        'center_right': { x: 0.75, y: 0.34, w: 0.25, h: 0.32 },
+        'auto_center':  { x: 0.35, y: 0.12, w: 0.30, h: 0.38 },
+        'auto_detect':  { x: 0.00, y: 0.68, w: 0.25, h: 0.32 }
       };
-      const activeCam = camConfigs[currentCam] || camConfigs['bottom_left'];
+
+      const activeRect = (customCamRect && customCamRect.w > 0.03 && customCamRect.h > 0.03)
+        ? customCamRect
+        : (presetRects[currentCam] || presetRects['bottom_left']);
 
       // Dynamic split ratio calculation
       let camHeightPercent = 40;
       if (currentCrop === 'split_50_50') camHeightPercent = 50;
       else if (currentCrop === 'split_30_70') camHeightPercent = 30;
       else if (currentCrop === 'split_70_30') camHeightPercent = 70;
+
+      // Exact CSS video positioning inside top facecam box so activeRect fills 100% with zero black bars
+      const containerAspect = (9 / 16) / (camHeightPercent / 100);
+      const videoAspect = 16 / 9;
+      const scaleWPercent = Math.max(
+        100 / Math.max(0.08, activeRect.w),
+        (100 * videoAspect) / (Math.max(0.08, activeRect.h) * containerAspect)
+      );
+      const cx = Math.max(0.04, Math.min(0.96, activeRect.x + activeRect.w / 2));
+      const cy = Math.max(0.04, Math.min(0.96, activeRect.y + activeRect.h / 2));
+
+      // Direct Mouse Drag (pan) inside Top Facecam Box
+      const handleTopPanStart = (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        setIsPanning(true);
+        panStartRef.current = {
+          clientX: e.clientX,
+          clientY: e.clientY,
+          rect: { ...activeRect }
+        };
+      };
+
+      React.useEffect(() => {
+        if (!isPanning) return;
+        const onMove = (e) => {
+          if (!panStartRef.current) return;
+          const dx = (e.clientX - panStartRef.current.clientX) / 360;
+          const dy = (e.clientY - panStartRef.current.clientY) / 260;
+          const base = panStartRef.current.rect;
+          const nextX = Math.max(0, Math.min(1 - base.w, base.x - dx));
+          const nextY = Math.max(0, Math.min(1 - base.h, base.y - dy));
+          onCustomRectChange && onCustomRectChange({ ...base, x: nextX, y: nextY });
+        };
+        const onUp = () => {
+          setIsPanning(false);
+          panStartRef.current = null;
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        return () => {
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+        };
+      }, [isPanning, onCustomRectChange]);
+
+      // Rectangle Drawing Handlers on Full 16:9 Picker
+      const getNormalizedPoint = (e) => {
+        const el = pickerBoxRef.current;
+        if (!el) return { x: 0, y: 0 };
+        const r = el.getBoundingClientRect();
+        return {
+          x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)),
+          y: Math.max(0, Math.min(1, (e.clientY - r.top) / r.height))
+        };
+      };
+
+      const handleDrawMouseDown = (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        const pt = getNormalizedPoint(e);
+        setDrawStart(pt);
+        setDrawCurrent(pt);
+      };
+
+      const handleDrawMouseMove = (e) => {
+        if (!drawStart) return;
+        setDrawCurrent(getNormalizedPoint(e));
+      };
+
+      const handleDrawMouseUp = () => {
+        if (!drawStart || !drawCurrent) {
+          setDrawStart(null);
+          setDrawCurrent(null);
+          return;
+        }
+        const x = Math.min(drawStart.x, drawCurrent.x);
+        const y = Math.min(drawStart.y, drawCurrent.y);
+        const w = Math.abs(drawCurrent.x - drawStart.x);
+        const h = Math.abs(drawCurrent.y - drawStart.y);
+        setDrawStart(null);
+        setDrawCurrent(null);
+        if (w >= 0.05 && h >= 0.05) {
+          onCustomRectChange && onCustomRectChange({ x, y, w, h });
+          setIsDrawMode(false);
+        }
+      };
+
+      const previewDrawRect = (drawStart && drawCurrent) ? {
+        x: Math.min(drawStart.x, drawCurrent.x),
+        y: Math.min(drawStart.y, drawCurrent.y),
+        w: Math.abs(drawCurrent.x - drawStart.x),
+        h: Math.abs(drawCurrent.y - drawStart.y)
+      } : activeRect;
 
       // Synchronize video players (play, pause, scrub)
       const handlePlay = () => {
@@ -1443,8 +1551,8 @@
         const punchText = splitAt > 0 ? words.slice(splitAt).join(' ') : rawHook;
 
         return (
-          <div class={`px-3 py-1.5 rounded-xl bg-slate-950/90 backdrop-blur-md border border-amber-400/60 shadow-[0_4px_20px_rgba(0,0,0,0.85)] text-center leading-snug max-w-[92%] mx-auto ${isDivider ? 'ring-2 ring-red-500/40' : ''}`}>
-            <div class="text-[11px] sm:text-xs font-black uppercase tracking-wide drop-shadow-[0_2px_2px_rgba(0,0,0,0.95)] break-words">
+          <div class={`px-2.5 py-1 rounded-xl bg-slate-950/90 backdrop-blur-md border border-amber-400/60 shadow-[0_4px_20px_rgba(0,0,0,0.85)] text-center leading-snug max-w-[92%] mx-auto ${isDivider ? 'ring-2 ring-red-500/40' : ''}`}>
+            <div class="text-[10px] sm:text-[11px] font-black uppercase tracking-wide drop-shadow-[0_2px_2px_rgba(0,0,0,0.95)] break-words">
               {leadText && <span class="text-white">{leadText} </span>}
               <span class="text-amber-300">{punchText}</span>
             </div>
@@ -1453,184 +1561,259 @@
       };
 
       return (
-        <div class={`relative w-full rounded-2xl overflow-hidden border-2 bg-black shadow-2xl flex flex-col group select-none transition-all duration-300 ${
-          isOriginal169 ? 'aspect-video max-h-80 border-slate-700' : isSquare ? 'aspect-square max-h-80 border-slate-700' : 'aspect-[9/16] max-h-96 border-indigo-500/50'
-        }`}>
-          {/* Live Framing Badge */}
-          <div class="absolute top-2 left-2 z-30 pointer-events-none flex items-center gap-1.5">
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500 text-slate-950 border border-emerald-300 shadow flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-slate-950 animate-pulse"></span>
-              <span>LIVE 0s PREVIEW</span>
-            </span>
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-black/80 text-amber-300 border border-amber-500/40 backdrop-blur-sm uppercase font-mono">
-              {currentCrop.replace('split_', '').replace('_', '/')}
-            </span>
-          </div>
-
-          {/* Quick Camera Corner Switcher for Split Modes */}
-          {isSplit && (
-            <div class="absolute top-2 right-2 z-30 flex items-center gap-1 bg-black/80 p-1 rounded-lg border border-slate-700/80 backdrop-blur-sm">
-              <span class="text-[9px] text-slate-400 font-bold px-1">Cam:</span>
-              {[
-                { id: 'bottom_left', label: '↙ BL' },
-                { id: 'top_left', label: '↖ TL' },
-                { id: 'bottom_right', label: '↘ BR' },
-                { id: 'top_right', label: '↗ TR' }
-              ].map(c => (
+        <div class="space-y-2.5">
+          {/* Interactive 16:9 Mouse Rectangle Facecam Drawer */}
+          {isDrawMode && (
+            <div class="bg-slate-950 border-2 border-amber-400/80 rounded-2xl p-2.5 space-y-2 shadow-2xl">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="font-bold text-amber-300 flex items-center gap-1.5">
+                  <span>📐</span>
+                  <span>Mouse se drag karke Streamer ke Face par Rectangle banayein:</span>
+                </span>
                 <button
-                  key={c.id}
                   type="button"
-                  onClick={() => onCamChange && onCamChange(c.id)}
-                  class={`px-1.5 py-0.5 rounded text-[9px] font-black transition cursor-pointer ${
-                    currentCam === c.id ? 'bg-amber-400 text-slate-950 shadow-sm' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                  }`}
-                  title={`Switch webcam corner to ${c.label}`}
+                  onClick={() => setIsDrawMode(false)}
+                  class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold cursor-pointer"
                 >
-                  {c.label}
+                  ✕ Close
                 </button>
-              ))}
-            </div>
-          )}
-
-          {/* A: SPLIT SCREEN (40/60, 50/50, 30/70, 70/30) */}
-          {isSplit && (
-            <div class="w-full h-full flex flex-col overflow-hidden">
-              {/* Top Facecam Box */}
+              </div>
               <div
-                class="relative w-full overflow-hidden bg-black shrink-0 transition-all duration-300"
-                style={{ height: `${camHeightPercent}%` }}
+                ref={pickerBoxRef}
+                onMouseDown={handleDrawMouseDown}
+                onMouseMove={handleDrawMouseMove}
+                onMouseUp={handleDrawMouseUp}
+                onMouseLeave={handleDrawMouseUp}
+                class="relative w-full aspect-video bg-black rounded-xl overflow-hidden cursor-crosshair select-none border border-slate-700"
               >
                 <video
-                  ref={topVideoRef}
+                  ref={pickerVideoRef}
                   src={videoSource}
                   muted
                   playsInline
-                  class="w-full h-full object-cover pointer-events-none transition-all duration-300"
-                  style={{
-                    transformOrigin: activeCam.origin,
-                    transform: `scale(${activeCam.scale})`
-                  }}
+                  autoPlay
+                  loop
+                  class="w-full h-full object-contain pointer-events-none"
                 />
-              </div>
-
-              {/* Center Hook Floating Viral Title Card */}
-              <div class="relative w-full h-1 bg-gradient-to-r from-red-600 via-amber-400 to-red-600 shrink-0 z-30 flex items-center justify-center">
-                <div class="pointer-events-none">
-                  {renderScreenTitle(true)}
+                {/* Drawn / Active Facecam Rectangle */}
+                <div
+                  class="absolute border-2 border-amber-400 bg-amber-400/20 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)] pointer-events-none"
+                  style={{
+                    left: `${previewDrawRect.x * 100}%`,
+                    top: `${previewDrawRect.y * 100}%`,
+                    width: `${previewDrawRect.w * 100}%`,
+                    height: `${previewDrawRect.h * 100}%`
+                  }}
+                >
+                  <span class="absolute -top-5 left-0 px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 text-[9px] font-black uppercase whitespace-nowrap shadow">
+                    🎯 Facecam Box ({Math.round(previewDrawRect.w * 100)}% × {Math.round(previewDrawRect.h * 100)}%)
+                  </span>
                 </div>
               </div>
+              <div class="text-[10px] text-slate-400 text-center">
+                Tip: Video par kahin bhi click karke box khinchein — chhodte hi 9:16 Reel me turant set ho jayega!
+              </div>
+            </div>
+          )}
 
-              {/* Bottom Gameplay Box */}
-              <div class="relative w-full flex-1 overflow-hidden bg-black">
+          {/* True 9:16 Vertical Reel Smartphone Frame (or 1:1 / 16:9) */}
+          <div class={`relative overflow-hidden border-2 bg-black shadow-2xl flex flex-col group select-none transition-all duration-300 ${
+            isOriginal169
+              ? 'w-full aspect-video rounded-2xl border-slate-700'
+              : isSquare
+                ? 'mx-auto w-[300px] sm:w-[320px] aspect-square rounded-2xl border-slate-700'
+                : 'mx-auto w-[270px] sm:w-[295px] aspect-[9/16] rounded-[24px] border-indigo-500/60 shadow-[0_0_30px_rgba(99,102,241,0.2)]'
+          }`}>
+            {/* Live Framing Badge */}
+            <div class="absolute top-2.5 left-2.5 z-30 pointer-events-none flex items-center gap-1">
+              <span class="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-emerald-500 text-slate-950 border border-emerald-300 shadow flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-slate-950 animate-pulse"></span>
+                <span>9:16 LIVE</span>
+              </span>
+              <span class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-black/80 text-amber-300 border border-amber-500/40 backdrop-blur-sm uppercase font-mono">
+                {currentCrop.replace('split_', '').replace('_', '/')}
+              </span>
+            </div>
+
+            {/* Quick Camera Corner Switcher + Mouse Rectangle Draw Button for Split Modes */}
+            {isSplit && (
+              <div class="absolute top-2.5 right-2 z-30 flex items-center gap-0.5 bg-black/85 p-0.5 rounded-lg border border-slate-700/80 backdrop-blur-sm">
+                {[
+                  { id: 'bottom_left', label: '↙BL' },
+                  { id: 'top_left', label: '↖TL' },
+                  { id: 'bottom_right', label: '↘BR' },
+                  { id: 'top_right', label: '↗TR' }
+                ].map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => onCamChange && onCamChange(c.id)}
+                    class={`px-1 py-0.5 rounded text-[8px] font-black transition cursor-pointer ${
+                      (!customCamRect && currentCam === c.id) ? 'bg-amber-400 text-slate-950 shadow-sm' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                    title={`Switch webcam corner to ${c.label}`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setIsDrawMode(v => !v)}
+                  class={`px-1.5 py-0.5 rounded text-[8px] font-black transition cursor-pointer ${
+                    (isDrawMode || customCamRect) ? 'bg-indigo-500 text-white shadow-sm' : 'bg-slate-700 text-amber-300 hover:bg-indigo-600'
+                  }`}
+                  title="Draw custom rectangle with mouse over streamer facecam"
+                >
+                  📐Draw
+                </button>
+              </div>
+            )}
+
+            {/* A: SPLIT SCREEN (40/60, 50/50, 30/70, 70/30) */}
+            {isSplit && (
+              <div class="w-full h-full flex flex-col overflow-hidden">
+                {/* Top Facecam Box — supports direct mouse drag pan! */}
+                <div
+                  onMouseDown={handleTopPanStart}
+                  class={`relative w-full overflow-hidden bg-black shrink-0 transition-all duration-150 ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+                  style={{ height: `${camHeightPercent}%` }}
+                  title="Drag with mouse to adjust streamer face position, or click 📐Draw to draw rectangle"
+                >
+                  <video
+                    ref={topVideoRef}
+                    src={videoSource}
+                    muted
+                    playsInline
+                    class="absolute max-w-none max-h-none pointer-events-none"
+                    style={{
+                      width: `${scaleWPercent}%`,
+                      height: 'auto',
+                      left: '50%',
+                      top: '50%',
+                      transform: `translate(-${cx * 100}%, -${cy * 100}%)`
+                    }}
+                  />
+                  <div class="absolute bottom-1.5 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none px-1.5 py-0.5 rounded bg-black/75 text-[8px] text-amber-300 font-bold border border-amber-400/30">
+                    ✋ Drag / 📐Draw
+                  </div>
+                </div>
+
+                {/* Center Hook Floating Viral Title Card */}
+                <div class="relative w-full h-1 bg-gradient-to-r from-red-600 via-amber-400 to-red-600 shrink-0 z-30 flex items-center justify-center">
+                  <div class="pointer-events-none w-full flex justify-center">
+                    {renderScreenTitle(true)}
+                  </div>
+                </div>
+
+                {/* Bottom Gameplay Box */}
+                <div class="relative w-full flex-1 overflow-hidden bg-black">
+                  <video
+                    ref={masterVideoRef}
+                    src={videoSource}
+                    controls
+                    playsInline
+                    onPlay={handlePlay}
+                    onPause={handlePause}
+                    onTimeUpdate={handleTimeUpdate}
+                    onSeeked={handleSeeked}
+                    class="w-full h-full object-cover object-center"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* B: GAUSSIAN BLUR PAD */}
+            {isBlur && (
+              <div class="relative w-full h-full flex items-center justify-center overflow-hidden">
+                <video
+                  ref={bgVideoRef}
+                  src={videoSource}
+                  muted
+                  playsInline
+                  class="absolute inset-0 w-full h-full object-cover pointer-events-none transition-all duration-300"
+                  style={{
+                    filter: `blur(${blurPx}px) brightness(0.55)`,
+                    transform: 'scale(1.2)'
+                  }}
+                />
+                <div class="absolute top-11 left-1/2 -translate-x-1/2 z-20 w-[92%] pointer-events-none">
+                  {renderScreenTitle(false)}
+                </div>
+                <div class="relative z-10 w-full px-2 mt-4">
+                  <video
+                    ref={masterVideoRef}
+                    src={videoSource}
+                    controls
+                    playsInline
+                    onPlay={handlePlay}
+                    onPause={handlePause}
+                    onTimeUpdate={handleTimeUpdate}
+                    onSeeked={handleSeeked}
+                    class="w-full aspect-video rounded-xl shadow-2xl border border-white/20 object-contain bg-black"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* C: DIRECT CENTER CROP */}
+            {isCenterCrop && (
+              <div class="relative w-full h-full overflow-hidden bg-black flex items-center justify-center">
+                <div class="absolute top-11 left-1/2 -translate-x-1/2 z-20 w-[92%] pointer-events-none">
+                  {renderScreenTitle(false)}
+                </div>
                 <video
                   ref={masterVideoRef}
                   src={videoSource}
                   controls
                   playsInline
-                  onPlay={handlePlay}
-                  onPause={handlePause}
-                  onTimeUpdate={handleTimeUpdate}
-                  onSeeked={handleSeeked}
                   class="w-full h-full object-cover object-center"
                 />
               </div>
-            </div>
-          )}
+            )}
 
-          {/* B: GAUSSIAN BLUR PAD */}
-          {isBlur && (
-            <div class="relative w-full h-full flex items-center justify-center overflow-hidden">
-              {/* Blurred Background Video */}
-              <video
-                ref={bgVideoRef}
-                src={videoSource}
-                muted
-                playsInline
-                class="absolute inset-0 w-full h-full object-cover pointer-events-none transition-all duration-300"
-                style={{
-                  filter: `blur(${blurPx}px) brightness(0.55)`,
-                  transform: 'scale(1.2)'
-                }}
-              />
-              {/* Top Safe-Zone Viral Title Card */}
-              <div class="absolute top-11 left-1/2 -translate-x-1/2 z-20 w-[92%] pointer-events-none">
-                {renderScreenTitle(false)}
-              </div>
-              {/* Centered 16:9 Foreground Video */}
-              <div class="relative z-10 w-full px-2 mt-4">
+            {/* D: SMART SPEAKER ZOOM */}
+            {isSmartZoom && (
+              <div class="relative w-full h-full overflow-hidden bg-black flex items-center justify-center">
+                <div class="absolute top-11 left-1/2 -translate-x-1/2 z-20 w-[92%] pointer-events-none">
+                  {renderScreenTitle(false)}
+                </div>
                 <video
                   ref={masterVideoRef}
                   src={videoSource}
                   controls
                   playsInline
-                  onPlay={handlePlay}
-                  onPause={handlePause}
-                  onTimeUpdate={handleTimeUpdate}
-                  onSeeked={handleSeeked}
-                  class="w-full aspect-video rounded-xl shadow-2xl border border-white/20 object-contain bg-black"
+                  class="w-full h-full object-cover transition-transform duration-500"
+                  style={{ transform: 'scale(1.25)', transformOrigin: 'center center' }}
                 />
               </div>
-            </div>
-          )}
+            )}
 
-          {/* C: DIRECT CENTER CROP */}
-          {isCenterCrop && (
-            <div class="relative w-full h-full overflow-hidden bg-black flex items-center justify-center">
-              <div class="absolute top-11 left-1/2 -translate-x-1/2 z-20 w-[92%] pointer-events-none">
-                {renderScreenTitle(false)}
+            {/* E: 1:1 SQUARE */}
+            {isSquare && (
+              <div class="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
+                <video
+                  ref={masterVideoRef}
+                  src={videoSource}
+                  controls
+                  playsInline
+                  class="w-full h-full object-cover object-center"
+                />
               </div>
-              <video
-                ref={masterVideoRef}
-                src={videoSource}
-                controls
-                playsInline
-                class="w-full h-full object-cover object-center"
-              />
-            </div>
-          )}
+            )}
 
-          {/* D: SMART SPEAKER ZOOM */}
-          {isSmartZoom && (
-            <div class="relative w-full h-full overflow-hidden bg-black flex items-center justify-center">
-              <div class="absolute top-11 left-1/2 -translate-x-1/2 z-20 w-[92%] pointer-events-none">
-                {renderScreenTitle(false)}
+            {/* F: 16:9 ORIGINAL */}
+            {isOriginal169 && (
+              <div class="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
+                <video
+                  ref={masterVideoRef}
+                  src={videoSource}
+                  controls
+                  playsInline
+                  class="w-full h-full object-cover object-center"
+                />
               </div>
-              <video
-                ref={masterVideoRef}
-                src={videoSource}
-                controls
-                playsInline
-                class="w-full h-full object-cover transition-transform duration-500"
-                style={{ transform: 'scale(1.25)', transformOrigin: 'center center' }}
-              />
-            </div>
-          )}
-
-          {/* E: 1:1 SQUARE */}
-          {isSquare && (
-            <div class="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
-              <video
-                ref={masterVideoRef}
-                src={videoSource}
-                controls
-                playsInline
-                class="w-full h-full object-cover object-center"
-              />
-            </div>
-          )}
-
-          {/* F: 16:9 ORIGINAL */}
-          {isOriginal169 && (
-            <div class="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
-              <video
-                ref={masterVideoRef}
-                src={videoSource}
-                controls
-                playsInline
-                class="w-full h-full object-contain"
-              />
-            </div>
-          )}
+            )}
+          </div>
         </div>
       );
     }
@@ -2646,6 +2829,7 @@
                   cropMode: chosenCropMode,
                   blurIntensity: chosenBlur,
                   camPosition: chosenCam,
+                  customCamRect: override.customCamRect || undefined,
                   captionStyle: chosenCaptionStyle,
                   isDemo
                 })
@@ -5639,7 +5823,7 @@
                                             const val = e.target.value;
                                             setMomentFramingOverrides(prev => ({
                                               ...prev,
-                                              [moment.rank]: { ...(prev[moment.rank] || {}), camPosition: val }
+                                              [moment.rank]: { ...(prev[moment.rank] || {}), camPosition: val, customCamRect: null }
                                             }));
                                           }}
                                           class="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs text-slate-200"
@@ -5687,11 +5871,18 @@
                                     currentCrop={currentCrop}
                                     currentCam={currentCam}
                                     currentBlur={(momentFramingOverrides[moment.rank]?.blurIntensity) || streamBlurIntensity}
+                                    customCamRect={momentFramingOverrides[moment.rank]?.customCamRect || null}
                                     hasFramingChanged={hasFramingChanged}
                                     onCamChange={(newCam) => {
                                       setMomentFramingOverrides(prev => ({
                                         ...prev,
-                                        [moment.rank]: { ...(prev[moment.rank] || {}), camPosition: newCam }
+                                        [moment.rank]: { ...(prev[moment.rank] || {}), camPosition: newCam, customCamRect: null }
+                                      }));
+                                    }}
+                                    onCustomRectChange={(rect) => {
+                                      setMomentFramingOverrides(prev => ({
+                                        ...prev,
+                                        [moment.rank]: { ...(prev[moment.rank] || {}), customCamRect: rect }
                                       }));
                                     }}
                                   />

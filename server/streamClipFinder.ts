@@ -786,6 +786,9 @@ export class StreamClipFinderService {
       try { if (fs.existsSync(tempRawPath)) fs.unlinkSync(tempRawPath); } catch (e) {}
       console.log(`[streamClipper] Raw stream unreadable or missing moov atom. Generating guaranteed clean sample clip for #${moment.rank}...`);
       await this.generateSampleStreamVideo(tempRawPath, moment, streamerName);
+      if (!fs.existsSync(cachedRawPath)) {
+        try { fs.copyFileSync(tempRawPath, cachedRawPath); } catch (e) {}
+      }
     } else if (!usedRawCache && !fs.existsSync(cachedRawPath)) {
       // Save pristine raw clip to persistent cache for instant 2-second re-renders!
       try { fs.copyFileSync(tempRawPath, cachedRawPath); } catch (e) {}
@@ -804,7 +807,16 @@ export class StreamClipFinderService {
 
     let detectedCamCrop: string | undefined = undefined;
     let detectedCamPositionLabel: string = camPosition;
-    if ((camPosition === 'auto_detect' || !camPosition) && cropMode.startsWith('split_')) {
+    const customCamRect = (options as any).customCamRect;
+    if (customCamRect && typeof customCamRect.w === 'number' && customCamRect.w > 0.03 && customCamRect.h > 0.03) {
+      const rx = Math.max(0, Math.min(0.95, customCamRect.x)).toFixed(4);
+      const ry = Math.max(0, Math.min(0.95, customCamRect.y)).toFixed(4);
+      const rw = Math.max(0.05, Math.min(1 - Number(rx), customCamRect.w)).toFixed(4);
+      const rh = Math.max(0.05, Math.min(1 - Number(ry), customCamRect.h)).toFixed(4);
+      detectedCamCrop = `crop=iw*${rw}:ih*${rh}:iw*${rx}:ih*${ry}`;
+      detectedCamPositionLabel = 'custom_rect';
+      console.log(`[streamClipper] 🎯 Using user-drawn custom facecam rectangle: ${detectedCamCrop}`);
+    } else if ((camPosition === 'auto_detect' || !camPosition) && cropMode.startsWith('split_')) {
       console.log(`[streamClipper] 🤖 Running AI Facecam Detector on ${path.basename(tempRawPath)}...`);
       const detection = await this.detectStreamerFacecam(tempRawPath, dividerY, `${streamerName}_${cleanUrlKey}`);
       if (detection && detection.ffmpeg_cam_crop) {
