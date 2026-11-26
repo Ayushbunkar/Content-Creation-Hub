@@ -504,9 +504,11 @@ export class StreamClipFinderService {
   }): Promise<{
     success: boolean;
     clipUrl: string;
+    rawClipUrl?: string;
     filePath: string;
     fileSizeMb: number;
     duration: number;
+    detectedCamPosition?: string;
     transcript?: any[];
   }> {
     let {
@@ -971,7 +973,7 @@ export class StreamClipFinderService {
       '--caption_style', captionStyle || 'speed_center',
       '--divider_y', String(dividerY || 768),
       '--duration', String(moment.duration || 30),
-      '--model', 'tiny'
+      '--model', 'base'
     ];
 
     return new Promise((resolve) => {

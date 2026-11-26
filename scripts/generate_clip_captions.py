@@ -15,6 +15,17 @@ import re
 import subprocess
 from pathlib import Path
 
+# Import transliteration helpers
+try:
+    sys.path.insert(0, str(Path(__file__).parent))
+    from transcribe_words import devanagari_to_hinglish, urdu_to_hinglish, to_roman_hinglish, has_devanagari, has_urdu
+except Exception:
+    def to_roman_hinglish(t: str) -> str: return t
+    def devanagari_to_hinglish(t: str) -> str: return t
+    def urdu_to_hinglish(t: str) -> str: return t
+    def has_devanagari(t: str) -> bool: return False
+    def has_urdu(t: str) -> bool: return False
+
 def format_ass_time(sec: float) -> str:
     sec = max(0.0, sec)
     h = int(sec // 3600)
@@ -26,8 +37,15 @@ def format_ass_time(sec: float) -> str:
     return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
 def clean_word(w: str) -> str:
-    # Allow alphanumeric, Hindi unicode (\u0900-\u097F), punctuation
-    return re.sub(r'[^\w\s\u0900-\u097F\'!\?-]', '', w).strip()
+    if not w:
+        return ""
+    # 1. Convert any Devanagari or Urdu script into clean Roman Hinglish
+    w = to_roman_hinglish(w)
+    # 2. Filter out non-Latin characters (strips Cyrillic, Chinese, Thai, Arabic symbols)
+    w = re.sub(r'[^a-zA-Z0-9\s\'\?!,.-]', '', w).strip()
+    # 3. Collapse repetitive character stutter/hallucinations (e.g. 'iviviv', 'sooooo' -> 'soo')
+    w = re.sub(r'(.)\1{2,}', r'\1\1', w)
+    return w
 
 def strip_unsupported_emojis(text: str) -> str:
     """Remove color emojis that Windows FFmpeg/libass renders as blank □ boxes, keeping crisp text & punctuation."""
@@ -214,48 +232,83 @@ def main():
 
         extracted_words = []
         try_faster = True
+        hinglish_prompt = (
+            "Gaming livestream commentary in Hinglish and English. "
+            "Bhai kya kar raha hai, gaadi nikaalo, bande a gaye, clutch ho gaya, OP bhai OP, "
+            "let's go guys, nice shot, dead, finish, watch out bro, carry mortal dynamo."
+        )
+
         try:
             import torch
             from faster_whisper import WhisperModel
             import sys
             import os
             sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-            from transcribe_words import devanagari_to_hinglish, has_devanagari
+            from transcribe_words import devanagari_to_hinglish, urdu_to_hinglish, to_roman_hinglish, has_devanagari, has_urdu
 
             device = "cuda" if torch.cuda.is_available() else "cpu"
             compute_type = "float16" if device == "cuda" else "int8"
             print(f"[captionGen] Accelerated WhisperModel '{args.model}' loading on {device} ({compute_type})...", file=sys.stderr)
             fw_model = WhisperModel(args.model, device=device, compute_type=compute_type)
 
+            # Detect language to prevent foreign hallucination (Arabic, Welsh, Maltese, Russian, etc.)
+            lang_detect_segs, info = fw_model.transcribe(audio_src, beam_size=1, vad_filter=True)
+            detected_lang = info.language if info and info.language else 'en'
+            print(f"[captionGen] Whisper audio language probe: {detected_lang} (prob: {getattr(info, 'language_probability', 1.0):.2f})", file=sys.stderr)
+
+            # Strictly allow English ('en') or Hindi ('hi') or Urdu ('ur').
+            # Any other language (Arabic, Persian, Russian, Welsh) is noise misdetection -> force 'en'
+            target_lang = detected_lang if detected_lang in ['en', 'hi', 'ur'] else 'en'
+
             segments, info = fw_model.transcribe(
                 audio_src,
+                language=target_lang,
                 word_timestamps=True,
-                beam_size=1,
+                beam_size=2,
+                condition_on_previous_text=False,
+                repetition_penalty=1.2,
+                no_repeat_ngram_size=3,
                 vad_filter=True,
-                initial_prompt="Namaste doston! Bhai ye dekho, kya scene hai, let's go carry mortal dynamo gaming stream."
+                vad_parameters=dict(min_silence_duration_ms=400, speech_pad_ms=200),
+                initial_prompt=hinglish_prompt
             )
+
+            prev_word = None
+            repeat_count = 0
             for seg in segments:
                 if seg.words:
                     for w in seg.words:
                         w_clean = clean_word(w.word)
-                        if has_devanagari(w_clean):
-                            w_clean = devanagari_to_hinglish(w_clean)
-                        if w_clean:
-                            extracted_words.append({
-                                'word': w_clean,
-                                'start': round(float(w.start), 2),
-                                'end': round(float(w.end), 2)
-                            })
+                        if not w_clean or len(w_clean) < 1:
+                            continue
+                        # Suppress repetitive word loops (e.g. 'main main main', '4100 4100 4100')
+                        if w_clean.lower() == (prev_word or '').lower():
+                            repeat_count += 1
+                            if repeat_count > 1:
+                                continue
+                        else:
+                            repeat_count = 0
+                        prev_word = w_clean
+                        extracted_words.append({
+                            'word': w_clean,
+                            'start': round(float(w.start), 2),
+                            'end': round(float(w.end), 2)
+                        })
                 else:
                     seg_text = seg.text.strip()
-                    if has_devanagari(seg_text):
-                        seg_text = devanagari_to_hinglish(seg_text)
                     tokens = [clean_word(t) for t in seg_text.split() if clean_word(t)]
                     if tokens:
                         s_start = float(seg.start)
                         s_end = float(seg.end or s_start + 2.0)
                         w_step = (s_end - s_start) / len(tokens)
                         for idx, tok in enumerate(tokens):
+                            if tok.lower() == (prev_word or '').lower():
+                                repeat_count += 1
+                                if repeat_count > 1:
+                                    continue
+                            else:
+                                repeat_count = 0
+                            prev_word = tok
                             extracted_words.append({
                                 'word': tok,
                                 'start': round(s_start + idx * w_step, 2),
@@ -266,28 +319,37 @@ def main():
             import whisper
             print(f"[captionGen] Running Whisper '{args.model}' word_timestamps=True on audio track...", file=sys.stderr)
             model = whisper.load_model(args.model)
-            
-            # Transcribe with auto language detection (handles Hindi, Hinglish, English seamlessly)
+
             res = model.transcribe(
                 audio_src,
                 word_timestamps=True,
-                no_speech_threshold=0.65,
-                logprob_threshold=-1.0,
+                no_speech_threshold=0.6,
                 condition_on_previous_text=False,
+                initial_prompt=hinglish_prompt,
                 fp16=False
             )
-            
+
+            prev_word = None
+            repeat_count = 0
             for seg in res.get('segments', []):
                 seg_words = seg.get('words', [])
                 if seg_words:
                     for w in seg_words:
                         word_clean = clean_word(w.get('word', ''))
-                        if word_clean:
-                            extracted_words.append({
-                                'word': word_clean,
-                                'start': round(float(w.get('start', 0.0)), 2),
-                                'end': round(float(w.get('end', 0.0)), 2)
-                            })
+                        if not word_clean:
+                            continue
+                        if word_clean.lower() == (prev_word or '').lower():
+                            repeat_count += 1
+                            if repeat_count > 1:
+                                continue
+                        else:
+                            repeat_count = 0
+                        prev_word = word_clean
+                        extracted_words.append({
+                            'word': word_clean,
+                            'start': round(float(w.get('start', 0.0)), 2),
+                            'end': round(float(w.get('end', 0.0)), 2)
+                        })
                 else:
                     seg_text = seg.get('text', '').strip()
                     tokens = [clean_word(t) for t in seg_text.split() if clean_word(t)]
@@ -296,6 +358,13 @@ def main():
                         s_end = float(seg.get('end', s_start + 2.0))
                         w_step = (s_end - s_start) / len(tokens)
                         for idx, tok in enumerate(tokens):
+                            if tok.lower() == (prev_word or '').lower():
+                                repeat_count += 1
+                                if repeat_count > 1:
+                                    continue
+                            else:
+                                repeat_count = 0
+                            prev_word = tok
                             extracted_words.append({
                                 'word': tok,
                                 'start': round(s_start + idx * w_step, 2),

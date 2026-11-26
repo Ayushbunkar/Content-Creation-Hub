@@ -54,8 +54,63 @@ COMMON_HINGLISH_WORDS = {
     'तो': 'toh', 'भी': 'bhi', 'नहीं': 'nahi', 'ना': 'na', 'हाँ': 'haan', 'बात': 'baat', 'लोग': 'log',
     'कुछ': 'kuch', 'सब': 'sab', 'सबको': 'sabko', 'अपने': 'apne', 'अपना': 'apna', 'अपनी': 'apni',
     'खेल': 'khel', 'खेला': 'khela', 'मजा': 'maza', 'आया': 'aaya', 'आएगा': 'aayega', 'रुको': 'ruko',
-    'एक': 'ek', 'दो': 'do', 'तीन': 'teen', 'चार': 'char', 'पाँच': 'paanch', 'दस': 'das'
+    'एक': 'ek', 'दो': 'do', 'तीन': 'teen', 'चार': 'char', 'पाँच': 'paanch', 'दस': 'das',
+    'गाड़ी': 'gaadi', 'बंदे': 'bande', 'ओपी': 'op', 'क्लच': 'clutch', 'सीन': 'scene',
+    'अरे': 'arey', 'यार': 'yaar', 'भाई': 'bhai', 'लेट्स': 'lets', 'गो': 'go'
 }
+
+URDU_MAP = {
+    'ا': 'a', 'آ': 'aa', 'ب': 'b', 'پ': 'p', 'ت': 't', 'ٹ': 't', 'ث': 's',
+    'ج': 'j', 'چ': 'ch', 'ح': 'h', 'خ': 'kh', 'د': 'd', 'ڈ': 'd', 'ذ': 'z',
+    'ر': 'r', 'ڑ': 'r', 'ز': 'z', 'ژ': 'zh', 'س': 's', 'ش': 'sh', 'ص': 's',
+    'ض': 'z', 'ط': 't', 'ظ': 'z', 'ع': 'a', 'غ': 'gh', 'ف': 'f', 'ق': 'q',
+    'ک': 'k', 'گ': 'g', 'ل': 'l', 'م': 'm', 'ن': 'n', 'ں': 'n', 'و': 'o',
+    'ہ': 'h', 'ھ': 'h', 'ء': '', 'ی': 'i', 'ے': 'e'
+}
+
+COMMON_URDU_WORDS = {
+    'اگر': 'agar', 'میں': 'main', 'نہیں': 'nahi', 'ہوں': 'hoon', 'ہے': 'hai',
+    'ہیں': 'hain', 'کیا': 'kya', 'کچھ': 'kuch', 'بھائی': 'bhai', 'گاڑی': 'gaadi',
+    'دیکھو': 'dekho', 'وہ': 'woh', 'یہ': 'yeh', 'ہم': 'hum', 'tum': 'tum', 'آپ': 'aap',
+    'تو': 'toh', 'بھی': 'bhi', 'کر': 'kar', 'کرو': 'karo', 'گیا': 'gaya', 'گئے': 'gaye',
+    'بہت': 'bahut', 'اچھا': 'achha', 'روکو': 'ruko', 'چلو': 'chalo', 'اوپی': 'op',
+    'بندے': 'bande', 'کلچ': 'clutch', 'یار': 'yaar', 'ارے': 'arey'
+}
+
+def has_urdu(text: str) -> bool:
+    if not text:
+        return False
+    return any('\u0600' <= ch <= '\u06ff' for ch in text)
+
+def urdu_to_hinglish(text: str) -> str:
+    """Converts Urdu / Arabic script to natural Roman Hinglish."""
+    if not text or not has_urdu(text):
+        return text
+    words = text.split()
+    out = []
+    for w in words:
+        clean_w = re.sub(r'[^\u0600-\u06ff]', '', w)
+        if clean_w in COMMON_URDU_WORDS:
+            out.append(COMMON_URDU_WORDS[clean_w])
+            continue
+        res = []
+        for ch in w:
+            if ch in URDU_MAP:
+                res.append(URDU_MAP[ch])
+            elif ch.isalnum() or ch in "'-":
+                res.append(ch)
+        out.append(''.join(res) if res else w)
+    return ' '.join(out)
+
+def to_roman_hinglish(text: str) -> str:
+    """Universal transliterator: turns Devanagari Hindi and Perso-Arabic Urdu into Roman Hinglish."""
+    if not text:
+        return ""
+    if has_devanagari(text):
+        text = devanagari_to_hinglish(text)
+    if has_urdu(text):
+        text = urdu_to_hinglish(text)
+    return text
 
 def has_devanagari(text: str) -> bool:
     if not text:
