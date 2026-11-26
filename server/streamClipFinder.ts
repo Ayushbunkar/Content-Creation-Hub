@@ -800,11 +800,13 @@ export class StreamClipFinderService {
     else dividerY = 768;
 
     let detectedCamCrop: string | undefined = undefined;
+    let detectedCamPositionLabel: string = camPosition;
     if ((camPosition === 'auto_detect' || !camPosition) && cropMode.startsWith('split_')) {
       console.log(`[streamClipper] 🤖 Running AI Facecam Detector on ${path.basename(tempRawPath)}...`);
       const detection = await this.detectStreamerFacecam(tempRawPath, dividerY, `${streamerName}_${cleanUrlKey}`);
       if (detection && detection.ffmpeg_cam_crop) {
         detectedCamCrop = detection.ffmpeg_cam_crop;
+        detectedCamPositionLabel = detection.position_label || 'bottom_left';
         console.log(`[streamClipper] ✅ Streamer facecam detected: ${detection.position_label} -> ${detectedCamCrop}`);
       }
     }
@@ -840,7 +842,7 @@ export class StreamClipFinderService {
       filePath: finalClipPath,
       fileSizeMb,
       duration: moment.duration,
-      detectedCamPosition: detectedCamCrop ? (detection?.position_label || camPosition) : camPosition,
+      detectedCamPosition: detectedCamPositionLabel,
       transcript: captionResult?.cues || []
     };
   }

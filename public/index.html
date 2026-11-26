@@ -5425,6 +5425,12 @@
                         {streamAnalysisResult.moments.map(moment => {
                           const isRenderingThis = streamRenderingRank === moment.rank;
                           const renderedData = renderedStreamClips[moment.rank];
+                          const currentCrop = (momentFramingOverrides[moment.rank]?.cropMode) || streamCropMode;
+                          const currentCam = (momentFramingOverrides[moment.rank]?.camPosition) || streamCamPosition;
+                          const hasFramingChanged = renderedData && (
+                            currentCrop !== (renderedData.appliedCropMode || streamCropMode) ||
+                            currentCam !== (renderedData.appliedCamPosition || streamCamPosition)
+                          );
 
                           return (
                             <div
@@ -5522,16 +5528,7 @@
                               </div>
 
                               {/* Custom Moment Framing & Blur Controls */}
-                              {(() => {
-                                const currentCrop = (momentFramingOverrides[moment.rank]?.cropMode) || streamCropMode;
-                                const currentCam = (momentFramingOverrides[moment.rank]?.camPosition) || streamCamPosition;
-                                const hasFramingChanged = renderedData && (
-                                  currentCrop !== (renderedData.appliedCropMode || streamCropMode) ||
-                                  currentCam !== (renderedData.appliedCamPosition || streamCamPosition)
-                                );
-
-                                return (
-                                  <div class="space-y-2.5">
+                              <div class="space-y-2.5">
                                     {/* 1-Click Framing Preset Quick Pills */}
                                     <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] font-bold">
                                       <span class="text-slate-500 uppercase tracking-wider text-[10px] mr-1 shrink-0">Presets:</span>
@@ -5666,8 +5663,6 @@
                                       </div>
                                     )}
                                   </div>
-                                );
-                              })()}
 
                               {/* Rendered Preview Player OR Initial Render Button */}
                               {renderedData ? (
