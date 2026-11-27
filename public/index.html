@@ -3083,15 +3083,24 @@
         if (!momentsList || momentsList.length === 0) return;
         setIsStreamBatchRendering(true);
         try {
-          for (let i = 0; i < momentsList.length; i++) {
-            const m = momentsList[i];
-            setBatchRenderProgress({
-              current: i + 1,
-              total: momentsList.length,
-              title: m.headline_hook || `Moment #${m.rank}`
-            });
-            await handleRenderStreamClip(m, analysisData);
-          }
+          // 2-worker parallel queue: cuts total batch render time in ~half while keeping GPU/CPU smooth
+          let nextIdx = 0;
+          let completed = 0;
+          const workerCount = Math.min(2, momentsList.length);
+          const runWorker = async () => {
+            while (nextIdx < momentsList.length) {
+              const idx = nextIdx++;
+              const m = momentsList[idx];
+              setBatchRenderProgress({
+                current: Math.min(momentsList.length, completed + 1),
+                total: momentsList.length,
+                title: m.headline_hook || `Moment #${m.rank}`
+              });
+              await handleRenderStreamClip(m, analysisData);
+              completed++;
+            }
+          };
+          await Promise.all(Array.from({ length: workerCount }, runWorker));
         } catch (err) {
           console.warn('[StreamClipper] Auto-render all moments encountered error:', err);
         } finally {

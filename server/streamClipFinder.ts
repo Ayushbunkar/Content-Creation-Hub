@@ -1,6 +1,6 @@
 import path from 'path';
 import fs from 'fs';
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 import crypto from 'crypto';
 
 export interface StreamerPreset {
@@ -808,6 +808,10 @@ export class StreamClipFinderService {
     let detectedCamCrop: string | undefined = undefined;
     let detectedCamPositionLabel: string = camPosition;
     const customCamRect = (options as any).customCamRect;
+    const needAutoFacecam = !(customCamRect && typeof customCamRect.w === 'number' && customCamRect.w > 0.03 && customCamRect.h > 0.03)
+      && (camPosition === 'auto_detect' || !camPosition)
+      && cropMode.startsWith('split_');
+
     if (customCamRect && typeof customCamRect.w === 'number' && customCamRect.w > 0.03 && customCamRect.h > 0.03) {
       const rx = Math.max(0, Math.min(0.95, customCamRect.x)).toFixed(4);
       const ry = Math.max(0, Math.min(0.95, customCamRect.y)).toFixed(4);
@@ -816,22 +820,26 @@ export class StreamClipFinderService {
       detectedCamCrop = `crop=iw*${rw}:ih*${rh}:iw*${rx}:ih*${ry}`;
       detectedCamPositionLabel = 'custom_rect';
       console.log(`[streamClipper] 🎯 Using user-drawn custom facecam rectangle: ${detectedCamCrop}`);
-    } else if ((camPosition === 'auto_detect' || !camPosition) && cropMode.startsWith('split_')) {
-      console.log(`[streamClipper] 🤖 Running AI Facecam Detector on ${path.basename(tempRawPath)}...`);
-      const detection = await this.detectStreamerFacecam(tempRawPath, dividerY, `${streamerName}_${cleanUrlKey}`);
-      if (detection && detection.ffmpeg_cam_crop) {
-        detectedCamCrop = detection.ffmpeg_cam_crop;
-        detectedCamPositionLabel = detection.position_label || 'bottom_left';
-        console.log(`[streamClipper] ✅ Streamer facecam detected: ${detection.position_label} -> ${detectedCamCrop}`);
-      }
     }
 
-    console.log(`[streamClipper] Generating viral captions (style: ${captionStyle}, divider: ${dividerY}px) for moment #${moment.rank}...`);
+    console.log(`[streamClipper] Generating captions${needAutoFacecam ? ' + detecting facecam in parallel' : ''} for moment #${moment.rank}...`);
     const tempAssPath = path.join(process.cwd(), 'storage', 'stream_clips', `captions_${clipId}.ass`);
     const tempJsonPath = path.join(process.cwd(), 'storage', 'stream_clips', `captions_${clipId}.json`);
     const hideTitle = Boolean((options as any).hideTitle) || (typeof moment.headline_hook === 'string' && moment.headline_hook.trim() === '');
     const hideSubtitles = Boolean((options as any).hideSubtitles);
-    const captionResult = await this.generateClipCaptions(tempRawPath, tempAssPath, tempJsonPath, streamerName, moment, captionStyle, dividerY, cachedTranscriptPath, hideTitle, hideSubtitles);
+
+    const [detection, captionResult] = await Promise.all([
+      needAutoFacecam
+        ? this.detectStreamerFacecam(tempRawPath, dividerY, `${streamerName}_${cleanUrlKey}`)
+        : Promise.resolve(null),
+      this.generateClipCaptions(tempRawPath, tempAssPath, tempJsonPath, streamerName, moment, captionStyle, dividerY, cachedTranscriptPath, hideTitle, hideSubtitles)
+    ]);
+
+    if (detection && detection.ffmpeg_cam_crop) {
+      detectedCamCrop = detection.ffmpeg_cam_crop;
+      detectedCamPositionLabel = detection.position_label || 'bottom_left';
+      console.log(`[streamClipper] ✅ Streamer facecam detected: ${detection.position_label} -> ${detectedCamCrop}`);
+    }
 
     // Step 3: FFmpeg Dual Split / Gaussian blur / Smart Zoom with burned Center Hook captions
     console.log(`[streamClipper] Cropping and formatting ${cropMode} video (cam: ${camPosition}, blur: ${blurIntensity}) with burned captions...`);
@@ -1134,46 +1142,47 @@ Dialogue: 2,0:00:00.00,${durStr},CenterHook,,0,0,0,,{\\pos(540,${dividerY || 768
       } else if (mode === 'center_crop') {
         // Direct punch-in 9:16 vertical crop
         if (hasAss) {
-          filterComplex = `[0:v]scale=1080:1920:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:1920[v0];[v0]subtitles='${escapedAss}'[v]`;
+          filterComplex = `[0:v]scale=1080:1920:flags=bicubic:force_original_aspect_ratio=increase,crop=1080:1920[v0];[v0]subtitles='${escapedAss}'[v]`;
         } else {
-          filterComplex = `[0:v]scale=1080:1920:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:1920[v]`;
+          filterComplex = `[0:v]scale=1080:1920:flags=bicubic:force_original_aspect_ratio=increase,crop=1080:1920[v]`;
         }
       } else if (mode === 'smart_zoom') {
         // Smart Speaker Zoom & Face Tracking: Punch in 1.35x centered on the active focal region
         if (hasAss) {
-          filterComplex = `[0:v]scale=1440:2560:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2[v0];[v0]subtitles='${escapedAss}'[v]`;
+          filterComplex = `[0:v]scale=1440:2560:flags=bicubic:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2[v0];[v0]subtitles='${escapedAss}'[v]`;
         } else {
-          filterComplex = `[0:v]scale=1440:2560:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2[v]`;
+          filterComplex = `[0:v]scale=1440:2560:flags=bicubic:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2[v]`;
         }
       } else if (mode === 'square_1_1') {
         // 1:1 Square Feed format
         if (hasAss) {
-          filterComplex = `[0:v]scale=1080:1080:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:1080[v0];[v0]subtitles='${escapedAss}'[v]`;
+          filterComplex = `[0:v]scale=1080:1080:flags=bicubic:force_original_aspect_ratio=increase,crop=1080:1080[v0];[v0]subtitles='${escapedAss}'[v]`;
         } else {
-          filterComplex = `[0:v]scale=1080:1080:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:1080[v]`;
+          filterComplex = `[0:v]scale=1080:1080:flags=bicubic:force_original_aspect_ratio=increase,crop=1080:1080[v]`;
         }
       } else if (mode === 'source_16_9') {
         // Original 16:9 widescreen
         if (hasAss) {
-          filterComplex = `[0:v]scale=1920:1080:flags=lanczos:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2[v0];[v0]subtitles='${escapedAss}'[v]`;
+          filterComplex = `[0:v]scale=1920:1080:flags=bicubic:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2[v0];[v0]subtitles='${escapedAss}'[v]`;
         } else {
-          filterComplex = `[0:v]scale=1920:1080:flags=lanczos:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2[v]`;
+          filterComplex = `[0:v]scale=1920:1080:flags=bicubic:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2[v]`;
         }
       } else {
         // Classic viral streamer format: Gaussian blurred background + crisp centered 16:9 stream + burned 3/4 captions
         if (hasAss) {
-          filterComplex = `[0:v]scale=1080:1920:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:1920,${blurParams}[bg];` +
-                          `[0:v]scale=1080:-1:flags=lanczos:force_original_aspect_ratio=decrease[fg];` +
+          filterComplex = `[0:v]scale=1080:1920:flags=bicubic:force_original_aspect_ratio=increase,crop=1080:1920,${blurParams}[bg];` +
+                          `[0:v]scale=1080:-1:flags=bicubic:force_original_aspect_ratio=decrease[fg];` +
                           `[bg][fg]overlay=(W-w)/2:(H-h)/2[v0];` +
                           `[v0]subtitles='${escapedAss}'[v]`;
         } else {
-          filterComplex = `[0:v]scale=1080:1920:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:1920,${blurParams}[bg];` +
-                          `[0:v]scale=1080:-1:flags=lanczos:force_original_aspect_ratio=decrease[fg];` +
+          filterComplex = `[0:v]scale=1080:1920:flags=bicubic:force_original_aspect_ratio=increase,crop=1080:1920,${blurParams}[bg];` +
+                          `[0:v]scale=1080:-1:flags=bicubic:force_original_aspect_ratio=decrease[fg];` +
                           `[bg][fg]overlay=(W-w)/2:(H-h)/2[v]`;
         }
       }
 
-      const args = [
+      const useNvenc = this.isNvencSupported();
+      const buildArgs = (nvenc: boolean) => [
         '-y',
         '-i', inputPath,
         '-filter_complex', filterComplex,
@@ -1181,13 +1190,9 @@ Dialogue: 2,0:00:00.00,${durStr},CenterHook,,0,0,0,,{\\pos(540,${dividerY || 768
         '-map', '0:a?',
         '-r', '30',
         '-fps_mode', 'cfr',
-        '-c:v', 'libx264',
-        '-preset', 'veryfast',
-        '-crf', '19',
-        '-threads', '0',
-        '-b:v', '8500k',
-        '-maxrate', '12000k',
-        '-bufsize', '16000k',
+        ...(nvenc
+          ? ['-c:v', 'h264_nvenc', '-preset', 'p4', '-cq', '19', '-b:v', '8500k', '-maxrate', '12000k', '-bufsize', '16000k']
+          : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-threads', '0', '-b:v', '8500k', '-maxrate', '12000k', '-bufsize', '16000k']),
         '-pix_fmt', 'yuv420p',
         '-af', 'aresample=async=1:first_pts=0',
         '-c:a', 'aac',
@@ -1197,17 +1202,41 @@ Dialogue: 2,0:00:00.00,${durStr},CenterHook,,0,0,0,,{\\pos(540,${dividerY || 768
         outputPath
       ];
 
-      const ffmpeg = spawn(this.getFfmpegCmd(), args);
-      let errStr = '';
-      ffmpeg.stderr.on('data', (d) => { errStr += d.toString(); });
-      ffmpeg.on('close', (code) => {
-        if (code === 0 && fs.existsSync(outputPath)) {
-          resolve();
-        } else {
-          reject(new Error(`FFmpeg vertical render failed (code ${code}): ${errStr.slice(-500)}`));
-        }
-      });
+      const runEncode = (nvenc: boolean) => {
+        const ffmpeg = spawn(this.getFfmpegCmd(), buildArgs(nvenc));
+        let errStr = '';
+        ffmpeg.stderr.on('data', (d) => { errStr += d.toString(); });
+        ffmpeg.on('close', (code) => {
+          if (code === 0 && fs.existsSync(outputPath)) {
+            resolve();
+          } else if (nvenc) {
+            console.warn('[streamClipper] NVENC encode failed, retrying with libx264 veryfast...');
+            this._nvencSupported = false;
+            runEncode(false);
+          } else {
+            reject(new Error(`FFmpeg vertical render failed (code ${code}): ${errStr.slice(-500)}`));
+          }
+        });
+      };
+      runEncode(useNvenc);
     });
+  }
+
+  private static _nvencSupported: boolean | null = null;
+  private static isNvencSupported(): boolean {
+    if (this._nvencSupported !== null) return this._nvencSupported;
+    try {
+      const res = spawnSync(this.getFfmpegCmd(), [
+        '-hide_banner', '-loglevel', 'error',
+        '-f', 'lavfi', '-i', 'color=c=black:s=256x256:d=0.1',
+        '-c:v', 'h264_nvenc', '-preset', 'p4', '-f', 'null', '-'
+      ], { timeout: 5000 });
+      this._nvencSupported = res.status === 0;
+      console.log(`[streamClipper] GPU NVENC hardware encoder: ${this._nvencSupported ? 'ENABLED (GTX 1650)' : 'CPU fallback (libx264)'}`);
+    } catch {
+      this._nvencSupported = false;
+    }
+    return this._nvencSupported;
   }
 
   /**

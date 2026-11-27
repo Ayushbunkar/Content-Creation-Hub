@@ -1735,30 +1735,30 @@ except Exception as e:
 
     if (aspect === '16:9') {
       const zoom169 = cameraZoomFilter ? `${cameraZoomFilter},` : '';
-      filterGraph = `[0:v]${zoom169}scale=1920:1080:force_original_aspect_ratio=decrease:flags=lanczos,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'[outv]`;
+      filterGraph = `[0:v]${zoom169}scale=1920:1080:force_original_aspect_ratio=decrease:flags=bicubic,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'[outv]`;
     } else if (aspect === '1:1') {
       if (mode === 'center_crop') {
-        const cropZoom = cameraZoomFilter ? `${cameraZoomFilter},scale=-1:1080:flags=lanczos` : 'scale=-1:1080:flags=lanczos';
+        const cropZoom = cameraZoomFilter ? `${cameraZoomFilter},scale=-1:1080:flags=bicubic` : 'scale=-1:1080:flags=bicubic';
         filterGraph = `[0:v]${cropZoom},crop=1080:1080:(iw-1080)/2:0,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'[outv]`;
       } else {
-        const fgZoom = cameraZoomFilter ? `${cameraZoomFilter},scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg]` : 'scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg]';
-        filterGraph = `[0:v]scale=1080:1080:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1080,gblur=sigma=28:steps=2,eq=brightness=-0.14:contrast=1.06[bg];[0:v]${fgZoom};[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${escapedAss}'[outv]`;
+        const fgZoom = cameraZoomFilter ? `${cameraZoomFilter},scale=1080:-1:flags=bicubic,unsharp=5:5:0.6:5:5:0.0[fg]` : 'scale=1080:-1:flags=bicubic,unsharp=5:5:0.6:5:5:0.0[fg]';
+        filterGraph = `[0:v]scale=1080:1080:force_original_aspect_ratio=increase:flags=bicubic,crop=1080:1080,gblur=sigma=28:steps=2,eq=brightness=-0.14:contrast=1.06[bg];[0:v]${fgZoom};[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${escapedAss}'[outv]`;
       }
     } else {
       // 9:16 Vertical Reel Formats
       if (mode === 'split_facecam') {
         // Gaming Facecam Layout: Gameplay 1140px on top, Webcam 780px on bottom with blurred backdrop
-        filterGraph = `[0:v]scale=1080:1140:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1140:(iw-1080)/2:0[top];[0:v]scale=1080:780:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:780,gblur=sigma=24:steps=2,eq=brightness=-0.16[botbg];[0:v]scale=1080:780:force_original_aspect_ratio=decrease:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[cam];[botbg][cam]overlay=(W-w)/2:(H-h)/2[bot];[top][bot]vstack=inputs=2[stacked];[stacked]subtitles='${escapedAss}'[outv]`;
+        filterGraph = `[0:v]scale=1080:1140:force_original_aspect_ratio=increase:flags=bicubic,crop=1080:1140:(iw-1080)/2:0[top];[0:v]scale=1080:780:force_original_aspect_ratio=increase:flags=bicubic,crop=1080:780,gblur=sigma=24:steps=2,eq=brightness=-0.16[botbg];[0:v]scale=1080:780:force_original_aspect_ratio=decrease:flags=bicubic,unsharp=5:5:0.6:5:5:0.0[cam];[botbg][cam]overlay=(W-w)/2:(H-h)/2[bot];[top][bot]vstack=inputs=2[stacked];[stacked]subtitles='${escapedAss}'[outv]`;
       } else if (mode === 'split_screen') {
         // Two-Person Podcast Layout: 50% Top Speaker (960px), 50% Bottom Speaker (960px)
-        filterGraph = `[0:v]crop=iw/2:ih:0:0,scale=1080:960:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:960[spk1];[0:v]crop=iw/2:ih:iw/2:0,scale=1080:960:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:960[spk2];[spk1][spk2]vstack=inputs=2[stacked];[stacked]subtitles='${escapedAss}'[outv]`;
+        filterGraph = `[0:v]crop=iw/2:ih:0:0,scale=1080:960:force_original_aspect_ratio=increase:flags=bicubic,crop=1080:960[spk1];[0:v]crop=iw/2:ih:iw/2:0,scale=1080:960:force_original_aspect_ratio=increase:flags=bicubic,crop=1080:960[spk2];[spk1][spk2]vstack=inputs=2[stacked];[stacked]subtitles='${escapedAss}'[outv]`;
       } else if (mode === 'center_crop') {
-        const cropZoom = cameraZoomFilter ? `${cameraZoomFilter},scale=-1:1920:flags=lanczos` : 'scale=-1:1920:flags=lanczos';
+        const cropZoom = cameraZoomFilter ? `${cameraZoomFilter},scale=-1:1920:flags=bicubic` : 'scale=-1:1920:flags=bicubic';
         filterGraph = `[0:v]${cropZoom},crop=1080:1920:(iw-1080)/2:0,unsharp=5:5:0.5:5:5:0.0,subtitles='${escapedAss}'[outv]`;
       } else {
         // High quality single frame with Gaussian blurred background
-        const fgZoom = cameraZoomFilter ? `${cameraZoomFilter},scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg]` : 'scale=1080:-1:flags=lanczos,unsharp=5:5:0.6:5:5:0.0[fg]';
-        filterGraph = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,gblur=sigma=28:steps=2,eq=brightness=-0.14:contrast=1.06[bg];[0:v]${fgZoom};[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${escapedAss}'[outv]`;
+        const fgZoom = cameraZoomFilter ? `${cameraZoomFilter},scale=1080:-1:flags=bicubic,unsharp=5:5:0.6:5:5:0.0[fg]` : 'scale=1080:-1:flags=bicubic,unsharp=5:5:0.6:5:5:0.0[fg]';
+        filterGraph = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=bicubic,crop=1080:1920,gblur=sigma=28:steps=2,eq=brightness=-0.14:contrast=1.06[bg];[0:v]${fgZoom};[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,subtitles='${escapedAss}'[outv]`;
       }
     }
 
@@ -1771,9 +1771,9 @@ except Exception as e:
         '-avoid_negative_ts', 'make_zero',
         ...(isComplex ? ['-filter_complex', filterGraph, '-map', '[outv]', '-map', '0:a?'] : ['-vf', filterGraph]),
         '-c:v', 'libx264',
-        '-preset', 'fast',
-        '-crf', '18',
-        '-tune', 'film',
+        '-preset', 'veryfast',
+        '-crf', '19',
+        '-threads', '0',
         '-pix_fmt', 'yuv420p',
         '-color_primaries', 'bt709',
         '-color_trc', 'bt709',
