@@ -829,7 +829,9 @@ export class StreamClipFinderService {
     console.log(`[streamClipper] Generating viral captions (style: ${captionStyle}, divider: ${dividerY}px) for moment #${moment.rank}...`);
     const tempAssPath = path.join(process.cwd(), 'storage', 'stream_clips', `captions_${clipId}.ass`);
     const tempJsonPath = path.join(process.cwd(), 'storage', 'stream_clips', `captions_${clipId}.json`);
-    const captionResult = await this.generateClipCaptions(tempRawPath, tempAssPath, tempJsonPath, streamerName, moment, captionStyle, dividerY, cachedTranscriptPath);
+    const hideTitle = Boolean((options as any).hideTitle) || (typeof moment.headline_hook === 'string' && moment.headline_hook.trim() === '');
+    const hideSubtitles = Boolean((options as any).hideSubtitles);
+    const captionResult = await this.generateClipCaptions(tempRawPath, tempAssPath, tempJsonPath, streamerName, moment, captionStyle, dividerY, cachedTranscriptPath, hideTitle, hideSubtitles);
 
     // Step 3: FFmpeg Dual Split / Gaussian blur / Smart Zoom with burned Center Hook captions
     console.log(`[streamClipper] Cropping and formatting ${cropMode} video (cam: ${camPosition}, blur: ${blurIntensity}) with burned captions...`);
@@ -956,7 +958,9 @@ export class StreamClipFinderService {
     moment: StreamMoment,
     captionStyle: string = 'speed_center',
     dividerY: number = 768,
-    cachedTranscriptPath?: string
+    cachedTranscriptPath?: string,
+    hideTitle: boolean = false,
+    hideSubtitles: boolean = false
   ): Promise<{ cues: any[]; hasSpeech: boolean }> {
     const venvPy = this.getPythonCmd();
     const scriptPath = path.join(process.cwd(), 'scripts', 'generate_clip_captions.py');
@@ -967,8 +971,8 @@ export class StreamClipFinderService {
       outputAssPath,
       '--output_json', outputJsonPath,
       '--streamer', streamerName || 'Creator',
-      '--hook', moment.headline_hook || 'UNREAL MOMENT',
-      '--center_hook', moment.headline_hook || 'UNREAL MOMENT',
+      '--hook', hideTitle ? '' : (moment.headline_hook || 'UNREAL MOMENT'),
+      '--center_hook', hideTitle ? '' : (moment.headline_hook || 'UNREAL MOMENT'),
       '--caption_style', captionStyle || 'speed_center',
       '--divider_y', String(dividerY || 768),
       '--duration', String(moment.duration || 30),
@@ -976,6 +980,12 @@ export class StreamClipFinderService {
     ];
     if (cachedTranscriptPath) {
       args.push('--cached_json', cachedTranscriptPath);
+    }
+    if (hideTitle) {
+      args.push('--no_hook');
+    }
+    if (hideSubtitles) {
+      args.push('--no_subtitles');
     }
 
     return new Promise((resolve) => {
@@ -987,7 +997,7 @@ export class StreamClipFinderService {
       proc.stderr.on('data', (d) => { stderr += d.toString(); });
 
       const ensureHookAssExists = () => {
-        if (fs.existsSync(outputAssPath) || captionStyle === 'bottom_standard') return;
+        if (hideTitle || fs.existsSync(outputAssPath) || captionStyle === 'bottom_standard') return;
         try {
           const cleanHook = (moment.headline_hook || 'UNREAL MOMENT')
             .replace(/[\u{10000}-\u{10FFFF}\u2600-\u27BF\uFE0F]/gu, '')

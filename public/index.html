@@ -1593,18 +1593,35 @@
       // Dual-tone attractive on-screen reel title renderer — click directly on text to edit live!
       const commitInlineTitle = () => {
         const cleaned = (draftTitle || '').trim();
-        if (cleaned && onHookChange) {
+        if (onHookChange) {
           onHookChange(cleaned);
         }
         setIsEditingTitle(false);
       };
 
       const renderScreenTitle = (isDivider = false) => {
-        const rawHook = (moment.headline_hook || 'YE KYA HO GAYA LIVE STREAM PE?!').trim();
+        const rawHook = (moment.headline_hook || '').trim();
         const words = rawHook.split(/\s+/).filter(Boolean);
         const splitAt = words.length > 2 ? Math.ceil(words.length / 2) : 0;
         const leadText = splitAt > 0 ? words.slice(0, splitAt).join(' ') : '';
         const punchText = splitAt > 0 ? words.slice(splitAt).join(' ') : rawHook;
+
+        if (!rawHook && !isEditingTitle) {
+          return (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDraftTitle('');
+                setIsEditingTitle(true);
+              }}
+              class="pointer-events-auto opacity-0 group-hover:opacity-100 transition-opacity px-2 py-0.5 rounded-full bg-slate-950/80 border border-slate-700 text-[9px] font-bold text-slate-300 hover:text-amber-300 cursor-pointer"
+              title="Add on-screen caption/title"
+            >
+              + Add Title
+            </button>
+          );
+        }
 
         if (isEditingTitle) {
           return (
@@ -1623,8 +1640,21 @@
                 }}
                 onBlur={commitInlineTitle}
                 class="w-full bg-transparent text-white text-[11px] font-black uppercase tracking-wide text-center focus:outline-none"
-                placeholder="Type your reel title..."
+                placeholder="Type title (ya khali chhodein delete ke liye)..."
               />
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setDraftTitle('');
+                  if (onHookChange) onHookChange('');
+                  setIsEditingTitle(false);
+                }}
+                class="px-1.5 py-0.5 rounded bg-red-600/80 hover:bg-red-500 text-white text-[9px] font-black shrink-0 cursor-pointer"
+                title="Delete caption/title"
+              >
+                🗑️
+              </button>
               <button
                 type="button"
                 onMouseDown={(e) => { e.preventDefault(); commitInlineTitle(); }}
@@ -1645,7 +1675,7 @@
               setIsEditingTitle(true);
             }}
             class={`pointer-events-auto cursor-text px-2.5 py-1 rounded-xl bg-slate-950/90 hover:bg-slate-900/95 backdrop-blur-md border border-amber-400/60 hover:border-amber-300 shadow-[0_4px_20px_rgba(0,0,0,0.85)] text-center leading-snug max-w-[92%] mx-auto transition group/title ${isDivider ? 'ring-2 ring-red-500/40' : ''}`}
-            title="Click directly on this text to edit it on screen!"
+            title="Click directly on this text to edit or delete!"
           >
             <div class="text-[10px] sm:text-[11px] font-black uppercase tracking-wide drop-shadow-[0_2px_2px_rgba(0,0,0,0.95)] break-words flex items-center justify-center gap-1">
               <span>
@@ -1653,6 +1683,17 @@
                 <span class="text-amber-300">{punchText}</span>
               </span>
               <span class="text-[9px] opacity-60 group-hover/title:opacity-100 text-amber-300">✏️</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onHookChange) onHookChange('');
+                }}
+                class="text-[9px] opacity-0 group-hover/title:opacity-100 text-red-400 hover:text-red-300 ml-0.5 cursor-pointer"
+                title="Delete title"
+              >
+                🗑️
+              </button>
             </div>
           </div>
         );
@@ -2969,6 +3010,8 @@
         const chosenBlur = override.blurIntensity || streamBlurIntensity;
         const chosenCam = override.camPosition || streamCamPosition;
         const chosenCaptionStyle = override.captionStyle || streamCaptionStyle;
+        const chosenHideTitle = !(moment.headline_hook || '').trim();
+        const chosenHideSubtitles = Boolean(override.hideSubtitles);
 
         const effectiveAnalysis = customAnalysis || streamAnalysisResult;
         const targetUrl = effectiveAnalysis?.url || streamUrlInput.trim() || '';
@@ -2991,6 +3034,8 @@
                   camPosition: chosenCam,
                   customCamRect: override.customCamRect || undefined,
                   captionStyle: chosenCaptionStyle,
+                  hideTitle: chosenHideTitle,
+                  hideSubtitles: chosenHideSubtitles,
                   isDemo
                 })
               });
@@ -3016,7 +3061,9 @@
             appliedCamPosition: chosenCam,
             appliedBlur: chosenBlur,
             appliedCustomRect: appliedCustomRectStr,
-            appliedHook: moment.headline_hook || ''
+            appliedHook: (moment.headline_hook || '').trim(),
+            appliedCaptionStyle: chosenCaptionStyle,
+            appliedHideSubtitles: chosenHideSubtitles
           };
           setRenderedStreamClips(prev => ({
             ...prev,
@@ -5790,11 +5837,15 @@
                           const currentCustomRectStr = momentFramingOverrides[moment.rank]?.customCamRect
                             ? JSON.stringify(momentFramingOverrides[moment.rank].customCamRect)
                             : null;
+                          const currentCaptionStyle = (momentFramingOverrides[moment.rank]?.captionStyle) || streamCaptionStyle;
+                          const currentHideSubtitles = Boolean(momentFramingOverrides[moment.rank]?.hideSubtitles);
                           const hasFramingChanged = renderedData && (
                             currentCrop !== (renderedData.appliedCropMode || streamCropMode) ||
                             currentCam !== (renderedData.appliedCamPosition || streamCamPosition) ||
                             currentCustomRectStr !== (renderedData.appliedCustomRect || null) ||
-                            (moment.headline_hook || '') !== (renderedData.appliedHook ?? moment.headline_hook ?? '')
+                            ((moment.headline_hook || '').trim()) !== ((renderedData.appliedHook ?? '').trim()) ||
+                            currentCaptionStyle !== (renderedData.appliedCaptionStyle || streamCaptionStyle) ||
+                            currentHideSubtitles !== Boolean(renderedData.appliedHideSubtitles)
                           );
 
                           return (
@@ -6233,13 +6284,47 @@
                                           </span>
                                           <span class="text-[10px] text-slate-400">Screen par click karke bhi edit karein ✏️</span>
                                         </div>
-                                        <input
-                                          type="text"
-                                          value={moment.headline_hook || ''}
-                                          onChange={(e) => updateHook(e.target.value)}
-                                          class="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-black text-amber-300 focus:outline-none"
-                                          placeholder="Apna khud ka reel title / caption likhein..."
-                                        />
+                                        <div class="flex items-center gap-1.5">
+                                          <input
+                                            type="text"
+                                            value={moment.headline_hook || ''}
+                                            onChange={(e) => updateHook(e.target.value)}
+                                            class="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-black text-amber-300 focus:outline-none"
+                                            placeholder="Apna khud ka reel title / caption likhein (ya khali chhodein)..."
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => updateHook('')}
+                                            class={`px-2.5 py-1.5 rounded-lg text-[10px] font-black border transition shrink-0 cursor-pointer ${
+                                              !(moment.headline_hook || '').trim()
+                                                ? 'bg-red-600 text-white border-red-400'
+                                                : 'bg-slate-900 hover:bg-red-950 text-red-400 border-red-800/60'
+                                            }`}
+                                            title="Delete on-screen title/caption (no title on video)"
+                                          >
+                                            🗑️ Delete Title
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setMomentFramingOverrides(prev => ({
+                                                ...prev,
+                                                [moment.rank]: {
+                                                  ...(prev[moment.rank] || {}),
+                                                  hideSubtitles: !prev[moment.rank]?.hideSubtitles
+                                                }
+                                              }));
+                                            }}
+                                            class={`px-2.5 py-1.5 rounded-lg text-[10px] font-black border transition shrink-0 cursor-pointer ${
+                                              momentFramingOverrides[moment.rank]?.hideSubtitles
+                                                ? 'bg-red-600 text-white border-red-400'
+                                                : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-700'
+                                            }`}
+                                            title="Toggle spoken captions on/off"
+                                          >
+                                            {momentFramingOverrides[moment.rank]?.hideSubtitles ? '🔇 Subtitles Off' : '💬 Subtitles On'}
+                                          </button>
+                                        </div>
                                         <div class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
                                           {uniqueOptions.map((opt, oIdx) => {
                                             const active = (moment.headline_hook || '').trim() === opt.trim();

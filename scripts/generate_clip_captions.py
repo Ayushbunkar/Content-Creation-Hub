@@ -190,40 +190,45 @@ def write_ass_and_json(cues, has_speech, args, ass_path):
         print("[captionGen] No speech detected in segment; leaving captions clean without chat fallback.", file=sys.stderr)
 
     # Generate ASS with Center Hook Banner and Spoken Voice Word-Highlight
-    active_hook = (args.center_hook or args.hook or '').strip()
-    active_hook = re.sub(r'\s*\(\s*#\d+\s*\)\s*$', '', active_hook).strip()
+    if getattr(args, 'no_hook', False):
+        active_hook = ""
+    else:
+        active_hook = (args.center_hook or args.hook or '').strip()
+        active_hook = re.sub(r'\s*\(\s*#\d+\s*\)\s*$', '', active_hook).strip()
 
-    is_generic_hook = (
-        not active_hook
-        or "MASSIVE W" in active_hook.upper()
-        or "UNREAL MOMENT" in active_hook.upper()
-        or "CHAT EXPLODED" in active_hook.upper()
-    )
+        is_generic_hook = (
+            not active_hook
+            or "MASSIVE W" in active_hook.upper()
+            or "UNREAL MOMENT" in active_hook.upper()
+            or "CHAT EXPLODED" in active_hook.upper()
+        )
 
-    if is_generic_hook:
-        spoken_text = " ".join(c.get('text', '') for c in cues).lower()
-        if spoken_text:
-            if any(k in spoken_text for k in ['die', 'dying', 'dead', 'kill', 'killed', 'rip', 'survive']):
-                active_hook = "1 HP PE POORA SQUAD WIPE"
-            elif any(k in spoken_text for k in ['calm', 'fine', 'chill', 'relax']):
-                active_hook = "BRO FORGOT IT'S JUST A GAME"
-            elif any(k in spoken_text for k in ['car', 'drive', 'cops', 'police', 'crash', 'driving']):
-                active_hook = "POLICE CHASE GONE WRONG"
-            elif any(k in spoken_text for k in ['money', 'dono', 'paid', 'dollar', 'superchat', 'rich']):
-                active_hook = "CRAZY SUPERCHAT REACTION"
-            elif any(k in spoken_text for k in ['no way', 'nah', 'bro what', 'wait wait']):
-                active_hook = "WAIT FOR THE LAST 3 SECONDS"
-            elif any(k in spoken_text for k in ['stop', 'shut up', 'mad', 'scream', 'help']):
-                active_hook = "KEYBOARD TODNE WALA THA BHAI"
-            elif any(k in spoken_text for k in ['win', 'won', 'lose', 'lost', 'choke']):
-                active_hook = "1 SECOND ME GAME PALAT GAYA"
+        if is_generic_hook:
+            spoken_text = " ".join(c.get('text', '') for c in cues).lower()
+            if spoken_text:
+                if any(k in spoken_text for k in ['die', 'dying', 'dead', 'kill', 'killed', 'rip', 'survive']):
+                    active_hook = "1 HP PE POORA SQUAD WIPE"
+                elif any(k in spoken_text for k in ['calm', 'fine', 'chill', 'relax']):
+                    active_hook = "BRO FORGOT IT'S JUST A GAME"
+                elif any(k in spoken_text for k in ['car', 'drive', 'cops', 'police', 'crash', 'driving']):
+                    active_hook = "POLICE CHASE GONE WRONG"
+                elif any(k in spoken_text for k in ['money', 'dono', 'paid', 'dollar', 'superchat', 'rich']):
+                    active_hook = "CRAZY SUPERCHAT REACTION"
+                elif any(k in spoken_text for k in ['no way', 'nah', 'bro what', 'wait wait']):
+                    active_hook = "WAIT FOR THE LAST 3 SECONDS"
+                elif any(k in spoken_text for k in ['stop', 'shut up', 'mad', 'scream', 'help']):
+                    active_hook = "KEYBOARD TODNE WALA THA BHAI"
+                elif any(k in spoken_text for k in ['win', 'won', 'lose', 'lost', 'choke']):
+                    active_hook = "1 SECOND ME GAME PALAT GAYA"
+                else:
+                    active_hook = "WAIT TILL YOU SEE THIS REACTION"
             else:
-                active_hook = "WAIT TILL YOU SEE THIS REACTION"
-        else:
-            active_hook = "YE KYA HO GAYA LIVE STREAM PE?!"
+                active_hook = "YE KYA HO GAYA LIVE STREAM PE?!"
+
+    cues_for_ass = [] if getattr(args, 'no_subtitles', False) else cues
 
     ass_text = build_ass_content(
-        cues,
+        cues_for_ass,
         target_width=1080,
         target_height=1920,
         margin_v=420,
@@ -261,6 +266,8 @@ def main():
     parser.add_argument("--duration", type=float, default=30.0, help="Clip duration")
     parser.add_argument("--model", default="base", help="Whisper model (tiny, base)")
     parser.add_argument("--cached_json", default=None, help="Persistent transcript cache JSON path to skip Whisper on re-render/save")
+    parser.add_argument("--no_hook", action="store_true", help="Do not render any center hook/title banner")
+    parser.add_argument("--no_subtitles", action="store_true", help="Do not render spoken subtitles")
     args = parser.parse_args()
 
     input_path = Path(args.input_media).resolve()
@@ -272,7 +279,7 @@ def main():
     temp_wav = ass_path.parent / f"temp_whisper_{ass_path.stem}.wav"
 
     # Pre-write styled Center Hook ASS immediately so even if Whisper times out, the on-screen title is guaranteed!
-    initial_hook = re.sub(r'\s*\(\s*#\d+\s*\)\s*$', '', (args.center_hook or args.hook or 'UNREAL MOMENT').strip()).strip()
+    initial_hook = '' if args.no_hook else re.sub(r'\s*\(\s*#\d+\s*\)\s*$', '', (args.center_hook or args.hook or 'UNREAL MOMENT').strip()).strip()
     try:
         pre_ass = build_ass_content(
             [],
@@ -288,6 +295,10 @@ def main():
             f.write(pre_ass)
     except Exception:
         pass
+
+    if args.no_hook and args.no_subtitles:
+        write_ass_and_json([], False, args, ass_path)
+        return
 
     if args.cached_json:
         cache_p = Path(args.cached_json).resolve()
@@ -504,6 +515,10 @@ def main():
                 pass
 
     # Save persistent transcript cache so future Saves/re-renders skip Whisper completely
+    if args.no_hook and args.no_subtitles:
+        write_ass_and_json([], False, args, ass_path)
+        return
+
     if args.cached_json:
         try:
             cache_p = Path(args.cached_json).resolve()

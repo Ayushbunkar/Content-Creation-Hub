@@ -2624,7 +2624,7 @@ app.post('/api/stream-clipper/analyze', async (req, res) => {
 // 3. Render a single clip segment as 9:16 vertical video
 app.post('/api/stream-clipper/render-clip', async (req, res) => {
   try {
-    const { url, moment, streamerName, cropMode, blurIntensity, camPosition, customCamRect, captionStyle, isDemo } = req.body;
+    const { url, moment, streamerName, cropMode, blurIntensity, camPosition, customCamRect, captionStyle, isDemo, hideTitle, hideSubtitles } = req.body;
     if (!moment) return res.status(400).json({ error: 'moment object is required' });
 
     const result = await StreamClipFinderService.renderClip({
@@ -2636,7 +2636,9 @@ app.post('/api/stream-clipper/render-clip', async (req, res) => {
       camPosition: camPosition || 'auto_detect',
       customCamRect,
       captionStyle: captionStyle || 'speed_center',
-      isDemo: Boolean(isDemo)
+      isDemo: Boolean(isDemo),
+      hideTitle: Boolean(hideTitle),
+      hideSubtitles: Boolean(hideSubtitles)
     } as any);
     res.json(result);
   } catch (err: any) {
