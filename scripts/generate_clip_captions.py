@@ -251,20 +251,33 @@ def main():
             print(f"[captionGen] Accelerated WhisperModel '{args.model}' loading on {device} ({compute_type})...", file=sys.stderr)
             fw_model = WhisperModel(args.model, device=device, compute_type=compute_type)
 
-            # Detect language to prevent foreign hallucination (Arabic, Welsh, Maltese, Russian, etc.)
-            lang_detect_segs, info = fw_model.transcribe(audio_src, beam_size=1, vad_filter=True)
-            detected_lang = info.language if info and info.language else 'en'
-            print(f"[captionGen] Whisper audio language probe: {detected_lang} (prob: {getattr(info, 'language_probability', 1.0):.2f})", file=sys.stderr)
+            # Fast language detection: read only first segment (much faster than full pass)
+            # Uses language_detection_segments=1 which probes just the first ~30s
+            detected_lang = 'en'
+            try:
+                _, info_probe = fw_model.transcribe(
+                    audio_src,
+                    beam_size=1,
+                    language_detection_segments=1,
+                    vad_filter=True,
+                    language_detection_threshold=0.5
+                )
+                detected_lang = info_probe.language if info_probe and info_probe.language else 'en'
+            except Exception:
+                detected_lang = 'en'
+
+            print(f"[captionGen] Whisper language detect (fast): {detected_lang}", file=sys.stderr)
 
             # Strictly allow English ('en') or Hindi ('hi') or Urdu ('ur').
             # Any other language (Arabic, Persian, Russian, Welsh) is noise misdetection -> force 'en'
             target_lang = detected_lang if detected_lang in ['en', 'hi', 'ur'] else 'en'
 
+            # Single-pass transcription with word timestamps (no double pass!)
             segments, info = fw_model.transcribe(
                 audio_src,
                 language=target_lang,
                 word_timestamps=True,
-                beam_size=2,
+                beam_size=1,
                 condition_on_previous_text=False,
                 repetition_penalty=1.2,
                 no_repeat_ngram_size=3,

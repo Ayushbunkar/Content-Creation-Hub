@@ -1532,6 +1532,31 @@
         h: Math.abs(drawCurrent.y - drawStart.y)
       } : activeRect;
 
+      // Force-paint the first frame on all hidden video refs when videoSource resolves
+      React.useEffect(() => {
+        if (!videoSource) return;
+        const refs = [topVideoRef, bgVideoRef, pickerVideoRef, masterVideoRef];
+        refs.forEach(ref => {
+          if (!ref.current) return;
+          const v = ref.current;
+          // Compare using pathname to handle relative vs absolute URL differences
+          const targetPath = videoSource.startsWith('http') ? videoSource : (window.location.origin + videoSource);
+          if (v.src !== targetPath) {
+            v.src = videoSource;
+          }
+          const showFrame = () => {
+            if (v.currentTime === 0 || v.readyState < 2) {
+              v.currentTime = 0.001; // paint first frame immediately
+            }
+          };
+          if (v.readyState >= 1) {
+            showFrame();
+          } else {
+            v.addEventListener('loadedmetadata', showFrame, { once: true });
+          }
+        });
+      }, [videoSource]);
+
       // Synchronize video players (play, pause, scrub)
       const handlePlay = () => {
         if (topVideoRef.current && topVideoRef.current.paused) topVideoRef.current.play().catch(() => {});
@@ -1758,6 +1783,7 @@
                     src={videoSource}
                     muted
                     playsInline
+                    preload="metadata"
                     class="absolute max-w-none max-h-none pointer-events-none"
                     style={{
                       width: `${scaleWPercent}%`,
@@ -1786,6 +1812,7 @@
                     src={videoSource}
                     controls
                     playsInline
+                    preload="metadata"
                     onPlay={handlePlay}
                     onPause={handlePause}
                     onTimeUpdate={handleTimeUpdate}
@@ -1804,6 +1831,7 @@
                   src={videoSource}
                   muted
                   playsInline
+                  preload="metadata"
                   class="absolute inset-0 w-full h-full object-cover pointer-events-none transition-all duration-300"
                   style={{
                     filter: `blur(${blurPx}px) brightness(0.55)`,
@@ -1819,6 +1847,7 @@
                     src={videoSource}
                     controls
                     playsInline
+                    preload="metadata"
                     onPlay={handlePlay}
                     onPause={handlePause}
                     onTimeUpdate={handleTimeUpdate}
@@ -1840,6 +1869,7 @@
                   src={videoSource}
                   controls
                   playsInline
+                  preload="metadata"
                   class="w-full h-full object-cover object-center"
                 />
               </div>
@@ -1856,6 +1886,7 @@
                   src={videoSource}
                   controls
                   playsInline
+                  preload="metadata"
                   class="w-full h-full object-cover transition-transform duration-500"
                   style={{ transform: 'scale(1.25)', transformOrigin: 'center center' }}
                 />
@@ -1870,6 +1901,7 @@
                   src={videoSource}
                   controls
                   playsInline
+                  preload="metadata"
                   class="w-full h-full object-cover object-center"
                 />
               </div>
@@ -1883,6 +1915,7 @@
                   src={videoSource}
                   controls
                   playsInline
+                  preload="metadata"
                   class="w-full h-full object-cover object-center"
                 />
               </div>

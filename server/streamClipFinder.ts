@@ -973,7 +973,7 @@ export class StreamClipFinderService {
       '--caption_style', captionStyle || 'speed_center',
       '--divider_y', String(dividerY || 768),
       '--duration', String(moment.duration || 30),
-      '--model', 'base'
+      '--model', 'tiny'
     ];
 
     return new Promise((resolve) => {
@@ -1024,10 +1024,10 @@ Dialogue: 2,0:00:00.00,${durStr},CenterHook,,0,0,0,,{\\pos(540,${dividerY || 768
 
       const timer = setTimeout(() => {
         try { proc.kill(); } catch (e) {}
-        console.warn('[streamClipper] Caption generation timed out after 35s; ensuring on-screen hook ASS.');
+        console.warn('[streamClipper] Caption generation timed out after 50s; ensuring on-screen hook ASS.');
         ensureHookAssExists();
         resolve({ cues: [], hasSpeech: false });
-      }, 35000);
+      }, 50000);
 
       proc.on('close', () => {
         clearTimeout(timer);
