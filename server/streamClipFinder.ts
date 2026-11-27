@@ -571,12 +571,10 @@ export class StreamClipFinderService {
       if (info.channel) streamerName = info.channel;
     }
 
-    // Ensure yt-dlp is available in Python runtime
-    await this.ensureYtDlp();
-    const venvPy = this.getPythonCmd();
-
     // Step 1: Download actual stream video chunk directly using fast HLS/m3u8 slicing (if not using cached raw clip)
     if (isRealVideo && !usedRawCache) {
+      await this.ensureYtDlp();
+      const venvPy = this.getPythonCmd();
       console.log(`[streamClipper] Resolving direct stream URL for fast cut (${moment.clip_start_formatted} - ${moment.clip_end_formatted})...`);
       
       let streamUrls: string[] = [];
@@ -831,7 +829,7 @@ export class StreamClipFinderService {
     console.log(`[streamClipper] Generating viral captions (style: ${captionStyle}, divider: ${dividerY}px) for moment #${moment.rank}...`);
     const tempAssPath = path.join(process.cwd(), 'storage', 'stream_clips', `captions_${clipId}.ass`);
     const tempJsonPath = path.join(process.cwd(), 'storage', 'stream_clips', `captions_${clipId}.json`);
-    const captionResult = await this.generateClipCaptions(tempRawPath, tempAssPath, tempJsonPath, streamerName, moment, captionStyle, dividerY);
+    const captionResult = await this.generateClipCaptions(tempRawPath, tempAssPath, tempJsonPath, streamerName, moment, captionStyle, dividerY, cachedTranscriptPath);
 
     // Step 3: FFmpeg Dual Split / Gaussian blur / Smart Zoom with burned Center Hook captions
     console.log(`[streamClipper] Cropping and formatting ${cropMode} video (cam: ${camPosition}, blur: ${blurIntensity}) with burned captions...`);
@@ -957,7 +955,8 @@ export class StreamClipFinderService {
     streamerName: string,
     moment: StreamMoment,
     captionStyle: string = 'speed_center',
-    dividerY: number = 768
+    dividerY: number = 768,
+    cachedTranscriptPath?: string
   ): Promise<{ cues: any[]; hasSpeech: boolean }> {
     const venvPy = this.getPythonCmd();
     const scriptPath = path.join(process.cwd(), 'scripts', 'generate_clip_captions.py');
@@ -975,6 +974,9 @@ export class StreamClipFinderService {
       '--duration', String(moment.duration || 30),
       '--model', 'tiny'
     ];
+    if (cachedTranscriptPath) {
+      args.push('--cached_json', cachedTranscriptPath);
+    }
 
     return new Promise((resolve) => {
       const proc = spawn(venvPy, args);
@@ -1110,8 +1112,8 @@ Dialogue: 2,0:00:00.00,${durStr},CenterHook,,0,0,0,,{\\pos(540,${dividerY || 768
 
         const stackFilter =
           `[0:v]split=2[in_cam][in_game];` +
-          `[in_cam]${camCrop},scale=1080:${camH}:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:${camH}[cam];` +
-          `[in_game]crop=iw*0.72:ih:iw*0.14:0,scale=1080:${gameH}:flags=lanczos:force_original_aspect_ratio=increase,crop=1080:${gameH}[game];` +
+          `[in_cam]${camCrop},scale=1080:${camH}:flags=bicubic:force_original_aspect_ratio=increase,crop=1080:${camH}[cam];` +
+          `[in_game]crop=iw*0.72:ih:iw*0.14:0,scale=1080:${gameH}:flags=bicubic:force_original_aspect_ratio=increase,crop=1080:${gameH}[game];` +
           `[cam][game]vstack=inputs=2[v_stacked]`;
 
         if (hasAss) {
@@ -1170,8 +1172,9 @@ Dialogue: 2,0:00:00.00,${durStr},CenterHook,,0,0,0,,{\\pos(540,${dividerY || 768
         '-r', '30',
         '-fps_mode', 'cfr',
         '-c:v', 'libx264',
-        '-preset', 'fast',
-        '-crf', '17',
+        '-preset', 'veryfast',
+        '-crf', '19',
+        '-threads', '0',
         '-b:v', '8500k',
         '-maxrate', '12000k',
         '-bufsize', '16000k',

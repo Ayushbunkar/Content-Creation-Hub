@@ -185,6 +185,69 @@ def extract_audio_wav(media_path: Path, temp_wav: Path) -> bool:
         print(f"[captionGen] audio extraction note: {e}", file=sys.stderr)
         return False
 
+def write_ass_and_json(cues, has_speech, args, ass_path):
+    if not cues:
+        print("[captionGen] No speech detected in segment; leaving captions clean without chat fallback.", file=sys.stderr)
+
+    # Generate ASS with Center Hook Banner and Spoken Voice Word-Highlight
+    active_hook = (args.center_hook or args.hook or '').strip()
+    active_hook = re.sub(r'\s*\(\s*#\d+\s*\)\s*$', '', active_hook).strip()
+
+    is_generic_hook = (
+        not active_hook
+        or "MASSIVE W" in active_hook.upper()
+        or "UNREAL MOMENT" in active_hook.upper()
+        or "CHAT EXPLODED" in active_hook.upper()
+    )
+
+    if is_generic_hook:
+        spoken_text = " ".join(c.get('text', '') for c in cues).lower()
+        if spoken_text:
+            if any(k in spoken_text for k in ['die', 'dying', 'dead', 'kill', 'killed', 'rip', 'survive']):
+                active_hook = "1 HP PE POORA SQUAD WIPE"
+            elif any(k in spoken_text for k in ['calm', 'fine', 'chill', 'relax']):
+                active_hook = "BRO FORGOT IT'S JUST A GAME"
+            elif any(k in spoken_text for k in ['car', 'drive', 'cops', 'police', 'crash', 'driving']):
+                active_hook = "POLICE CHASE GONE WRONG"
+            elif any(k in spoken_text for k in ['money', 'dono', 'paid', 'dollar', 'superchat', 'rich']):
+                active_hook = "CRAZY SUPERCHAT REACTION"
+            elif any(k in spoken_text for k in ['no way', 'nah', 'bro what', 'wait wait']):
+                active_hook = "WAIT FOR THE LAST 3 SECONDS"
+            elif any(k in spoken_text for k in ['stop', 'shut up', 'mad', 'scream', 'help']):
+                active_hook = "KEYBOARD TODNE WALA THA BHAI"
+            elif any(k in spoken_text for k in ['win', 'won', 'lose', 'lost', 'choke']):
+                active_hook = "1 SECOND ME GAME PALAT GAYA"
+            else:
+                active_hook = "WAIT TILL YOU SEE THIS REACTION"
+        else:
+            active_hook = "YE KYA HO GAYA LIVE STREAM PE?!"
+
+    ass_text = build_ass_content(
+        cues,
+        target_width=1080,
+        target_height=1920,
+        margin_v=420,
+        center_hook=active_hook,
+        caption_style=args.caption_style,
+        split_divider_y=args.divider_y,
+        clip_duration=args.duration
+    )
+    with open(ass_path, 'w', encoding='utf-8') as f:
+        f.write(ass_text)
+    print(f"[captionGen] Wrote {len(cues)} creator speech cues (hook: '{active_hook}') to {ass_path}", file=sys.stderr)
+
+    if args.output_json:
+        json_path = Path(args.output_json).resolve()
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump({
+                'has_speech': has_speech,
+                'cues_count': len(cues),
+                'cues': cues
+            }, f, indent=2)
+
+    print(json.dumps({'success': True, 'cues_count': len(cues), 'has_speech': has_speech}))
+
 def main():
     parser = argparse.ArgumentParser(description="Generate 3-4 word viral captions of creator voice at 3/4 position")
     parser.add_argument("input_media", help="Input video or audio file")
@@ -197,6 +260,7 @@ def main():
     parser.add_argument("--divider_y", type=int, default=768, help="Y position of center hook banner")
     parser.add_argument("--duration", type=float, default=30.0, help="Clip duration")
     parser.add_argument("--model", default="base", help="Whisper model (tiny, base)")
+    parser.add_argument("--cached_json", default=None, help="Persistent transcript cache JSON path to skip Whisper on re-render/save")
     args = parser.parse_args()
 
     input_path = Path(args.input_media).resolve()
@@ -225,6 +289,21 @@ def main():
     except Exception:
         pass
 
+    if args.cached_json:
+        cache_p = Path(args.cached_json).resolve()
+        if cache_p.exists():
+            try:
+                with open(cache_p, 'r', encoding='utf-8') as cf:
+                    cached_data = json.load(cf)
+                if isinstance(cached_data, dict) and 'cues' in cached_data:
+                    cues = cached_data.get('cues') or []
+                    has_speech = bool(cached_data.get('has_speech', len(cues) > 0))
+                    print(f"[captionGen] FAST SAVE: Loaded {len(cues)} cached cues from {cache_p.name} (0s Whisper)", file=sys.stderr)
+                    write_ass_and_json(cues, has_speech, args, ass_path)
+                    return
+            except Exception as cache_err:
+                print(f"[captionGen] Cache read note: {cache_err}", file=sys.stderr)
+
     try:
         # Pre-extract normalized 16kHz audio for maximum transcription accuracy
         has_wav = extract_audio_wav(input_path, temp_wav)
@@ -241,10 +320,6 @@ def main():
         try:
             import torch
             from faster_whisper import WhisperModel
-            import sys
-            import os
-            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-            from transcribe_words import devanagari_to_hinglish, urdu_to_hinglish, to_roman_hinglish, has_devanagari, has_urdu
 
             device = "cuda" if torch.cuda.is_available() else "cpu"
             compute_type = "float16" if device == "cuda" else "int8"
@@ -428,70 +503,21 @@ def main():
             except Exception:
                 pass
 
-    # If no speech was found at all in the audio track, do NOT inject fake chat slogans!
-    # Instead, leave cues clean so we don't display unwanted spam like 'CHAT GOING CRAZY'
-    if not cues:
-        print("[captionGen] No speech detected in segment; leaving captions clean without chat fallback.", file=sys.stderr)
+    # Save persistent transcript cache so future Saves/re-renders skip Whisper completely
+    if args.cached_json:
+        try:
+            cache_p = Path(args.cached_json).resolve()
+            cache_p.parent.mkdir(parents=True, exist_ok=True)
+            with open(cache_p, 'w', encoding='utf-8') as cf:
+                json.dump({
+                    'has_speech': has_speech,
+                    'cues_count': len(cues),
+                    'cues': cues
+                }, cf, indent=2)
+        except Exception:
+            pass
 
-    # Generate ASS with Center Hook Banner and Spoken Voice Word-Highlight
-    active_hook = (args.center_hook or args.hook or '').strip()
-    active_hook = re.sub(r'\s*\(\s*#\d+\s*\)\s*$', '', active_hook).strip()
-
-    is_generic_hook = (
-        not active_hook
-        or "MASSIVE W" in active_hook.upper()
-        or "UNREAL MOMENT" in active_hook.upper()
-        or "CHAT EXPLODED" in active_hook.upper()
-    )
-
-    # Only fill in a speech-derived hook if no custom/pipeline hook was provided
-    if is_generic_hook:
-        spoken_text = " ".join(c.get('text', '') for c in cues).lower()
-        if spoken_text:
-            if any(k in spoken_text for k in ['die', 'dying', 'dead', 'kill', 'killed', 'rip', 'survive']):
-                active_hook = "1 HP PE POORA SQUAD WIPE"
-            elif any(k in spoken_text for k in ['calm', 'fine', 'chill', 'relax']):
-                active_hook = "BRO FORGOT IT'S JUST A GAME"
-            elif any(k in spoken_text for k in ['car', 'drive', 'cops', 'police', 'crash', 'driving']):
-                active_hook = "POLICE CHASE GONE WRONG"
-            elif any(k in spoken_text for k in ['money', 'dono', 'paid', 'dollar', 'superchat', 'rich']):
-                active_hook = "CRAZY SUPERCHAT REACTION"
-            elif any(k in spoken_text for k in ['no way', 'nah', 'bro what', 'wait wait']):
-                active_hook = "WAIT FOR THE LAST 3 SECONDS"
-            elif any(k in spoken_text for k in ['stop', 'shut up', 'mad', 'scream', 'help']):
-                active_hook = "KEYBOARD TODNE WALA THA BHAI"
-            elif any(k in spoken_text for k in ['win', 'won', 'lose', 'lost', 'choke']):
-                active_hook = "1 SECOND ME GAME PALAT GAYA"
-            else:
-                active_hook = "WAIT TILL YOU SEE THIS REACTION"
-        else:
-            active_hook = "YE KYA HO GAYA LIVE STREAM PE?!"
-
-    ass_text = build_ass_content(
-        cues,
-        target_width=1080,
-        target_height=1920,
-        margin_v=420,
-        center_hook=active_hook,
-        caption_style=args.caption_style,
-        split_divider_y=args.divider_y,
-        clip_duration=args.duration
-    )
-    with open(ass_path, 'w', encoding='utf-8') as f:
-        f.write(ass_text)
-    print(f"[captionGen] Wrote {len(cues)} creator speech cues (hook: '{active_hook}') to {ass_path}", file=sys.stderr)
-
-    if args.output_json:
-        json_path = Path(args.output_json).resolve()
-        json_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(json_path, 'w', encoding='utf-8') as f:
-            json.dump({
-                'has_speech': has_speech,
-                'cues_count': len(cues),
-                'cues': cues
-            }, f, indent=2)
-
-    print(json.dumps({'success': True, 'cues_count': len(cues), 'has_speech': has_speech}))
+    write_ass_and_json(cues, has_speech, args, ass_path)
 
 if __name__ == '__main__':
     main()
